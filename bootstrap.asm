@@ -1,5 +1,6 @@
 bits 32
 
+
 section .text
 ; Multiboot2 header
 
@@ -23,16 +24,17 @@ dd 8
 
 ; Multiboot2 header end
 
+
+extern kernel_main
+
 mov esp, kernel_stack + KERNEL_STACK_SIZE
-
-mov word [0x000B8000], 0x2841
-
+call kernel_main
 jmp $
-
-KERNEL_STACK_SIZE equ 8192
 
 
 section .bss
+
+KERNEL_STACK_SIZE equ 8192
 
 align 4                                     
 kernel_stack:
