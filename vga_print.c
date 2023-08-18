@@ -7,8 +7,8 @@ u16* const TEXT_BUFFER = (u16*) 0x000B8000;
 
 u16 cur_row = ROW_NUMBER - 1;
 u16 cur_col = 0;
-enum VGA_Color cur_foreground = WHITE;
-enum VGA_Color cur_background = BLACK;
+VGA_Color cur_foreground = WHITE;
+VGA_Color cur_background = BLACK;
 
 void new_line();
 
@@ -45,7 +45,7 @@ void new_line() {
     cur_col = 0;
 }
 
-void print_char_with_color(u16 row, u16 col, char ch, enum VGA_Color foreground, enum VGA_Color background) {
+void print_char_with_color(u16 row, u16 col, char ch, VGA_Color foreground, VGA_Color background) {
     TEXT_BUFFER[row * COLUMN_WIDTH + col] = (background << 12) | (foreground << 8) | ch;
 }
 

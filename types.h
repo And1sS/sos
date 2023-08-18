@@ -10,4 +10,8 @@
 #define i32 signed int
 #define u32 unsigned int
 
+#define bool u8
+#define true 1
+#define false 0
+
 #endif // TYPES_H

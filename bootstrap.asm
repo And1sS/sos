@@ -31,6 +31,24 @@ mov esp, kernel_stack + KERNEL_STACK_SIZE
 call kernel_main
 jmp $
 
+global load_gdt
+load_gdt:
+mov eax, dword [esp + 4]
+lgdt [eax]
+
+jmp 08h:temp
+temp:
+
+mov eax, 0x10
+mov ds, eax
+mov ss, eax
+
+mov eax, 0
+mov es, eax
+mov fs, eax
+mov gs, eax
+
+ret
 
 section .bss
 

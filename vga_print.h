@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-enum VGA_Color {
+typedef enum {
     BLACK = 0,
     BLUE = 1,
     GREEN = 2,
@@ -20,7 +20,7 @@ enum VGA_Color {
     LIGHT_MAGENTA = 13,
     YELLOW = 14,
     WHITE = 15
-};
+} VGA_Color;
 
 extern const u16 COLUMN_WIDTH;
 extern const u16 ROW_NUMBER;
@@ -28,7 +28,8 @@ extern const u16 ROW_NUMBER;
 void print_char(char ch);
 void print(const char* str);
 void println(const char* str);
-void print_char_with_color(u16 row, u16 col, char ch, enum VGA_Color foreground, enum VGA_Color background);
+void print_char_with_color(u16 row, u16 col, char ch, VGA_Color foreground,
+                           VGA_Color background);
 void clear_screen();
 
 #endif // VGA_PRINT_H
