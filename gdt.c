@@ -10,5 +10,5 @@ const segment_descriptor gdt_data[5] = {
 
 const gdt_descriptor gdt = {
     .data = gdt_data,
-    .limit = sizeof(gdt_data),
+    .limit = sizeof(gdt_data) - 1,
 };

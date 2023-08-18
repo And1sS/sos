@@ -16,7 +16,7 @@
 #define gen_code_segment_descriptor_8_15_flags(                                \
     present, dpl, descriptor_type, conforming, read_enabled, accessed)         \
     ((((present) &1) << SEGMENT_PRESENT_OFFSET)                                \
-     | (((dpl) &1) << DESCRIPTOR_PRIVILEGE_LEVEL_OFFSET)                       \
+     | (((dpl) &0b11) << DESCRIPTOR_PRIVILEGE_LEVEL_OFFSET)                    \
      | (((descriptor_type) &1) << DESCRIPTOR_TYPE_OFFSET)                      \
      | (1 << DATA_OR_CODE_OFFSET) | (((conforming) &1) << CONFORMING_OFFSET)   \
      | (((read_enabled) &1) << READ_ENABLE_OFFSET)                             \
@@ -26,7 +26,7 @@
                                                expansion_direction,            \
                                                write_enabled, accessed)        \
     ((((present) &1) << SEGMENT_PRESENT_OFFSET)                                \
-     | (((dpl) &1) << DESCRIPTOR_PRIVILEGE_LEVEL_OFFSET)                       \
+     | (((dpl) &0b11) << DESCRIPTOR_PRIVILEGE_LEVEL_OFFSET)                    \
      | (((descriptor_type) &1) << DESCRIPTOR_TYPE_OFFSET)                      \
      | (0 << DATA_OR_CODE_OFFSET)                                              \
      | (((expansion_direction) &1) << EXPANSION_OFFSET)                        \
@@ -48,7 +48,7 @@
      | ((available_for_system) << AVAILABLE_FOR_SYSTEM_OFFSET)                 \
      | ((segment_limit_16_23) << SEGMENT_LIMIT_16_19_OFFSET))
 
-typedef struct __attribute__((__packed__)) {
+typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 segment_limit_0_15;
     u32 base_addr_0_23 : 24;
     u8 flags_8_15;

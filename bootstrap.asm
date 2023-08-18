@@ -27,28 +27,51 @@ dd 8
 
 extern kernel_main
 
-mov esp, kernel_stack + KERNEL_STACK_SIZE
-call kernel_main
-jmp $
+start:
+    mov esp, kernel_stack + KERNEL_STACK_SIZE
+    jmp kernel_main
+    jmp $
+
 
 global load_gdt
 load_gdt:
-mov eax, dword [esp + 4]
-lgdt [eax]
+    mov eax, dword [esp + 4]
+    lgdt [eax]
 
-jmp 08h:temp
+    jmp 08h:temp
 temp:
 
-mov eax, 0x10
-mov ds, eax
-mov ss, eax
+    mov eax, 0x10
+    mov ds, eax
+    mov ss, eax
 
-mov eax, 0
-mov es, eax
-mov fs, eax
-mov gs, eax
+    mov eax, 0
+    mov es, eax
+    mov fs, eax
+    mov gs, eax
 
-ret
+    ret
+
+
+global load_idt
+load_idt:
+    mov eax, dword [esp + 4]
+    lidt [eax]
+
+    sti
+    ret
+
+extern handle_interrupt
+global handle_interrupt_asm
+handle_interrupt_asm:
+    cli
+    pushad
+
+    call handle_interrupt
+
+    popad
+    sti
+    iret
 
 section .bss
 
