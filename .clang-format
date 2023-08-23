@@ -2,3 +2,4 @@ IndentWidth: 4
 PointerAlignment: Left
 SpaceAfterCStyleCast: true
 BreakBeforeBinaryOperators: NonAssignment
+PenaltyReturnTypeOnItsOwnLine: 1000000

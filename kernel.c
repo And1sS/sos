@@ -3,10 +3,10 @@
 #include "types.h"
 #include "vga_print.h"
 
+void init();
+
 _Noreturn void kernel_main() {
-    load_gdt(&gdt);
-    init_idt();
-    load_idt(&idt);
+    init();
 
     clear_screen();
     for (char i = '0'; i < '2'; i++) {
@@ -19,4 +19,9 @@ _Noreturn void kernel_main() {
 
     while (true) {
     }
+}
+
+void init() {
+    init_gdt();
+    init_idt();
 }

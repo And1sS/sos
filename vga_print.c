@@ -36,17 +36,21 @@ void println(const char* str) {
 void new_line() {
     for (u16 row = 0; row < ROW_NUMBER - 1; row++) {
         for (u16 col = 0; col < COLUMN_WIDTH; col++) {
-            TEXT_BUFFER[row * COLUMN_WIDTH + col] = TEXT_BUFFER[(row + 1) * COLUMN_WIDTH + col];
+            TEXT_BUFFER[row * COLUMN_WIDTH + col] =
+                TEXT_BUFFER[(row + 1) * COLUMN_WIDTH + col];
         }
     }
     for (u16 col = 0; col < COLUMN_WIDTH; col++) {
-        print_char_with_color(ROW_NUMBER - 1, col, ' ', cur_background, cur_background);
+        print_char_with_color(ROW_NUMBER - 1, col, ' ', cur_background,
+                              cur_background);
     }
     cur_col = 0;
 }
 
-void print_char_with_color(u16 row, u16 col, char ch, VGA_Color foreground, VGA_Color background) {
-    TEXT_BUFFER[row * COLUMN_WIDTH + col] = (background << 12) | (foreground << 8) | ch;
+void print_char_with_color(u16 row, u16 col, char ch, VGA_Color foreground,
+                           VGA_Color background) {
+    TEXT_BUFFER[row * COLUMN_WIDTH + col] =
+        (background << 12) | (foreground << 8) | ch;
 }
 
 void clear_screen() {
