@@ -52,27 +52,6 @@ temp:
 
     ret
 
-
-global load_idt
-load_idt:
-    mov eax, dword [esp + 4]
-    lidt [eax]
-
-    sti
-    ret
-
-extern handle_interrupt
-global handle_interrupt_asm
-handle_interrupt_asm:
-    cli
-    pushad
-
-    call handle_interrupt
-
-    popad
-    sti
-    iret
-
 section .bss
 
 KERNEL_STACK_SIZE equ 8192

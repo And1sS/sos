@@ -77,7 +77,7 @@ u8 gen_segment_descriptor_16_23_flags(bit granularity,
            | (segment_limit_16_19 << SEGMENT_LIMIT_16_19_OFFSET);
 }
 
-segment_descriptor gen_null_segment_decriptor() {
+segment_descriptor gen_null_segment_decriptor(void) {
     segment_descriptor result = {};
     return result;
 }
@@ -138,7 +138,7 @@ segment_descriptor gen_task_state_segment_descriptor(
 
 extern void load_gdt(const gdt_descriptor* gdt);
 
-void init_gdt() {
+void init_gdt(void) {
     gdt_data[0] = gen_null_segment_decriptor();
     gdt_data[1] =
         gen_code_segment_descriptor(0, 0xFFFFF, 1, 1, 0, 1, 1, 0, 0, 0, 0);

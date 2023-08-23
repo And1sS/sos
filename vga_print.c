@@ -10,9 +10,9 @@ u16 cur_col = 0;
 VGA_Color cur_foreground = WHITE;
 VGA_Color cur_background = BLACK;
 
-void new_line();
+__attribute__((no_caller_saved_registers)) void new_line(void);
 
-void print_char(char ch) {
+__attribute__((no_caller_saved_registers)) void print_char(char ch) {
     if (ch == '\n' || cur_col == COLUMN_WIDTH) {
         new_line();
     } else {
@@ -21,19 +21,19 @@ void print_char(char ch) {
     }
 }
 
-void print(const char* str) {
+__attribute__((no_caller_saved_registers)) void print(const char* str) {
     while (*str) {
         print_char(*str);
         str++;
     }
 }
 
-void println(const char* str) {
+__attribute__((no_caller_saved_registers)) void println(const char* str) {
     print(str);
     print_char('\n');
 }
 
-void new_line() {
+__attribute__((no_caller_saved_registers)) void new_line(void) {
     for (u16 row = 0; row < ROW_NUMBER - 1; row++) {
         for (u16 col = 0; col < COLUMN_WIDTH; col++) {
             TEXT_BUFFER[row * COLUMN_WIDTH + col] =
@@ -47,13 +47,13 @@ void new_line() {
     cur_col = 0;
 }
 
-void print_char_with_color(u16 row, u16 col, char ch, VGA_Color foreground,
-                           VGA_Color background) {
+__attribute__((no_caller_saved_registers)) void print_char_with_color(
+    u16 row, u16 col, char ch, VGA_Color foreground, VGA_Color background) {
     TEXT_BUFFER[row * COLUMN_WIDTH + col] =
         (background << 12) | (foreground << 8) | ch;
 }
 
-void clear_screen() {
+__attribute__((no_caller_saved_registers)) void clear_screen(void) {
     for (u16 row = 0; row < ROW_NUMBER; row++) {
         for (u16 col = 0; col < COLUMN_WIDTH; col++) {
             print_char_with_color(row, col, ' ', WHITE, BLACK);

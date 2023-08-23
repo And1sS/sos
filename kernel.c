@@ -3,9 +3,9 @@
 #include "types.h"
 #include "vga_print.h"
 
-void init();
+void init(void);
 
-_Noreturn void kernel_main() {
+_Noreturn void kernel_main(void) {
     init();
 
     clear_screen();
@@ -21,7 +21,7 @@ _Noreturn void kernel_main() {
     }
 }
 
-void init() {
+void init(void) {
     init_gdt();
     init_idt();
 }

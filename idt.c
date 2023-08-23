@@ -1,6 +1,6 @@
 #include "idt.h"
+#include "interrupt_handlers.h"
 #include "types.h"
-#include "vga_print.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 offset_0_15;
@@ -24,9 +24,6 @@ interrupt_descriptor idt_data[32];
 const idt_descriptor idt = {.data = idt_data, .limit = sizeof(idt_data) - 1};
 
 extern void load_idt(const idt_descriptor* idt);
-extern void handle_interrupt_asm();
-
-void handle_interrupt() { println("Received interrupt"); }
 
 u8 gen_interrupt_descriptor_flags(bit present, u8 dpl, bit size,
                                   bit gate_type) {
@@ -49,12 +46,12 @@ interrupt_descriptor gen_interrupt_descriptor(u16 segment_selector, u32 offset,
     return result;
 }
 
-void init_idt() {
+void init_idt(void) {
     for (int i = 0; i < 32; i++) {
-        interrupt_descriptor temp = gen_interrupt_descriptor(
-            0x08, (int) handle_interrupt_asm, 1, 0, 1, 0);
-        idt_data[i] = temp;
+        idt_data[i] = gen_interrupt_descriptor(
+            0x08, (u32) interrupt_handlers[i], 1, 0, 1, 0);
     }
 
-    load_idt(&idt);
+    __asm__("lidt %0" : : "m"(idt));
+    __asm__("sti");
 }

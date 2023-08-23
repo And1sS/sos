@@ -25,11 +25,11 @@ typedef enum {
 extern const u16 COLUMN_WIDTH;
 extern const u16 ROW_NUMBER;
 
-void print_char(char ch);
-void print(const char* str);
-void println(const char* str);
-void print_char_with_color(u16 row, u16 col, char ch, VGA_Color foreground,
-                           VGA_Color background);
-void clear_screen();
+__attribute__((no_caller_saved_registers)) void print_char(char ch);
+__attribute__((no_caller_saved_registers)) void print(const char* str);
+__attribute__((no_caller_saved_registers)) void println(const char* str);
+__attribute__((no_caller_saved_registers)) void print_char_with_color(
+    u16 row, u16 col, char ch, VGA_Color foreground, VGA_Color background);
+__attribute__((no_caller_saved_registers)) void clear_screen(void);
 
 #endif // VGA_PRINT_H
