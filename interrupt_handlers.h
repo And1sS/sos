@@ -3,9 +3,6 @@
 
 #include "types.h"
 
-__attribute__((no_caller_saved_registers)) void handle_interrupt(
-    u8 interrupt_number);
-
 __attribute__((__interrupt__)) void handle_interrupt_0(void* frame);
 __attribute__((__interrupt__)) void handle_interrupt_1(void* frame);
 __attribute__((__interrupt__)) void handle_interrupt_2(void* frame);
@@ -39,6 +36,23 @@ __attribute__((__interrupt__)) void handle_interrupt_29(void* frame);
 __attribute__((__interrupt__)) void handle_interrupt_30(void* frame);
 __attribute__((__interrupt__)) void handle_interrupt_31(void* frame);
 
-extern void* interrupt_handlers[32];
+__attribute__((__interrupt__)) void handle_interrupt_32(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_33(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_34(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_35(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_36(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_37(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_38(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_39(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_40(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_41(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_42(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_43(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_44(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_45(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_46(void* frame);
+__attribute__((__interrupt__)) void handle_interrupt_47(void* frame);
+
+extern void* interrupt_handlers[48];
 
 #endif // INTERRUPT_HANDLERS_H

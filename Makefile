@@ -15,7 +15,7 @@ ISO_FILE = $(BUILD_FOLDER)/sos.iso
 CROSS_COMPILE = x86_64-elf-
 ASM = nasm
 CC = gcc
-CC_FLAGS = -c -g -m32 -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs \
+CC_FLAGS = -c -g -O3 -m32 -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs \
 		   -Wall -Wextra -Werror
 LINKER = ld
 

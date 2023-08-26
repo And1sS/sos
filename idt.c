@@ -1,6 +1,6 @@
 #include "idt.h"
 #include "interrupt_handlers.h"
-#include "types.h"
+#include "io.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 offset_0_15;
@@ -20,13 +20,14 @@ const int DPL_OFFSET = 5;
 const int SIZE_OFFSET = 3;
 const int INTERRUPT_TYPE_OFFSET = 0;
 
-interrupt_descriptor idt_data[32];
+interrupt_descriptor idt_data[48];
 const idt_descriptor idt = {.data = idt_data, .limit = sizeof(idt_data) - 1};
 
 extern void load_idt(const idt_descriptor* idt);
 
 u8 gen_interrupt_descriptor_flags(bit present, u8 dpl, bit size,
                                   bit gate_type) {
+
     return ((present & 1) << PRESENT_OFFSET) | ((dpl & 0b11) << DPL_OFFSET)
            | ((size & 1) << SIZE_OFFSET)
            | ((gate_type & 1) << INTERRUPT_TYPE_OFFSET) | 0b110;
@@ -46,12 +47,94 @@ interrupt_descriptor gen_interrupt_descriptor(u16 segment_selector, u32 offset,
     return result;
 }
 
+const u8 ICW1_ICW4_OFFSET = 0;
+const u8 ICW1_SINGLE_MODE_OFFSET = 1;
+const u8 ICW1_CALL_ADDRESS_INTERVAL_OFFSET = 2;
+const u8 ICW1_LEVEL_TRIGGERED_MODE = 3;
+
+const u8 ICW4_8086_MODE_OFFSET = 0;
+const u8 ICW4_AUTO_EOI_OFFSET = 1;
+const u8 ICW4_BUFFERED_MODE_OFFSET = 2;
+const u8 ICW4_SPECIAL_FULLY_NESTED_MODE_OFFSET = 4;
+
+typedef enum {
+    NON_BUFFERED = 0,
+    SLAVE_BUFFERED_MODE = 0b10,
+    MASTER_BUFFERED_MODE = 0b11
+} pic_buffered_mode;
+
+u8 gen_icw1(bool icw4_needed, bool in_single_mode, bit call_address_interval,
+            bool in_level_triggered_mode) {
+
+    return ((icw4_needed & 1) << ICW1_ICW4_OFFSET)
+           | ((in_single_mode & 1) << ICW1_SINGLE_MODE_OFFSET)
+           | ((call_address_interval & 1) << ICW1_CALL_ADDRESS_INTERVAL_OFFSET)
+           | ((in_level_triggered_mode & 1) << ICW1_LEVEL_TRIGGERED_MODE)
+           | (1 << 4);
+}
+
+u8 gen_icw2(u8 interrupt_offset) { return interrupt_offset & 0b11111000; }
+
+// slave on irq 2
+u8 gen_icw3_master() { return 1 << 2; }
+
+u8 gen_icw3_slave() { return 2; }
+
+u8 gen_icw4(bool in_auto_eoi_mode, pic_buffered_mode buffered_mode,
+            bool in_special_fully_nested_mode) {
+
+    return (1 << ICW4_8086_MODE_OFFSET)
+           | ((in_auto_eoi_mode & 1) << ICW4_AUTO_EOI_OFFSET)
+           | (buffered_mode << ICW4_BUFFERED_MODE_OFFSET)
+           | ((in_special_fully_nested_mode & 1)
+              << ICW4_SPECIAL_FULLY_NESTED_MODE_OFFSET);
+}
+
+const u16 MASTER_PIC_COMMAND_ADDR = 0x20;
+const u16 MASTER_PIC_DATA_ADDR = 0x21;
+const u16 SLAVE_PIC_COMMAND_ADDR = 0xA0;
+const u16 SLAVE_PIC_DATA_ADDR = 0xA1;
+
+void init_pic(void) {
+    u8 icw1 = gen_icw1(true, false, 0, false);
+    outb(MASTER_PIC_COMMAND_ADDR, icw1);
+    io_wait();
+    outb(SLAVE_PIC_COMMAND_ADDR, icw1);
+    io_wait();
+
+    outb(MASTER_PIC_DATA_ADDR, gen_icw2(32));
+    io_wait();
+    outb(SLAVE_PIC_DATA_ADDR, gen_icw2(40));
+    io_wait();
+
+    outb(MASTER_PIC_DATA_ADDR, gen_icw3_master());
+    io_wait();
+    outb(SLAVE_PIC_DATA_ADDR, gen_icw3_slave());
+    io_wait();
+
+    u8 icw4 = gen_icw4(false, NON_BUFFERED, false);
+    outb(MASTER_PIC_DATA_ADDR, icw4);
+    io_wait();
+    outb(SLAVE_PIC_DATA_ADDR, icw4);
+    io_wait();
+
+    // enable all interrupts
+    u8 ocw1 = 0;
+    outb(MASTER_PIC_DATA_ADDR, ocw1);
+    io_wait();
+    outb(SLAVE_PIC_DATA_ADDR, ocw1);
+    io_wait();
+}
+
 void init_idt(void) {
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 48; i++) {
         idt_data[i] = gen_interrupt_descriptor(
             0x08, (u32) interrupt_handlers[i], 1, 0, 1, 0);
     }
 
-    __asm__("lidt %0" : : "m"(idt));
-    __asm__("sti");
+    __asm__ volatile("lidt %0" : : "m"(idt));
+
+    init_pic();
+
+    __asm__ volatile("sti");
 }
