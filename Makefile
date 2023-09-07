@@ -1,8 +1,8 @@
 BUILD_FOLDER = build_output
 
-H_FILES := $(shell find . -name '*.h')
-SOURCE_FILES := $(shell find . -name '*.c')
-OBJ_FILES := $(patsubst %.c, $(BUILD_FOLDER)/%.o, $(SOURCE_FILES))
+H_FILES := $(shell find ./source -name '*.h')
+SOURCE_FILES := $(shell find ./source -name '*.c')
+OBJ_FILES := $(patsubst ./source/%.c, $(BUILD_FOLDER)/%.o, $(SOURCE_FILES))
 
 BOOTSTRAP_ELF = $(BUILD_FOLDER)/bootstrap.elf
 KERNEL_ELF = $(BUILD_FOLDER)/sos_kernel.elf
@@ -43,10 +43,10 @@ $(ISO_GRUB_CFG): grub.cfg
 $(KERNEL_ELF): $(BOOTSTRAP_ELF) $(OBJ_FILES)
 	$(CROSS_COMPILE)$(LINKER) -melf_i386 -Tlinker.ld $(BOOTSTRAP_ELF) $(OBJ_FILES) -o $(KERNEL_ELF)
 
-$(BOOTSTRAP_ELF): bootstrap.asm
+$(BOOTSTRAP_ELF): source/bootstrap.asm
 	mkdir -p $(@D)
 	$(ASM) -f elf32 -o $@ $<
 
-$(BUILD_FOLDER)/%.o: %.c $(H_FILES)
+$(BUILD_FOLDER)/%.o: source/%.c $(H_FILES)
 	mkdir -p $(@D)
 	$(CROSS_COMPILE)$(CC) $(CC_FLAGS) -o $@ $<

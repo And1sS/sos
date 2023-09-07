@@ -39,12 +39,12 @@ const u8 OCW2_EOI_OFFSET = 5;
 
 __attribute__((no_caller_saved_registers)) void handle_interrupt(
     u8 interrupt_number) {
-    u8 i1 = interrupt_number / 10;
-    u8 i2 = interrupt_number % 10;
+    static u32 count = 0;
 
     print("Received interrupt #");
-    print_char('0' + i1);
-    print_char('0' + i2);
+    print_u32(interrupt_number);
+    print(": ");
+    print_u32(count++);
     print_char('\n');
 }
 

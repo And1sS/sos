@@ -2,6 +2,7 @@
 #include "idt.h"
 #include "types.h"
 #include "vga_print.h"
+#include "timer.h"
 
 void init(void);
 
@@ -23,5 +24,6 @@ _Noreturn void kernel_main(void) {
 
 void init(void) {
     init_gdt();
+    init_timer();
     init_idt();
 }

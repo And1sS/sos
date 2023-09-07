@@ -85,7 +85,7 @@ u8 gen_icw4(bool in_auto_eoi_mode, pic_buffered_mode buffered_mode,
 
     return (1 << ICW4_8086_MODE_OFFSET)
            | ((in_auto_eoi_mode & 1) << ICW4_AUTO_EOI_OFFSET)
-           | (buffered_mode << ICW4_BUFFERED_MODE_OFFSET)
+           | ((buffered_mode & 0b11) << ICW4_BUFFERED_MODE_OFFSET)
            | ((in_special_fully_nested_mode & 1)
               << ICW4_SPECIAL_FULLY_NESTED_MODE_OFFSET);
 }

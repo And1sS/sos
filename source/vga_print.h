@@ -25,6 +25,7 @@ typedef enum {
 extern const u16 COLUMN_WIDTH;
 extern const u16 ROW_NUMBER;
 
+__attribute__((no_caller_saved_registers)) void print_u32(u32 x);
 __attribute__((no_caller_saved_registers)) void print_char(char ch);
 __attribute__((no_caller_saved_registers)) void print(const char* str);
 __attribute__((no_caller_saved_registers)) void println(const char* str);

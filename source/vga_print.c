@@ -62,3 +62,23 @@ __attribute__((no_caller_saved_registers)) void clear_screen(void) {
     cur_row = ROW_NUMBER - 1;
     cur_col = 0;
 }
+
+__attribute__((no_caller_saved_registers)) void print_u32(u32 x) {
+    if (x == 0) {
+        print_char('0');
+        return;
+    }
+
+    u8 digits[10];
+
+    i8 digit_count = 0;
+    while (x > 0) {
+        digits[digit_count++] = x % 10;
+        x /= 10;
+    }
+
+    digit_count--;
+    while (digit_count >= 0) {
+        print_char(digits[digit_count--] + '0');
+    }
+}

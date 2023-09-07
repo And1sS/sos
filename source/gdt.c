@@ -148,6 +148,6 @@ void init_gdt(void) {
         gen_code_segment_descriptor(0, 0xFFFFF, 1, 1, 0, 0, 1, 3, 0, 0, 0);
     gdt_data[4] =
         gen_data_segment_descriptor(0, 0xFFFFF, 1, 1, 0, 0, 1, 3, 0, 1, 0);
-    gdt_data[5] = gen_task_state_segment_descriptor(0, 0xFFFFF, 1, 1, 1, 0, 0);
+    //gdt_data[5] = gen_task_state_segment_descriptor(0, 0xFFFFF, 1, 1, 1, 0, 0);
     load_gdt(&gdt);
 }
