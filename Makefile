@@ -15,14 +15,15 @@ ISO_FILE = $(BUILD_FOLDER)/sos.iso
 CROSS_COMPILE = x86_64-elf-
 ASM = nasm
 CC = gcc
-CC_FLAGS = -c -g -O3 -m32 -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs \
+CC_FLAGS = -c -g -O3 -m64 -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
 		   -Wall -Wextra -Werror
+QEMU_FLAGS = -D ./log.txt -d int,cpu_reset -no-reboot
 LINKER = ld
 
 all: iso
 
 run: iso
-	qemu-system-x86_64 -cdrom $(ISO_FILE)
+	qemu-system-x86_64 -cdrom $(ISO_FILE) $(QEMU_FLAGS)
 
 iso: $(ISO_FILE)
 
@@ -41,11 +42,11 @@ $(ISO_GRUB_CFG): grub.cfg
 	cp $< $@
 
 $(KERNEL_ELF): $(BOOTSTRAP_ELF) $(OBJ_FILES)
-	$(CROSS_COMPILE)$(LINKER) -melf_i386 -Tlinker.ld $(BOOTSTRAP_ELF) $(OBJ_FILES) -o $(KERNEL_ELF)
+	$(CROSS_COMPILE)$(LINKER) -melf_x86_64 -Tlinker.ld $(BOOTSTRAP_ELF) $(OBJ_FILES) -o $(KERNEL_ELF)
 
 $(BOOTSTRAP_ELF): source/bootstrap.asm
 	mkdir -p $(@D)
-	$(ASM) -f elf32 -o $@ $<
+	$(ASM) -f elf64 -o $@ $<
 
 $(BUILD_FOLDER)/%.o: source/%.c $(H_FILES)
 	mkdir -p $(@D)

@@ -10,6 +10,9 @@
 #define i32 signed int
 #define u32 unsigned int
 
+#define i64 long
+#define u64 unsigned long
+
 #define bit u8
 #define bool u8
 #define true 1

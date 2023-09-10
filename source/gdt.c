@@ -136,18 +136,34 @@ segment_descriptor gen_task_state_segment_descriptor(
     return result;
 }
 
-extern void load_gdt(const gdt_descriptor* gdt);
-
 void init_gdt(void) {
     gdt_data[0] = gen_null_segment_decriptor();
+
+    // in long mode default operation size flag should be zero, base and limits
+    // are ignored
     gdt_data[1] =
-        gen_code_segment_descriptor(0, 0xFFFFF, 1, 1, 0, 1, 1, 0, 0, 0, 0);
+        gen_code_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 1, 1, 0, 0, 0, 0);
     gdt_data[2] =
-        gen_data_segment_descriptor(0, 0xFFFFF, 1, 1, 0, 1, 1, 0, 0, 1, 0);
+        gen_data_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 1, 1, 0, 0, 1, 0);
     gdt_data[3] =
-        gen_code_segment_descriptor(0, 0xFFFFF, 1, 1, 0, 0, 1, 3, 0, 0, 0);
+        gen_code_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 0, 1, 3, 0, 0, 0);
     gdt_data[4] =
-        gen_data_segment_descriptor(0, 0xFFFFF, 1, 1, 0, 0, 1, 3, 0, 1, 0);
-    //gdt_data[5] = gen_task_state_segment_descriptor(0, 0xFFFFF, 1, 1, 1, 0, 0);
-    load_gdt(&gdt);
+        gen_data_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 0, 1, 3, 0, 1, 0);
+    // gdt_data[5] = gen_task_state_segment_descriptor(0, 0xFFFFF, 1, 1, 1, 0,
+    // 0);
+
+    __asm__ volatile("    lgdt (%%rax)\n"
+                     "    pushq $0x8\n"
+                     "    pushq $tmp%=\n"
+                     "    retfq\n" // far ret to force cs register reloading
+                     "tmp%=:\n"
+                     "    mov $0x10, %%rax\n"
+                     "    mov %%rax, %%ds\n"
+                     "    mov %%rax, %%ss\n"
+                     "    mov $0, %%rax\n"
+                     "    mov %%rax, %%es\n"
+                     "    mov %%rax, %%fs\n"
+                     "    mov %%rax, %%gs"
+                     :
+                     : "a"(&gdt));
 }
