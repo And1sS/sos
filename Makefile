@@ -40,7 +40,7 @@ $(ISO_GRUB_CFG): grub.cfg
 	mkdir -p $(@D)
 	cp $< $@
 
-$(KERNEL_ELF): $(BOOTSTRAP_ELF) $(OBJ_FILES)
+$(KERNEL_ELF): $(BOOTSTRAP_ELF) $(OBJ_FILES) linker.ld
 	$(CROSS_COMPILE)$(LINKER) -melf_i386 -Tlinker.ld $(BOOTSTRAP_ELF) $(OBJ_FILES) -o $(KERNEL_ELF)
 
 $(BOOTSTRAP_ELF): source/bootstrap.asm

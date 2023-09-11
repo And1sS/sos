@@ -26,8 +26,8 @@ dd 8
 
 
 extern kernel_main
-
-start:
+extern _start
+_start:
     mov esp, kernel_stack + KERNEL_STACK_SIZE
     jmp kernel_main
     jmp $
