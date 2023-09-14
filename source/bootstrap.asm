@@ -47,8 +47,8 @@ _start:
     call set_up_page_tables
     call enable_paging
 
-    lgdt [gdt64.pointer]
-    jmp gdt64.code:long_mode_start
+    lgdt [GDT64.pointer]
+    jmp GDT64.code:long_mode_start
 
 
 MULTIBOOT2_MAGIC equ 0x36D76289
@@ -62,35 +62,24 @@ check_multiboot:
     call print_error
 
 
-check_cpuid:
-    ; Check if CPUID is supported by attempting to flip the ID bit (bit 21)
-    ; in the FLAGS register. If we can flip it, CPUID is available.
+ID_ATTR equ 1 << 21
 
-    ; Copy FLAGS in to EAX via stack
+; Check if CPUID is supported by attempting to flip the ID bit (bit 21)
+; in the FLAGS register. If we can flip it, CPUID is available.
+check_cpuid:
     pushfd
     pop eax
 
-    ; Copy to ECX as well for comparing later on
     mov ecx, eax
-
-    ; Flip the ID bit
-    xor eax, 1 << 21
-
-    ; Copy EAX to FLAGS via the stack
+    xor eax, ID_ATTR
     push eax
     popfd
 
-    ; Copy FLAGS back to EAX (with the flipped bit if CPUID is supported)
     pushfd
     pop eax
-
-    ; Restore FLAGS from the old version stored in ECX (i.e. flipping the
-    ; ID bit back if it was ever flipped).
     push ecx
     popfd
 
-    ; Compare EAX and ECX. If they are equal then that means the bit
-    ; wasn't flipped, and CPUID isn't supported.
     cmp eax, ecx
     je .no_cpuid
     ret
@@ -98,71 +87,75 @@ check_cpuid:
     mov esi, CPUID_ERROR_STR
     call print_error
 
+CPUID_LONG_MODE_ATTR                equ 1 << 29
+CPUID_MAXIMUM_ROUTINE               equ 0x80000000
+CPUID_VERSION_INFORMATION_ROUTINE   equ 0x80000001
 
 check_long_mode:
     ; test if extended processor info in available
-    mov eax, 0x80000000    ; implicit argument for cpuid
-    cpuid                  ; get highest supported argument
-    cmp eax, 0x80000001    ; it needs to be at least 0x80000001
-    jb .no_long_mode       ; if it's less, the CPU is too old for long mode
+    mov eax, CPUID_MAXIMUM_ROUTINE                      ; implicit argument for cpuid
+    cpuid
+    cmp eax, CPUID_VERSION_INFORMATION_ROUTINE
+    jb .no_long_mode
 
-    ; use extended info to test if long mode is available
-    mov eax, 0x80000001    ; argument for extended processor info
-    cpuid                  ; returns various feature bits in ecx and edx
-    test edx, 1 << 29      ; test if the LM-bit is set in the D-register
-    jz .no_long_mode       ; If it's not set, there is no long mode
+    mov eax, CPUID_VERSION_INFORMATION_ROUTINE
+    cpuid                  
+    test edx, CPUID_LONG_MODE_ATTR                      ; implicit return data
+    jz .no_long_mode       
     ret
 .no_long_mode:
     mov esi, LONG_MODE_ERROR_STR
     call print_error
 
 
+WRITABLE_ATTR   equ 1 << 0
+PRESENT_ATTR    equ 1 << 1
+HUGE_ATTR       equ 1 << 7
+HUGE_PAGE_SIZE  equ 0x200000
+
 set_up_page_tables:
-    ; map first P4 entry to P3 table
     mov eax, p3_table
-    or eax, 0b11 ; present + writable
+    or eax, PRESENT_ATTR | WRITABLE_ATTR
     mov [p4_table], eax
 
-    ; map first P3 entry to P2 table
     mov eax, p2_table
-    or eax, 0b11 ; present + writable
+    or eax, PRESENT_ATTR | WRITABLE_ATTR
     mov [p3_table], eax
 
-    mov ecx, 0         ; counter variable
+    mov ecx, 0
 
 .map_p2_table:
-    ; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
-    mov eax, 0x200000  ; 2MiB
-    mul ecx            ; start address of ecx-th page
-    or eax, 0b10000011 ; present + writable + huge
-    mov [p2_table + ecx * 8], eax ; map ecx-th entry
+    mov eax, HUGE_PAGE_SIZE
+    mul ecx
+    or eax, HUGE_ATTR | PRESENT_ATTR | WRITABLE_ATTR
+    mov [p2_table + ecx * 8], eax
 
-    inc ecx            ; increase counter
-    cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
-    jne .map_p2_table  ; else map the next entry
+    inc ecx
+    cmp ecx, 512
+    jne .map_p2_table
 
     ret
 
 
+PAE_ATTR                equ 1 << 5
+EFER_LONG_MODE_ATTR     equ 1 << 8
+PAGING_ENABLED_ATTR     equ 1 << 31
+
 enable_paging:
-    ; load P4 to cr3 register (cpu uses this to access the P4 table)
     mov eax, p4_table
     mov cr3, eax
 
-    ; enable PAE-flag in cr4 (Physical Address Extension)
     mov eax, cr4
-    or eax, 1 << 5
+    or eax, PAE_ATTR
     mov cr4, eax
 
-    ; set the long mode bit in the EFER MSR (model specific register)
     mov ecx, 0xC0000080
     rdmsr
-    or eax, 1 << 8
+    or eax, EFER_LONG_MODE_ATTR
     wrmsr
 
-    ; enable paging in the cr0 register
     mov eax, cr0
-    or eax, 1 << 31
+    or eax, PAGING_ENABLED_ATTR
     mov cr0, eax
 
     ret
@@ -299,14 +292,19 @@ kernel_stack:
 
 section .rodata
 
+CODE_ATTR                   equ 1 << 43
+CONFORMING_ATTR             equ 1 << 44
+SEGMENT_PRESENT_ATTR        equ 1 << 47
+LONG_MODE_ATTR              equ 1 << 53
+
 ; temporary gdt to get to long mode and resetup it later properly
-gdt64:
-    dq 0 ; reserved entry
-.code: equ $ - gdt64 ; new
-    dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; code segment
+GDT64:
+    dq 0 
+.code: equ $ - GDT64
+    dq CODE_ATTR | CONFORMING_ATTR | SEGMENT_PRESENT_ATTR | LONG_MODE_ATTR
 .pointer:
-    dw $ - gdt64 - 1
-    dq gdt64
+    dw $ - GDT64 - 1
+    dq GDT64
 
 KERNEL_STARTUP_MESSAGE_STR db 'Booting sos kernel in long mode...', 0
 ERROR_PREFIX_STR db 'Error: ', 0
