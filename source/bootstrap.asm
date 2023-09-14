@@ -29,7 +29,18 @@ extern kernel_main
 extern _start
 _start:
     mov esp, kernel_stack + KERNEL_STACK_SIZE
-    ; call check_multiboot
+
+    push eax ; to preserve eax register which should hold multiboot magic
+
+    call clear_screen
+    mov esi, KERNEL_STARTUP_MESSAGE_STR
+    call print_string
+    call move_cursor_next_line
+
+
+    pop eax
+    call check_multiboot
+
     call check_cpuid
     call check_long_mode
 
@@ -38,6 +49,17 @@ _start:
 
     lgdt [gdt64.pointer]
     jmp gdt64.code:long_mode_start
+
+
+MULTIBOOT2_MAGIC equ 0x36D76289
+
+check_multiboot:
+    cmp eax, MULTIBOOT2_MAGIC
+    jne .no_multiboot
+    ret
+.no_multiboot:
+    mov esi, MULTIBOOT_ERROR_STR
+    call print_error
 
 
 check_cpuid:
@@ -73,17 +95,8 @@ check_cpuid:
     je .no_cpuid
     ret
 .no_cpuid:
-    mov al, "1"
-    jmp error
-
-
-check_multiboot:
-    cmp eax, 0x36d76289
-    jne .no_multiboot
-    ret
-.no_multiboot:
-    mov al, "0"
-    jmp error
+    mov esi, CPUID_ERROR_STR
+    call print_error
 
 
 check_long_mode:
@@ -100,8 +113,8 @@ check_long_mode:
     jz .no_long_mode       ; If it's not set, there is no long mode
     ret
 .no_long_mode:
-    mov al, "2"
-    jmp error
+    mov esi, LONG_MODE_ERROR_STR
+    call print_error
 
 
 set_up_page_tables:
@@ -154,12 +167,118 @@ enable_paging:
 
     ret
 
-error:
-    mov dword [0xb8000], 0x4f524f45
-    mov dword [0xb8004], 0x4f3a4f52
-    mov dword [0xb8008], 0x4f204f20
-    mov byte  [0xb800a], al
+
+; Screen printing routines start
+
+VGA_MEMORY_ADDR         equ 0xB8000
+WHITE_ON_BLACK_ATTR     equ 0x0F
+WHITE_ON_RED_ATTR       equ 0x4F
+
+CONSOLE_WIDTH           equ 80
+CONSOLE_HEIGHT          equ 25
+
+
+print_error:
+    push esi
+
+    mov esi, ERROR_PREFIX_STR
+    mov dh, WHITE_ON_RED_ATTR
+    call print_string_with_attr
+
+    pop esi
+    mov dh, WHITE_ON_RED_ATTR
+    call print_string_with_attr
+
     hlt
+
+
+print_string:
+    mov dh, WHITE_ON_BLACK_ATTR
+    call print_string_with_attr
+    ret
+
+
+print_string_with_attr:
+    lodsb
+
+    cmp al, 0
+    je .done
+
+    mov ah, dh
+
+    mov dword ecx, [cursor_col]
+    imul ecx, ecx, 2
+
+    mov dword ebx, [cursor_row]
+    imul ebx, ebx, 2 * CONSOLE_WIDTH
+
+    mov word [VGA_MEMORY_ADDR + ebx + ecx], ax
+
+    mov eax, [cursor_col]
+    inc eax
+    mov [cursor_col], eax
+    cmp eax, CONSOLE_WIDTH
+    jne .print_next_char
+
+.proceed_on_new_line:
+    cmp dword [cursor_row], CONSOLE_HEIGHT
+    je .done
+
+    call move_cursor_next_line
+
+.print_next_char:
+    jmp print_string_with_attr
+
+.done:
+    ret
+
+
+clear_screen:
+    mov dword [cursor_col], 0
+    mov dword [cursor_row], 0
+
+.clear_row:
+    mov ah, WHITE_ON_BLACK_ATTR
+    mov al, ' '
+
+    mov dword ecx, [cursor_col]
+    imul ecx, ecx, 2
+
+    mov dword ebx, [cursor_row]
+    imul ebx, ebx, 2 * CONSOLE_WIDTH
+
+    mov word [VGA_MEMORY_ADDR + ebx + ecx], ax
+
+    mov dword eax, [cursor_col]
+    inc eax
+    mov dword [cursor_col], eax
+    cmp eax, CONSOLE_WIDTH
+    jne .clear_row
+
+.done_clearing_row:
+    call move_cursor_next_line
+
+    cmp dword [cursor_row], CONSOLE_HEIGHT
+    jne .clear_row
+
+.done:
+    mov dword [cursor_row], 0
+    mov dword [cursor_col], 0
+    ret
+
+
+move_cursor_next_line:
+    inc dword [cursor_row]
+    mov dword [cursor_col], 0
+    ret
+
+
+section .data
+    cursor_col dd 0
+    cursor_row dd 0
+
+; Screen printing routines end
+
 
 section .bss
 
@@ -182,13 +301,18 @@ section .rodata
 
 ; temporary gdt to get to long mode and resetup it later properly
 gdt64:
-    dq 0 ; zero entry
+    dq 0 ; reserved entry
 .code: equ $ - gdt64 ; new
     dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; code segment
 .pointer:
     dw $ - gdt64 - 1
     dq gdt64
 
+KERNEL_STARTUP_MESSAGE_STR db 'Booting sos kernel in long mode...', 0
+ERROR_PREFIX_STR db 'Error: ', 0
+MULTIBOOT_ERROR_STR db 'Multiboot2 is not configured.', 0
+CPUID_ERROR_STR db 'Cpuid instruction is not supported.', 0
+LONG_MODE_ERROR_STR db 'Long mode is not supported.', 0
 
 bits 64
 section .text
@@ -196,10 +320,5 @@ section .text
 extern kernel_main
 
 long_mode_start:
-    ; print `OKAY` to screen
-    mov rax, 0x2f592f412f4b2f4f
-    mov qword [0xb8000], rax
     jmp kernel_main
     jmp $
-
-
