@@ -25,7 +25,9 @@ dd 8
 ; Multiboot2 header end
 
 
-start:
+extern kernel_main
+extern _start
+_start:
     mov esp, kernel_stack + KERNEL_STACK_SIZE
     ; call check_multiboot
     call check_cpuid
@@ -172,7 +174,7 @@ p3_table:
 p2_table:
     resb 4096
 
-align 4                                     
+align 4
 kernel_stack:
     resb KERNEL_STACK_SIZE
 
