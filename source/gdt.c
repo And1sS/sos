@@ -136,6 +136,11 @@ segment_descriptor gen_task_state_segment_descriptor(
     return result;
 }
 
+u16 KERNEL_CODE_SEGMENT_SELECTOR = 1 << 3;
+u16 KERNEL_DATA_SEGMENT_SELECTOR = 2 << 3;
+u16 USER_CODE_SEGMENT_SELECTOR = 3 << 3;
+u16 USER_DATA_SEGMENT_SELECTOR = 4 << 4;
+
 void init_gdt(void) {
     gdt_data[0] = gen_null_segment_decriptor();
 
@@ -152,18 +157,17 @@ void init_gdt(void) {
     // gdt_data[5] = gen_task_state_segment_descriptor(0, 0xFFFFF, 1, 1, 1, 0,
     // 0);
 
-    __asm__ volatile("    lgdt (%%rax)\n"
-                     "    pushq $0x8\n"
+    __asm__ volatile("    lgdt %0\n"
+                     "    pushq %1\n"
                      "    pushq $tmp%=\n"
                      "    retfq\n" // far ret to force cs register reloading
                      "tmp%=:\n"
-                     "    mov $0x10, %%rax\n"
-                     "    mov %%rax, %%ds\n"
-                     "    mov %%rax, %%ss\n"
+                     "    mov %2, %%ds\n"
+                     "    mov %2, %%ss\n"
                      "    mov $0, %%rax\n"
                      "    mov %%rax, %%es\n"
                      "    mov %%rax, %%fs\n"
                      "    mov %%rax, %%gs"
                      :
-                     : "a"(&gdt));
+                     : "m"(gdt), "r"((u64) KERNEL_CODE_SEGMENT_SELECTOR), "r"(KERNEL_DATA_SEGMENT_SELECTOR));
 }

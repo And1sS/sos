@@ -48,7 +48,7 @@ _start:
     call enable_paging
 
     lgdt [GDT64.pointer]
-    jmp GDT64.code:long_mode_start
+    jmp CODE_SEGMENT_SELECTOR:long_mode_start
 
 
 MULTIBOOT2_MAGIC equ 0x36D76289
@@ -297,10 +297,11 @@ CONFORMING_ATTR             equ 1 << 44
 SEGMENT_PRESENT_ATTR        equ 1 << 47
 LONG_MODE_ATTR              equ 1 << 53
 
+CODE_SEGMENT_SELECTOR       equ 1 << 3
 ; temporary gdt to get to long mode and resetup it later properly
 GDT64:
     dq 0 
-.code: equ $ - GDT64
+.code:
     dq CODE_ATTR | CONFORMING_ATTR | SEGMENT_PRESENT_ATTR | LONG_MODE_ATTR
 .pointer:
     dw $ - GDT64 - 1
@@ -319,4 +320,3 @@ extern kernel_main
 
 long_mode_start:
     jmp kernel_main
-    jmp $

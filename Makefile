@@ -42,7 +42,7 @@ $(ISO_GRUB_CFG): grub.cfg
 	cp $< $@
 
 $(KERNEL_ELF): $(BOOTSTRAP_ELF) $(OBJ_FILES) linker.ld
-	$(CROSS_COMPILE)$(LINKER) -melf_x86_64 -Tlinker.ld $(BOOTSTRAP_ELF) $(OBJ_FILES) -o $(KERNEL_ELF)
+	$(CROSS_COMPILE)$(LINKER) -melf_x86_64 -z max-page-size=0x1000 -Tlinker.ld $(BOOTSTRAP_ELF) $(OBJ_FILES) -o $(KERNEL_ELF)
 
 $(BOOTSTRAP_ELF): source/bootstrap.asm
 	mkdir -p $(@D)
