@@ -30,6 +30,7 @@ extern _start
 _start:
     mov esp, kernel_stack + KERNEL_STACK_SIZE
 
+    push ebx ; to preserve multiboot structure address loaded by grub
     push eax ; to preserve eax register which should hold multiboot magic
 
     call clear_screen
@@ -319,4 +320,8 @@ section .text
 extern kernel_main
 
 long_mode_start:
-    jmp kernel_main
+    ; here stack contains argument of multiboot structure, which should be passed wia rdi register
+    ; following System V AMD64 ABI calling convention
+    pop rdi
+    call kernel_main
+    jmp $
