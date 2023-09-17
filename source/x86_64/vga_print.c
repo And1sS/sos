@@ -103,7 +103,8 @@ __attribute__((no_caller_saved_registers)) void print_u64(u64 x) {
     }
 }
 
-char hex_chars[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+char hex_chars[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
+                      '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 __attribute__((no_caller_saved_registers)) void print_u32_hex(u32 x) {
     char digits[8];
     for (u8 i = 0; i < 8; i++) {

@@ -128,8 +128,9 @@ void init_pic(void) {
 
 void init_idt(void) {
     for (int i = 0; i < 48; i++) {
-        idt_data[i] = gen_interrupt_descriptor(
-            KERNEL_CODE_SEGMENT_SELECTOR, (u64) interrupt_handlers[i], true, 0, false);
+        idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,
+                                               (u64) interrupt_handlers[i],
+                                               true, 0, false);
     }
 
     __asm__ volatile("lidt %0" : : "m"(idt));

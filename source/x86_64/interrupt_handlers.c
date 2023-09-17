@@ -32,8 +32,7 @@ void* interrupt_handlers[48] = {
     handle_interrupt_36, handle_interrupt_37, handle_interrupt_38,
     handle_interrupt_39, handle_interrupt_40, handle_interrupt_41,
     handle_interrupt_42, handle_interrupt_43, handle_interrupt_44,
-    handle_interrupt_45, handle_interrupt_46, handle_interrupt_47
-};
+    handle_interrupt_45, handle_interrupt_46, handle_interrupt_47};
 
 const u8 OCW2_EOI_OFFSET = 5;
 

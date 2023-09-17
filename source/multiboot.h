@@ -38,15 +38,15 @@ typedef struct {
     u64 length;
     u32 type;
     u32 reserved;
-} parsed_memory_map_entry_v0;
+} memory_map_entry_v0;
 
 typedef struct {
     tag_header header;
     u32 entry_size;
     u32 entries_count;
     u32 entry_version;
-    parsed_memory_map_entry_v0* entries;
-} parsed_memory_map;
+    memory_map_entry_v0* entries;
+} memory_map;
 
 // https://docs.oracle.com/cd/E19683-01/816-1386/6m7qcoblj/index.html#chapter6-28341
 typedef struct {
@@ -69,14 +69,14 @@ typedef struct {
     u32 section_size;
     u32 shndx;
     elf64_shdr* sections;
-} parsed_elf_sections;
+} elf_sections;
 
 typedef struct {
     u32 size;
-    parsed_memory_map mmap;
-    parsed_elf_sections elf_sections;
-} parsed_multiboot_info;
+    memory_map mmap;
+    elf_sections elf_sections;
+} multiboot_info;
 
-parsed_multiboot_info parse_multiboot_info(void* multiboot_info);
+multiboot_info parse_multiboot_info(void* multiboot_info_ptr);
 
 #endif // SOS_MULTIBOOT_H

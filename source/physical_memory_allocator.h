@@ -6,7 +6,7 @@
 
 extern const u32 FRAME_SIZE;
 
-void init_physical_allocator(parsed_multiboot_info* multiboot_info);
+void init_physical_allocator(multiboot_info* multiboot_info);
 
 void* allocate_frame();
 void deallocate_frame();

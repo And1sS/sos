@@ -169,5 +169,6 @@ void init_gdt(void) {
                      "    mov %%rax, %%fs\n"
                      "    mov %%rax, %%gs"
                      :
-                     : "m"(gdt), "r"((u64) KERNEL_CODE_SEGMENT_SELECTOR), "r"(KERNEL_DATA_SEGMENT_SELECTOR));
+                     : "m"(gdt), "r"((u64) KERNEL_CODE_SEGMENT_SELECTOR),
+                       "r"(KERNEL_DATA_SEGMENT_SELECTOR));
 }

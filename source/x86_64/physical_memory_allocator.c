@@ -1,13 +1,13 @@
 #include "../physical_memory_allocator.h"
 
 #define IS_INSIDE(start_1, end_1, start_2, end_2)                              \
-    ((start_1) >= (start_2)) && ((end_1) <= (end_2))
+    (((start_1) >= (start_2)) && ((end_1) <= (end_2)))
 
 const u32 FRAME_SIZE = 4096;
 
 u64 free_frame = NULL;
 
-parsed_memory_map* memory_map;
+memory_map* memory_map_data;
 u64 kernel_start, kernel_end;
 u64 multiboot_start, multiboot_end;
 u64 end_of_memory;
@@ -15,8 +15,8 @@ u64 end_of_memory;
 u64 find_end_of_memory() {
     u64 max_block_end = NULL;
 
-    for (int i = 0; i < memory_map->entries_count; ++i) {
-        parsed_memory_map_entry_v0* mm_entry = &memory_map->entries[i];
+    for (u32 i = 0; i < memory_map_data->entries_count; ++i) {
+        memory_map_entry_v0* mm_entry = &memory_map_data->entries[i];
         if (mm_entry->type != 1)
             continue;
 
@@ -28,7 +28,7 @@ u64 find_end_of_memory() {
     return max_block_end;
 }
 
-void init_physical_allocator(parsed_multiboot_info* multiboot_info) {
+void init_physical_allocator(multiboot_info* multiboot_info) {
     kernel_start = 0xFFFFFFFFFFFFFFFF;
     kernel_end = 0;
 
@@ -40,7 +40,7 @@ void init_physical_allocator(parsed_multiboot_info* multiboot_info) {
             kernel_end = section->addr + section->size;
     }
 
-    memory_map = &multiboot_info->mmap;
+    memory_map_data = &multiboot_info->mmap;
 
     multiboot_start = (u64) multiboot_start;
     multiboot_end = multiboot_start + multiboot_info->size;
@@ -50,8 +50,8 @@ void init_physical_allocator(parsed_multiboot_info* multiboot_info) {
 
 void* allocate_frame() {
     while (free_frame < end_of_memory) {
-        for (int i = 0; i < memory_map->entries_count; ++i) {
-            parsed_memory_map_entry_v0* mm_entry = &memory_map->entries[i];
+        for (u32 i = 0; i < memory_map_data->entries_count; ++i) {
+            memory_map_entry_v0* mm_entry = &memory_map_data->entries[i];
 
             if (mm_entry->type != 1
                 || !IS_INSIDE(free_frame, free_frame + FRAME_SIZE,

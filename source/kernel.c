@@ -6,11 +6,11 @@
 #include "types.h"
 #include "vga_print.h"
 
-void init(parsed_multiboot_info* multiboot_info);
+void init(multiboot_info* multiboot_info);
 
 _Noreturn void kernel_main(void* multiboot_structure) {
-    parsed_multiboot_info ms = parse_multiboot_info(multiboot_structure);
-    init(&ms);
+    multiboot_info multiboot_info = parse_multiboot_info(multiboot_structure);
+    init(&multiboot_info);
 
     clear_screen();
 
@@ -25,11 +25,10 @@ _Noreturn void kernel_main(void* multiboot_structure) {
     }
 }
 
-void init(parsed_multiboot_info* multiboot_info) {
+void init(multiboot_info* multiboot_info) {
     init_gdt();
     init_physical_allocator(multiboot_info);
 
     init_timer();
     init_idt();
-
 }

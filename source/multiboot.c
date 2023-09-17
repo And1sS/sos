@@ -6,21 +6,21 @@
         ptr += sizeof(typeof(field));                                          \
     }
 
-void parse_multiboot_mmap(u64 ptr, parsed_multiboot_info* dst) {
-    parsed_memory_map result;
+void parse_multiboot_mmap(u64 ptr, multiboot_info* dst) {
+    memory_map result;
 
     READ_FIELD(result.header, ptr)
     READ_FIELD(result.entry_size, ptr)
     READ_FIELD(result.entry_version, ptr);
-    result.entries = (parsed_memory_map_entry_v0*) ptr;
+    result.entries = (memory_map_entry_v0*) ptr;
     result.entries_count =
         (result.header.size - 4 * sizeof(u32)) / result.entry_size;
 
     dst->mmap = result;
 }
 
-void parse_multiboot_elf_symbols(u64 ptr, parsed_multiboot_info* dst) {
-    parsed_elf_sections result;
+void parse_multiboot_elf_symbols(u64 ptr, multiboot_info* dst) {
+    elf_sections result;
 
     READ_FIELD(result.header, ptr)
     READ_FIELD(result.sections_number, ptr)
@@ -32,7 +32,7 @@ void parse_multiboot_elf_symbols(u64 ptr, parsed_multiboot_info* dst) {
 }
 
 void parse_multiboot_tag(u64 ptr, MULTIBOOT_TAG_TYPE type,
-                         parsed_multiboot_info* dst) {
+                         multiboot_info* dst) {
 
     switch (type) {
     case MEMORY_MAP:
@@ -47,10 +47,10 @@ void parse_multiboot_tag(u64 ptr, MULTIBOOT_TAG_TYPE type,
     }
 }
 
-parsed_multiboot_info parse_multiboot_info(void* multiboot_info) {
-    parsed_multiboot_info result;
+multiboot_info parse_multiboot_info(void* multiboot_info_ptr) {
+    multiboot_info result;
 
-    u64 start_ptr = (u64) multiboot_info;
+    u64 start_ptr = (u64) multiboot_info_ptr;
     u64 ptr = start_ptr;
 
     u32 reserved;
