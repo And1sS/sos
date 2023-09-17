@@ -64,23 +64,7 @@ __attribute__((no_caller_saved_registers)) void clear_screen(void) {
 }
 
 __attribute__((no_caller_saved_registers)) void print_u32(u32 x) {
-    if (x == 0) {
-        print_char('0');
-        return;
-    }
-
-    u8 digits[10];
-
-    i8 digit_count = 0;
-    while (x > 0) {
-        digits[digit_count++] = x % 10;
-        x /= 10;
-    }
-
-    digit_count--;
-    while (digit_count >= 0) {
-        print_char(digits[digit_count--] + '0');
-    }
+    print_u64(x);
 }
 
 __attribute__((no_caller_saved_registers)) void print_u64(u64 x) {
@@ -89,7 +73,7 @@ __attribute__((no_caller_saved_registers)) void print_u64(u64 x) {
         return;
     }
 
-    u8 digits[20];
+    u8 digits[16];
 
     i8 digit_count = 0;
     while (x > 0) {
