@@ -7,16 +7,16 @@ const u32 FRAME_SIZE = 4096;
 
 u64 free_frame = NULL;
 
-parsed_memory_map* _memory_map;
-u64 _kernel_start, _kernel_end;
-u64 _multiboot_start, _multiboot_end;
-u64 last_memory_block_end;
+parsed_memory_map* memory_map;
+u64 kernel_start, kernel_end;
+u64 multiboot_start, multiboot_end;
+u64 end_of_memory;
 
 u64 find_end_of_memory() {
     u64 max_block_end = NULL;
 
-    for (int i = 0; i < _memory_map->entries_count; ++i) {
-        parsed_memory_map_entry_v0* mm_entry = &_memory_map->entries[i];
+    for (int i = 0; i < memory_map->entries_count; ++i) {
+        parsed_memory_map_entry_v0* mm_entry = &memory_map->entries[i];
         if (mm_entry->type != 1)
             continue;
 
@@ -28,29 +28,39 @@ u64 find_end_of_memory() {
     return max_block_end;
 }
 
-void init_physical_allocator(parsed_memory_map* memory_map, u64 kernel_start,
-                             u64 kernel_end, u64 multiboot_start,
-                             u64 multiboot_end) {
+void init_physical_allocator(parsed_multiboot_info* multiboot_info) {
+    kernel_start = 0xFFFFFFFFFFFFFFFF;
+    kernel_end = 0;
 
-    _memory_map = memory_map;
-    _kernel_start = kernel_start, _kernel_end = kernel_end;
-    _multiboot_start = multiboot_start, _multiboot_end = multiboot_end;
-    last_memory_block_end = find_end_of_memory();
+    for (u32 i = 1; i < multiboot_info->elf_sections.sections_number; ++i) {
+        elf64_shdr* section = &multiboot_info->elf_sections.sections[i];
+        if (section->addr < kernel_start)
+            kernel_start = section->addr;
+        if (section->addr + section->size > kernel_end)
+            kernel_end = section->addr + section->size;
+    }
+
+    memory_map = &multiboot_info->mmap;
+
+    multiboot_start = (u64) multiboot_start;
+    multiboot_end = multiboot_start + multiboot_info->size;
+
+    end_of_memory = find_end_of_memory();
 }
 
 void* allocate_frame() {
-    while (free_frame < last_memory_block_end) {
-        for (int i = 0; i < _memory_map->entries_count; ++i) {
-            parsed_memory_map_entry_v0* mm_entry = &_memory_map->entries[i];
+    while (free_frame < end_of_memory) {
+        for (int i = 0; i < memory_map->entries_count; ++i) {
+            parsed_memory_map_entry_v0* mm_entry = &memory_map->entries[i];
 
             if (mm_entry->type != 1
                 || !IS_INSIDE(free_frame, free_frame + FRAME_SIZE,
                               mm_entry->base_addr,
                               mm_entry->base_addr + mm_entry->length)
-                || IS_INSIDE(free_frame, free_frame + FRAME_SIZE, _kernel_start,
-                             _kernel_end)
+                || IS_INSIDE(free_frame, free_frame + FRAME_SIZE, kernel_start,
+                             kernel_end)
                 || IS_INSIDE(free_frame, free_frame + FRAME_SIZE,
-                             _multiboot_start, _multiboot_end))
+                             multiboot_start, multiboot_end))
                 continue;
 
             free_frame += FRAME_SIZE;
