@@ -1,10 +1,10 @@
-#include "gdt.h"
-#include "idt.h"
 #include "multiboot.h"
 #include "physical_memory_allocator.h"
 #include "timer.h"
 #include "types.h"
 #include "vga_print.h"
+#include "x86_64/gdt.h"
+#include "x86_64/idt.h"
 
 void init(multiboot_info* multiboot_info);
 
@@ -14,7 +14,7 @@ _Noreturn void kernel_main(void* multiboot_structure) {
 
     clear_screen();
 
-    for (u64 i = 0; i < 100000000000; ++i) {
+    for (u64 i = 0; i < 10; ++i) {
         void* allocated_frame = allocate_frame();
         print("allocated frame: ");
         print_u64_hex((u64) allocated_frame);

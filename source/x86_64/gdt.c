@@ -1,4 +1,4 @@
-#include "../gdt.h"
+#include "gdt.h"
 #include "../types.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
