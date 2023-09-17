@@ -1,23 +1,34 @@
 #include "multiboot.h"
 
-#define READ_FIELD(field, type, ptr)                                           \
+#define READ_FIELD(field, ptr)                                                 \
     {                                                                          \
-        field = *(type*) ptr;                                                  \
-        ptr += sizeof(type);                                                   \
+        field = *(typeof(field)*) ptr;                                         \
+        ptr += sizeof(typeof(field));                                          \
     }
 
-void parse_multiboot_mmap(u64 multiboot_mmap, parsed_multiboot_info* dst) {
-    u64 ptr = multiboot_mmap;
+void parse_multiboot_mmap(u64 ptr, parsed_multiboot_info* dst) {
     parsed_memory_map result;
 
-    READ_FIELD(result.type, u32, ptr)
-    READ_FIELD(result.size, u32, ptr)
-    READ_FIELD(result.entry_size, u32, ptr)
-    READ_FIELD(result.entry_version, u32, ptr);
+    READ_FIELD(result.header, ptr)
+    READ_FIELD(result.entry_size, ptr)
+    READ_FIELD(result.entry_version, ptr);
     result.entries = (parsed_memory_map_entry_v0*) ptr;
-    result.entries_count = (result.size - 4 * sizeof(u32)) / result.entry_size;
+    result.entries_count =
+        (result.header.size - 4 * sizeof(u32)) / result.entry_size;
 
     dst->mmap = result;
+}
+
+void parse_multiboot_elf_symbols(u64 ptr, parsed_multiboot_info* dst) {
+    parsed_elf_sections result;
+
+    READ_FIELD(result.header, ptr)
+    READ_FIELD(result.sections_number, ptr)
+    READ_FIELD(result.section_size, ptr)
+    READ_FIELD(result.shndx, ptr)
+    result.sections = (elf64_shdr*) ptr;
+
+    dst->elf_sections = result;
 }
 
 void parse_multiboot_tag(u64 ptr, MULTIBOOT_TAG_TYPE type,
@@ -27,6 +38,10 @@ void parse_multiboot_tag(u64 ptr, MULTIBOOT_TAG_TYPE type,
     case MEMORY_MAP:
         parse_multiboot_mmap(ptr, dst);
         break;
+
+    case ELF_SYMBOLS:
+        parse_multiboot_elf_symbols(ptr, dst);
+
     default:
         break;
     }
@@ -38,26 +53,22 @@ parsed_multiboot_info parse_multiboot_info(void* multiboot_info) {
     u64 start_ptr = (u64) multiboot_info;
     u64 ptr = start_ptr;
 
-    u32 total_size;
     u32 reserved;
 
-    READ_FIELD(total_size, u32, ptr);
-    READ_FIELD(reserved, u32, ptr);
+    READ_FIELD(result.size, ptr);
+    READ_FIELD(reserved, ptr);
 
-    while (ptr < start_ptr + total_size) {
+    while (ptr < start_ptr + result.size) {
         u64 tmp = ptr;
-        MULTIBOOT_TAG_TYPE tag_type;
-        u32 tag_size;
+        tag_header header;
+        READ_FIELD(header, tmp)
 
-        READ_FIELD(tag_type, u32, tmp)
-        READ_FIELD(tag_size, u32, tmp)
-
-        parse_multiboot_tag(ptr, tag_type, &result);
+        parse_multiboot_tag(ptr, header.type, &result);
 
         // each entry is 8 byte aligned and this alignment is not included in
         // size, so we should add padding
-        u32 remainder = tag_size % 8;
-        ptr += tag_size + ((remainder != 0) ? (8 - remainder) : 0);
+        u32 remainder = header.size % 8;
+        ptr += header.size + ((remainder != 0) ? (8 - remainder) : 0);
     }
 
     return result;

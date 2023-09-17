@@ -29,6 +29,11 @@ typedef enum {
 } MULTIBOOT_TAG_TYPE;
 
 typedef struct {
+    u32 type;
+    u32 size;
+} tag_header;
+
+typedef struct {
     u64 base_addr;
     u64 length;
     u32 type;
@@ -36,16 +41,40 @@ typedef struct {
 } parsed_memory_map_entry_v0;
 
 typedef struct {
-    u32 type;
-    u32 size;
+    tag_header header;
     u32 entry_size;
     u32 entries_count;
     u32 entry_version;
     parsed_memory_map_entry_v0* entries;
 } parsed_memory_map;
 
+// https://docs.oracle.com/cd/E19683-01/816-1386/6m7qcoblj/index.html#chapter6-28341
 typedef struct {
+    u32 name;
+    u32 type;
+    u64 flags;
+    u64 addr;
+    u64 offset;
+    u64 size;
+    u32 link;
+    u32 info;
+    u64 addralign;
+    u64 entsize;
+} elf64_shdr;
+
+// https://forum.osdev.org/viewtopic.php?f=1&t=33268
+typedef struct {
+    tag_header header;
+    u32 sections_number;
+    u32 section_size;
+    u32 shndx;
+    elf64_shdr* sections;
+} parsed_elf_sections;
+
+typedef struct {
+    u32 size;
     parsed_memory_map mmap;
+    parsed_elf_sections elf_sections;
 } parsed_multiboot_info;
 
 parsed_multiboot_info parse_multiboot_info(void* multiboot_info);
