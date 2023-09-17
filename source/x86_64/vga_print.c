@@ -1,4 +1,4 @@
-#include "vga_print.h"
+#include "../vga_print.h"
 
 const u16 COLUMN_WIDTH = 80;
 const u16 ROW_NUMBER = 25;

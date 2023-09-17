@@ -1,8 +1,8 @@
 #include "interrupt_handlers.h"
-#include "idt.h"
+#include "../idt.h"
+#include "../util.h"
+#include "../vga_print.h"
 #include "io.h"
-#include "util.h"
-#include "vga_print.h"
 
 #define DEFINE_SOFTWARE_INTERRUPT_HANDLER(i)                                   \
     __attribute__((__interrupt__)) void handle_interrupt_##i(void* frame) {    \

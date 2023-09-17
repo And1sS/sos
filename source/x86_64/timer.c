@@ -1,5 +1,5 @@
-#include "timer.h"
-#include "types.h"
+#include "../timer.h"
+#include "../types.h"
 #include "io.h"
 
 const u8 SELECT_COUNTER_OFFSET = 6;

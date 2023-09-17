@@ -1,7 +1,7 @@
-#include "idt.h"
+#include "../idt.h"
+#include "../gdt.h"
 #include "interrupt_handlers.h"
 #include "io.h"
-#include "gdt.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 offset_0_15;
