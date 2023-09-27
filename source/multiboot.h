@@ -72,6 +72,7 @@ typedef struct {
 } elf_sections;
 
 typedef struct {
+    void* original_struct_addr;
     u32 size;
     memory_map mmap;
     elf_sections elf_sections;

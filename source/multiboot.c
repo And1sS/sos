@@ -48,7 +48,7 @@ void parse_multiboot_tag(u64 ptr, MULTIBOOT_TAG_TYPE type,
 }
 
 multiboot_info parse_multiboot_info(void* multiboot_info_ptr) {
-    multiboot_info result;
+    multiboot_info result = {.original_struct_addr = multiboot_info_ptr};
 
     u64 start_ptr = (u64) multiboot_info_ptr;
     u64 ptr = start_ptr;

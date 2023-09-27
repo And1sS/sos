@@ -6,9 +6,9 @@
 
 extern const u32 FRAME_SIZE;
 
-void init_physical_allocator(multiboot_info* multiboot_info);
+void init_physical_allocator(const multiboot_info* const multiboot_info);
 
 void* allocate_frame();
-void deallocate_frame();
+bool deallocate_frame(u64 frame);
 
 #endif // SOS_PHYSICAL_MEMORY_MANAGER_H
