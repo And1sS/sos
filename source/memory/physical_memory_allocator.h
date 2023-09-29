@@ -1,8 +1,8 @@
 #ifndef SOS_PHYSICAL_MEMORY_MANAGER_H
 #define SOS_PHYSICAL_MEMORY_MANAGER_H
 
-#include "multiboot.h"
-#include "types.h"
+#include "../lib/types.h"
+#include "../multiboot.h"
 
 extern const u32 FRAME_SIZE;
 

@@ -1,7 +1,7 @@
-#include "../physical_memory_allocator.h"
-#include "../util/alignment.h"
-#include "../util/array_stack.h"
-#include "../util/math.h"
+#include "../memory/physical_memory_allocator.h"
+#include "../lib/alignment.h"
+#include "../lib/array_stack.h"
+#include "../lib/math.h"
 
 #define IS_INSIDE(start_1, end_1, start_2, end_2)                              \
     (((start_1) >= (start_2)) && ((end_1) <= (end_2)))

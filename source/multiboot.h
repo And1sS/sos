@@ -1,7 +1,7 @@
 #ifndef SOS_MULTIBOOT_H
 #define SOS_MULTIBOOT_H
 
-#include "types.h"
+#include "lib/types.h"
 
 typedef enum {
     EMPTY = 0,

@@ -1,4 +1,5 @@
 #include "multiboot.h"
+#include "lib/alignment.h"
 
 #define READ_FIELD(field, ptr)                                                 \
     {                                                                          \
@@ -65,10 +66,8 @@ multiboot_info parse_multiboot_info(void* multiboot_info_ptr) {
 
         parse_multiboot_tag(ptr, header.type, &result);
 
-        // each entry is 8 byte aligned and this alignment is not included in
-        // size, so we should add padding
-        u32 remainder = header.size % 8;
-        ptr += header.size + ((remainder != 0) ? (8 - remainder) : 0);
+        // each entry is 8 byte aligned
+        ptr += align_to_upper(header.size, 8);
     }
 
     return result;

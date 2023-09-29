@@ -73,7 +73,7 @@ __attribute__((no_caller_saved_registers)) void print_u64(u64 x) {
         return;
     }
 
-    u8 digits[16];
+    u8 digits[19];
 
     i8 digit_count = 0;
     while (x > 0) {

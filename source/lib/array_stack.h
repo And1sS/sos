@@ -1,7 +1,7 @@
 #ifndef SOS_ARRAY_STACK_H
 #define SOS_ARRAY_STACK_H
 
-#include "../types.h"
+#include "types.h"
 
 typedef struct {
     u64 size;

@@ -40,11 +40,13 @@ __attribute__((no_caller_saved_registers)) void handle_interrupt(
     u8 interrupt_number) {
     static u32 count = 0;
 
-    print("Received interrupt #");
-    print_u32(interrupt_number);
-    print(": ");
-    print_u32(count++);
-    print_char('\n');
+    UNUSED(count);
+    UNUSED(interrupt_number);
+    //    print("Received interrupt #");
+    //    print_u32(interrupt_number);
+    //    print(": ");
+    //    print_u32(count++);
+    //    print_char('\n');
 }
 
 __attribute__((no_caller_saved_registers)) void handle_hardware_interrupt(

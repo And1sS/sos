@@ -17,4 +17,4 @@ bool push(array_stack* stack, u64 entry) {
 
 bool can_pop(array_stack* stack) { return stack->entries > 0; }
 
-u64 pop(array_stack* stack) { return stack->array[stack->entries--]; }
+u64 pop(array_stack* stack) { return stack->array[--stack->entries]; }

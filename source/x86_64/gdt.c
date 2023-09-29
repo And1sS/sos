@@ -1,5 +1,5 @@
 #include "gdt.h"
-#include "../types.h"
+#include "../lib/types.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 segment_limit_0_15;

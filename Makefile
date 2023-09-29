@@ -12,7 +12,7 @@ ISO_KERNEL_FILE = $(BUILD_FOLDER)/iso/boot/sos-kernel.elf
 
 ISO_FILE = $(BUILD_FOLDER)/sos.iso
 
-CROSS_COMPILE = x86_64-elf-
+CROSS_COMPILE =
 ASM = nasm
 CC = gcc
 CC_FLAGS = -c -g -O3 -m64 -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
