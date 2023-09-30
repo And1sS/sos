@@ -1,7 +1,8 @@
 #include "idt.h"
+#include "../gdt.h"
+#include "../io.h"
 #include "interrupt_handlers.h"
-#include "io.h"
-#include "gdt.h"
+#include "interrupts.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 offset_0_15;
@@ -128,13 +129,13 @@ void init_pic(void) {
 
 void init_idt(void) {
     for (int i = 0; i < 48; i++) {
-        idt_data[i] = gen_interrupt_descriptor(
-            KERNEL_CODE_SEGMENT_SELECTOR, (u64) interrupt_handlers[i], true, 0, false);
+        idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,
+                                               (u64) interrupt_handlers[i],
+                                               true, 0, false);
     }
 
     __asm__ volatile("lidt %0" : : "m"(idt));
 
     init_pic();
-
-    __asm__ volatile("sti");
+    enable_interrupts();
 }

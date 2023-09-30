@@ -1,7 +1,7 @@
 #ifndef INTERRUPT_HANDLERS_H
 #define INTERRUPT_HANDLERS_H
 
-#include "types.h"
+#include "../types.h"
 
 __attribute__((__interrupt__)) void handle_interrupt_0(void* frame);
 __attribute__((__interrupt__)) void handle_interrupt_1(void* frame);
