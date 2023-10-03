@@ -8,11 +8,12 @@
 
 void init(multiboot_info* multiboot_info);
 
-_Noreturn void kernel_main(void* multiboot_structure) {
-    multiboot_info multiboot_info = parse_multiboot_info(multiboot_structure);
+_Noreturn void kernel_main(paddr multiboot_structure) {
+    multiboot_info multiboot_info =
+        parse_multiboot_info((void*) P2V(multiboot_structure));
+    init(&multiboot_info);
 
     clear_screen();
-
     println("memory map: ");
     for (u8 i = 0; i < multiboot_info.mmap.entries_count; i++) {
         print("t: ");
@@ -27,49 +28,46 @@ _Noreturn void kernel_main(void* multiboot_structure) {
         println("kb");
     }
 
-//    println("");
-//    println("elf sections: ");
-//    elf64_shdr name_table =
-//        multiboot_info.elf_sections.sections[multiboot_info.elf_sections.shndx];
-//
-//    for (u64 i = 0; i < multiboot_info.elf_sections.sections_number; i++) {
-//        print("s: ");
-//        print_u64_hex(multiboot_info.elf_sections.sections[i].addr);
-//        print(" e: ");
-//        print_u64_hex(multiboot_info.elf_sections.sections[i].addr
-//                      + multiboot_info.elf_sections.sections[i].size);
-//        print(" n: ");
-//        print(
-//            (const char*) (name_table.addr +
-//                           multiboot_info.elf_sections.sections[i].name));
-//        print(" f: ");
-//        print_u32(multiboot_info.elf_sections.sections[i].flags);
-//        println("");
-//    }
+    println("");
+    println("elf sections: ");
+    elf64_shdr name_table =
+        multiboot_info.elf_sections.sections[multiboot_info.elf_sections.shndx];
 
-//    u64 kernel_start = 0xFFFFFFFFFFFFFFFF;
-//    u64 kernel_end = 0;
-//
-//    for (u32 i = 1; i < multiboot_info.elf_sections.sections_number; ++i) {
-//        elf64_shdr* section = &multiboot_info.elf_sections.sections[i];
-//        if (section->addr < kernel_start)
-//            kernel_start = section->addr;
-//        if (section->addr + section->size > kernel_end)
-//            kernel_end = section->addr + section->size;
-//    }
-//
-//    print("kernel s: ");
-//    print_u64_hex(kernel_start);
-//    print(" e: ");
-//    print_u64_hex(kernel_end);
-//    println("");
-//
-//    print("multiboot s: ");
-//    print_u64_hex((u64) multiboot_structure);
-//    print(" e: ");
-//    print_u64_hex((u64) multiboot_structure + multiboot_info.size);
-//
-//    init(&multiboot_info);
+    for (u64 i = 0; i < multiboot_info.elf_sections.sections_number; i++) {
+        print("s: ");
+        print_u64_hex(multiboot_info.elf_sections.sections[i].addr);
+        print(" e: ");
+        print_u64_hex(multiboot_info.elf_sections.sections[i].addr
+                      + multiboot_info.elf_sections.sections[i].size);
+        print(" n: ");
+        print((const char*) (P2V(name_table.addr)
+                             + multiboot_info.elf_sections.sections[i].name));
+        print(" f: ");
+        print_u32(multiboot_info.elf_sections.sections[i].flags);
+        println("");
+    }
+
+    u64 kernel_start = 0xFFFFFFFFFFFFFFFF;
+    u64 kernel_end = 0;
+
+    for (u32 i = 1; i < multiboot_info.elf_sections.sections_number; ++i) {
+        elf64_shdr* section = &multiboot_info.elf_sections.sections[i];
+        if (section->addr < kernel_start)
+            kernel_start = section->addr;
+        if (section->addr + section->size > kernel_end)
+            kernel_end = section->addr + section->size;
+    }
+
+    print("kernel s: ");
+    print_u64_hex(kernel_start);
+    print(" e: ");
+    print_u64_hex(kernel_end);
+    println("");
+
+    print("multiboot s: ");
+    print_u64_hex((u64) multiboot_structure);
+    print(" e: ");
+    print_u64_hex((u64) multiboot_structure + multiboot_info.size);
 
     while (true) {
     }

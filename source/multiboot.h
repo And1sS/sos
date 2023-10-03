@@ -2,6 +2,7 @@
 #define SOS_MULTIBOOT_H
 
 #include "lib/types.h"
+#include "memory/memory.h"
 
 typedef enum {
     EMPTY = 0,
@@ -53,7 +54,7 @@ typedef struct {
     u32 name;
     u32 type;
     u64 flags;
-    u64 addr;
+    paddr addr;
     u64 offset;
     u64 size;
     u32 link;
