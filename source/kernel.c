@@ -20,10 +20,14 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     }
 }
 
+#include "util.h"
 void init(multiboot_info* multiboot_info) {
+    UNUSED(multiboot_info);
+    // TODO: move into x86_64 arch specific folder
     init_gdt();
-    init_pmm(multiboot_info);
 
     init_timer();
+
+    // TODO: move into x86_64 arch specific folder
     init_idt();
 }

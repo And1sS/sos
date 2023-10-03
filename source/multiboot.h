@@ -2,7 +2,7 @@
 #define SOS_MULTIBOOT_H
 
 #include "lib/types.h"
-#include "memory/memory.h"
+#include "memory/memory_map.h"
 #include "vga_print.h"
 
 typedef enum {
