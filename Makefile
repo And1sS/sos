@@ -15,7 +15,7 @@ ISO_FILE = $(BUILD_FOLDER)/sos.iso
 CROSS_COMPILE =
 ASM = nasm
 CC = gcc
-CC_FLAGS = -c -g -O3 -m64 -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
+CC_FLAGS = -c -g -O3 -m64 -mcmodel=large -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
 		   -Wall -Wextra -Werror
 QEMU_FLAGS = -D ./log.txt -d int,cpu_reset -no-reboot
 LINKER = ld

@@ -159,7 +159,8 @@ void init_gdt(void) {
 
     __asm__ volatile("    lgdt %0\n"
                      "    pushq %1\n"
-                     "    pushq $tmp%=\n"
+                     "    movabs $tmp%=, %%rax\n"
+                     "    pushq %%rax\n"
                      "    retfq\n" // far ret to force cs register reloading
                      "tmp%=:\n"
                      "    mov %2, %%ds\n"

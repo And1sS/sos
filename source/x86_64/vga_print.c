@@ -1,9 +1,10 @@
 #include "../vga_print.h"
+#include "../memory/memory.h"
 
 const u16 COLUMN_WIDTH = 80;
 const u16 ROW_NUMBER = 25;
 
-volatile u16* const TEXT_BUFFER = (u16*) 0x000B8000;
+volatile u16* const TEXT_BUFFER = (u16*) (KERNEL_VMAPPED_RAM_START_VADDR | 0x000B8000);
 
 u16 cur_row = ROW_NUMBER - 1;
 u16 cur_col = 0;
