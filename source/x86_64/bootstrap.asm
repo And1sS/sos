@@ -336,7 +336,9 @@ section .text
 extern kernel_main
 
 long_mode_start:
-    mov rsp, kernel_stack + KERNEL_STACK_SIZE
+    ; now rsp contains physical address, we need to adjust it to with virtual
+    mov rax, KERNEL_START_VADDR
+    add rsp, rax
 
     mov rax, qword .upper_memory
     jmp rax
@@ -350,11 +352,11 @@ long_mode_start:
 
     ; here stack contains argument of multiboot structure, which should be passed wia rdi register
     ; following System V AMD64 ABI calling convention
-;    pop rdi
-
-    mov rdi, 0xDEADBEEF
-    ; multiboot structure address is physical, in order to access it, we need to change it to mapped virtual address
-    ;add rdi, KERNEL_VMAPPED_RAM_START_VADDR
+    pop rdi
+    ; same here, multiboot info address is physical, so we need to adjust it
+    mov rax, KERNEL_START_VADDR
+    add rdi, rax
 
     call kernel_main
+
     jmp $
