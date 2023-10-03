@@ -3,6 +3,7 @@
 
 #include "lib/types.h"
 #include "memory/memory.h"
+#include "vga_print.h"
 
 typedef enum {
     EMPTY = 0,
@@ -73,12 +74,14 @@ typedef struct {
 } elf_sections;
 
 typedef struct {
-    void* original_struct_addr;
+    paddr original_struct_addr;
     u32 size;
     memory_map mmap;
     elf_sections elf_sections;
 } multiboot_info;
 
 multiboot_info parse_multiboot_info(void* multiboot_info_ptr);
+
+void print_multiboot_info(multiboot_info* multiboot_info_ptr);
 
 #endif // SOS_MULTIBOOT_H

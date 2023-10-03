@@ -18,6 +18,8 @@
 #define true 1
 #define false 0
 
+#define string const char*
+
 #define NULL 0
 
 #endif // TYPES_H
