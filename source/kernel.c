@@ -1,5 +1,5 @@
 #include "lib/types.h"
-#include "memory/physical_memory_allocator.h"
+#include "memory/pmm.h"
 #include "multiboot.h"
 #include "timer.h"
 #include "vga_print.h"
@@ -47,29 +47,29 @@ _Noreturn void kernel_main(void* multiboot_structure) {
 //        println("");
 //    }
 
-    u64 kernel_start = 0xFFFFFFFFFFFFFFFF;
-    u64 kernel_end = 0;
-
-    for (u32 i = 1; i < multiboot_info.elf_sections.sections_number; ++i) {
-        elf64_shdr* section = &multiboot_info.elf_sections.sections[i];
-        if (section->addr < kernel_start)
-            kernel_start = section->addr;
-        if (section->addr + section->size > kernel_end)
-            kernel_end = section->addr + section->size;
-    }
-
-    print("kernel s: ");
-    print_u64_hex(kernel_start);
-    print(" e: ");
-    print_u64_hex(kernel_end);
-    println("");
-
-    print("multiboot s: ");
-    print_u64_hex((u64) multiboot_structure);
-    print(" e: ");
-    print_u64_hex((u64) multiboot_structure + multiboot_info.size);
-
-    init(&multiboot_info);
+//    u64 kernel_start = 0xFFFFFFFFFFFFFFFF;
+//    u64 kernel_end = 0;
+//
+//    for (u32 i = 1; i < multiboot_info.elf_sections.sections_number; ++i) {
+//        elf64_shdr* section = &multiboot_info.elf_sections.sections[i];
+//        if (section->addr < kernel_start)
+//            kernel_start = section->addr;
+//        if (section->addr + section->size > kernel_end)
+//            kernel_end = section->addr + section->size;
+//    }
+//
+//    print("kernel s: ");
+//    print_u64_hex(kernel_start);
+//    print(" e: ");
+//    print_u64_hex(kernel_end);
+//    println("");
+//
+//    print("multiboot s: ");
+//    print_u64_hex((u64) multiboot_structure);
+//    print(" e: ");
+//    print_u64_hex((u64) multiboot_structure + multiboot_info.size);
+//
+//    init(&multiboot_info);
 
     while (true) {
     }
@@ -77,7 +77,7 @@ _Noreturn void kernel_main(void* multiboot_structure) {
 
 void init(multiboot_info* multiboot_info) {
     init_gdt();
-    init_physical_allocator(multiboot_info);
+    init_pmm(multiboot_info);
 
     init_timer();
     init_idt();
