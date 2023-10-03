@@ -4,7 +4,7 @@
 #include "timer.h"
 #include "vga_print.h"
 #include "x86_64/gdt.h"
-#include "x86_64/idt.h"
+#include "x86_64/interrupts/idt.h"
 
 void init(multiboot_info* multiboot_info);
 

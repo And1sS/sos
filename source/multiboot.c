@@ -127,8 +127,8 @@ void print_multiboot_info(multiboot_info* multiboot_info_ptr) {
     print_u64_hex(kernel_end);
     println("");
 
-    print("multiboot s(v): ");
+    print("multiboot s: ");
     print_u64_hex((u64) mboot_info.original_struct_addr);
-    print(" e(v): ");
+    print(" e: ");
     print_u64_hex((u64) mboot_info.original_struct_addr + mboot_info.size);
 }

@@ -1,7 +1,8 @@
 #include "idt.h"
-#include "gdt.h"
-#include "interrupt_handlers.h"
-#include "io.h"
+#include "../../interrupts/interrupts.h"
+#include "../gdt.h"
+#include "../interrupt_handlers.h"
+#include "../io.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 offset_0_15;
@@ -136,6 +137,5 @@ void init_idt(void) {
     __asm__ volatile("lidt %0" : : "m"(idt));
 
     init_pic();
-
-    __asm__ volatile("sti");
+    enable_interrupts();
 }

@@ -1,7 +1,6 @@
 #include "interrupt_handlers.h"
 #include "../util.h"
-#include "../vga_print.h"
-#include "idt.h"
+#include "interrupts/idt.h"
 #include "io.h"
 
 #define DEFINE_SOFTWARE_INTERRUPT_HANDLER(i)                                   \
