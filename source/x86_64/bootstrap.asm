@@ -116,8 +116,8 @@ check_long_mode:
     call print_error
 
 
-WRITABLE_ATTR                           equ 1 << 0
-PRESENT_ATTR                            equ 1 << 1
+PRESENT_ATTR                            equ 1 << 0
+WRITABLE_ATTR                           equ 1 << 1
 PAGE_SIZE                               equ 4096
 PT_ENTRIES                              equ 512
 PT_KERNEL_SPACE_START_IDX               equ 256 ; 0xFFFF800000000000
@@ -139,6 +139,7 @@ set_up_page_tables:
     or eax, PRESENT_ATTR | WRITABLE_ATTR
     mov [V2P(p2_table)], eax
 
+    mov ebx, 0
 .identity_map_first_2mb:
     mov eax, PAGE_SIZE
     mul ebx
