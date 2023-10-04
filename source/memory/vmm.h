@@ -1,11 +1,9 @@
 #ifndef SOS_VIRTUAL_MEMORY_MANAGER_H
 #define SOS_VIRTUAL_MEMORY_MANAGER_H
 
-#include "pmm.h"
+#include "memory_map.h"
 
-#define P1_OFFSET(a) (((a) >> 12) & 0x1FF)
-#define P2_OFFSET(a) (((a) >> 21) & 0x1FF)
-#define P3_OFFSET(a) (((a) >> 30) & 0x1FF)
-#define P4_OFFSET(a) (((a) >> 39) & 0x1FF)
+u64 get_page(vaddr virtual_page);
+bool map_page(vaddr virtual_page, paddr physical_page, u16 flags);
 
 #endif // SOS_VIRTUAL_MEMORY_MANAGER_H

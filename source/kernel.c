@@ -1,5 +1,5 @@
 #include "lib/types.h"
-#include "memory/pmm.h"
+#include "memory/memory.h"
 #include "multiboot.h"
 #include "timer.h"
 #include "vga_print.h"
@@ -11,10 +11,12 @@ void init(multiboot_info* multiboot_info);
 _Noreturn void kernel_main(paddr multiboot_structure) {
     multiboot_info multiboot_info =
         parse_multiboot_info((void*) P2V(multiboot_structure));
-    init(&multiboot_info);
-
-    clear_screen();
     print_multiboot_info(&multiboot_info);
+    init(&multiboot_info);
+    println("Finished initialization!");
+
+//    clear_screen();
+//    print_multiboot_info(&multiboot_info);
 
     while (true) {
     }
@@ -22,9 +24,9 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
 
 #include "util.h"
 void init(multiboot_info* multiboot_info) {
-    UNUSED(multiboot_info);
     // TODO: move into x86_64 arch specific folder
     init_gdt();
+    init_memory(multiboot_info);
 
     init_timer();
 

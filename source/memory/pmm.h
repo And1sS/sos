@@ -5,5 +5,6 @@
 
 paddr allocate_frame();
 void free_frame(paddr frame);
+u64 get_available_frames_count();
 
 #endif // SOS_PHYSICAL_MEMORY_MANAGER_H

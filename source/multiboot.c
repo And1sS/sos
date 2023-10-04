@@ -91,25 +91,25 @@ void print_multiboot_info(multiboot_info* multiboot_info_ptr) {
         println("kb");
     }
 
-    println("");
-    println("elf sections: ");
-    elf64_shdr name_table =
-        mboot_info.elf_sections.sections[mboot_info.elf_sections.shndx];
-
-    for (u64 i = 0; i < mboot_info.elf_sections.sections_number; i++) {
-        print("s: ");
-        print_u64_hex(mboot_info.elf_sections.sections[i].addr);
-        print(" e: ");
-        print_u64_hex(mboot_info.elf_sections.sections[i].addr
-                      + mboot_info.elf_sections.sections[i].size);
-        print(" n: ");
-        print((string) (P2V(name_table.addr)
-                        + mboot_info.elf_sections.sections[i].name));
-        print(" f: ");
-        print_u32(mboot_info.elf_sections.sections[i].flags);
-        println("");
-    }
-
+//    println("");
+//    println("elf sections: ");
+//    elf64_shdr name_table =
+//        mboot_info.elf_sections.sections[mboot_info.elf_sections.shndx];
+//
+//    for (u64 i = 0; i < mboot_info.elf_sections.sections_number; i++) {
+//        print("s: ");
+//        print_u64_hex(mboot_info.elf_sections.sections[i].addr);
+//        print(" e: ");
+//        print_u64_hex(mboot_info.elf_sections.sections[i].addr
+//                      + mboot_info.elf_sections.sections[i].size);
+//        print(" n: ");
+//        print((string) (P2V(name_table.addr)
+//                        + mboot_info.elf_sections.sections[i].name));
+//        print(" f: ");
+//        print_u32(mboot_info.elf_sections.sections[i].flags);
+//        println("");
+//    }
+//
     u64 kernel_start = 0xFFFFFFFFFFFFFFFF;
     u64 kernel_end = 0;
 
@@ -131,4 +131,5 @@ void print_multiboot_info(multiboot_info* multiboot_info_ptr) {
     print_u64_hex((u64) mboot_info.original_struct_addr);
     print(" e: ");
     print_u64_hex((u64) mboot_info.original_struct_addr + mboot_info.size);
+    println("");
 }

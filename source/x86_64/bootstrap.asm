@@ -126,10 +126,10 @@ PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX   equ 273 ; 0XFFFF888000000000
 set_up_page_tables:
     mov eax, V2P(p3_table)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
-    mov [V2P(p4_table)], eax
+    mov [V2P(kernel_p4_table)], eax
 
-    mov [V2P(p4_table) + PT_KERNEL_SPACE_START_IDX * 8], eax
-    mov [V2P(p4_table) + PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX * 8], eax
+    mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_START_IDX * 8], eax
+    mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX * 8], eax
 
     mov eax, V2P(p2_table)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
@@ -157,7 +157,7 @@ EFER_LONG_MODE_ATTR     equ 1 << 8
 PAGING_ENABLED_ATTR     equ 1 << 31
 
 enable_paging:
-    mov eax, V2P(p4_table)
+    mov eax, V2P(kernel_p4_table)
     mov cr3, eax
 
     mov eax, cr4
@@ -292,9 +292,10 @@ section .bss
 
 KERNEL_STACK_SIZE equ 8192
 
+global kernel_p4_table
 ; temporary page tables mappings to get to long mode and resetup it later properly
 align 4096
-p4_table:
+kernel_p4_table:
     resb 4096
 p3_table:
     resb 4096
@@ -345,7 +346,7 @@ long_mode_start:
 
 .upper_memory:
     mov qword rax, 0
-    mov [qword p4_table], rax
+    mov [qword kernel_p4_table], rax
 
     mov rax, cr3
     mov cr3, rax
