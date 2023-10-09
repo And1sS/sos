@@ -1,35 +1,18 @@
+#include "arch_init.h"
 #include "lib/types.h"
-#include "memory/memory.h"
 #include "multiboot.h"
-#include "timer.h"
 #include "vga_print.h"
-#include "x86_64/gdt.h"
-#include "x86_64/interrupts/idt.h"
-
-void init(multiboot_info* multiboot_info);
 
 _Noreturn void kernel_main(paddr multiboot_structure) {
+    clear_screen();
+    println("Starting initialization");
     multiboot_info multiboot_info =
         parse_multiboot_info((void*) P2V(multiboot_structure));
-    print_multiboot_info(&multiboot_info);
-    init(&multiboot_info);
-    println("Finished initialization!");
+    arch_init(&multiboot_info);
 
-//    clear_screen();
-//    print_multiboot_info(&multiboot_info);
+    print_multiboot_info(&multiboot_info);
+    println("Finished initialization!");
 
     while (true) {
     }
-}
-
-#include "util.h"
-void init(multiboot_info* multiboot_info) {
-    // TODO: move into x86_64 arch specific folder
-    init_gdt();
-    init_memory(multiboot_info);
-
-    init_timer();
-
-    // TODO: move into x86_64 arch specific folder
-    init_idt();
 }
