@@ -6,21 +6,25 @@
 #include "../../memory/vmm.h"
 #include "../../spin_lock.h"
 
-typedef struct _header {
+typedef struct __attribute__((__packed__)) _header {
     u64 size; // sizeof(header) + sizeof(footer) included
+    bool used;
     struct _header* prev;
     struct _header* next;
 } header;
 
-typedef struct {
+typedef struct __attribute__((__packed__)) {
     header* start;
 } footer;
 
 #define block header
-#define BLOCK_ADDR(blk) ((u64) blk)
+#define BLOCK_ADDR(blk) ((vaddr) (blk))
+#define BLOCK_FOOTER(blk)                                                      \
+    ((footer*) (((vaddr) (blk)) + (blk)->size - sizeof(footer)))
 #define FREE_SIZE(block_size) ((block_size) - sizeof(header) - sizeof(footer))
 #define BLOCK_SIZE(free_size) ((free_size) + sizeof(header) + sizeof(footer))
 #define BLOCK_FREE_SIZE(blk) (FREE_SIZE((blk)->size))
+#define FREE_SPACE_PTR(blk) ((void*) ((vaddr) (blk) + sizeof(header)))
 #define MIN_BLOCK_SIZE (2 * (sizeof(header) + sizeof(footer)))
 
 typedef struct {
@@ -86,16 +90,16 @@ block* find_best_fit_block(bin* bin, u64 free_size) {
 block* init_block(vaddr addr, u64 size, header* prev, header* next) {
     header* head = (header*) addr;
     head->size = size;
+    head->used = false;
     head->prev = prev;
     head->next = next;
 
-    footer* foot = (footer*) (addr + size - sizeof(footer));
-    foot->start = head;
+    BLOCK_FOOTER(head)->start = head;
 
     return head;
 }
 
-void insert_into_bin(bin* bin, block* to_insert) {
+void insert_block(bin* bin, block* to_insert) {
     if (bin->blocks == 0) {
         bin->blocks = 1;
         bin->first = to_insert;
@@ -137,18 +141,79 @@ void insert_into_bin(bin* bin, block* to_insert) {
     bin->blocks++;
 }
 
-#include "../../util.h"
+// bin -> prev -> cur -> next <- bin_last
+block* remove_block(bin* block_bin, block* to_remove) {
+    block* prev = to_remove->prev;
+    block* next = to_remove->next;
 
-block* shrink_block(bin* block_bin, block* to_shrink, u64 shrink_size) {
-    UNUSED(block_bin);
-    u64 new_block_size = to_shrink->size - shrink_size;
-    if (new_block_size < MIN_BLOCK_SIZE)
-        return to_shrink;
+    if (prev == NULL) {
+        block_bin->first = next;
+    } else {
+        prev->next = next;
+    }
 
-    return NULL;
+    if (next == NULL) {
+        block_bin->last = prev;
+    } else {
+        next->prev = prev;
+    }
+    block_bin->blocks--;
+
+    to_remove->prev = NULL;
+    to_remove->next = NULL;
+    return to_remove;
+}
+
+typedef struct {
+    block* left_split;
+    block* right_split;
+} split_result;
+
+split_result split_block(bin* block_bin, block* to_split, u64 split_size) {
+    block* prev = to_split->prev;
+    block* next = to_split->next;
+
+    u64 left_size = split_size;
+    u64 right_size = to_split->size - split_size;
+
+    block* left_split = to_split;
+    block* right_split = (block*) ((vaddr) to_split + split_size);
+    init_block((vaddr) left_split, left_size, prev, right_split);
+    init_block((vaddr) right_split, right_size, left_split, next);
+
+    if (prev == NULL) {
+        block_bin->first = left_split;
+    }
+    if (next == NULL) {
+        block_bin->last = right_split;
+    }
+
+    split_result result = {.left_split = left_split, .right_split=right_split};
+    return result;
+}
+
+block* cut_block(bin* block_bin, block* cut_from, u64 shrink_size) {
+    u64 new_block_size = cut_from->size - shrink_size;
+    if (new_block_size < MIN_BLOCK_SIZE) {
+        return remove_block(block_bin, cut_from);
+    }
+
+    split_result splits = split_block(block_bin, cut_from, shrink_size);
+    block* left_split = remove_block(block_bin, splits.left_split);
+    block* right_split = splits.right_split;
+
+    bin* right_split_bin = find_best_fit_bin(right_split->size);
+    if (right_split_bin != block_bin) {
+        right_split = remove_block(block_bin, right_split);
+        insert_block(right_split_bin, right_split);
+    }
+
+    return left_split;
 }
 
 void* kmalloc(u64 size) {
+    u64 block_size = BLOCK_SIZE(size);
+
     block* best_fit_block = NULL;
     bin* best_fit_bin = find_best_fit_bin(size);
 
@@ -161,11 +226,15 @@ void* kmalloc(u64 size) {
 
     if (best_fit_block == NULL) {
         return NULL; // TODO: try growing heap
-    } else {
     }
 
-    return (void*) KHEAP_START_VADDR;
+    block* result = cut_block(best_fit_bin, best_fit_block, block_size);
+    result->used = true;
+
+    return FREE_SPACE_PTR(result);
 }
+
+#include "../../util.h"
 
 void kfree(void* addr) { UNUSED(addr); }
 
@@ -181,5 +250,5 @@ void kmalloc_init() {
     block* initial_block =
         init_block(KHEAP_START_VADDR, KHEAP_INITIAL_SIZE, NULL, NULL);
     bin* initial_block_bin = find_best_fit_bin(FREE_SIZE(KHEAP_INITIAL_SIZE));
-    insert_into_bin(initial_block_bin, initial_block);
+    insert_block(initial_block_bin, initial_block);
 }
