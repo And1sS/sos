@@ -3,9 +3,10 @@
 
 #include "../../lib/types.h"
 
-#define HEAP_MAX_SIZE 0x10000000000 // 1TB
-#define HEAP_INITIAL_SIZE 0xA00000  // 10MB
+#define KHEAP_MAX_SIZE 0x10000000000 // 1TB
+#define KHEAP_INITIAL_SIZE 0x100000  // 1MB
 
+void kmalloc_init();
 void* kmalloc(u64 size);
 void kfree(void* addr);
 
