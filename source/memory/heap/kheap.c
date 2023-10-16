@@ -1,6 +1,7 @@
 #include "kheap.h"
 
 #include "../../lib/alignment.h"
+#include "../../lib/math.h"
 #include "../../lib/memory_util.h"
 #include "../../memory/memory_map.h"
 #include "../../memory/pmm.h"
@@ -89,14 +90,7 @@ void allocate_initial_heap_array() {
 }
 
 bin* find_best_fit_bin(u64 size) {
-    // TODO: probably replace with binary search
-    for (u8 bin = 0; bin < BINS_COUNT; bin++) {
-        if (size < BIN_ENTRY_MAX_SIZE(bin)) {
-            return &kheap.bins[bin];
-        }
-    }
-
-    return NULL;
+    return size == 0 ? NULL : &kheap.bins[most_significant_bit(size)];
 }
 
 block* preceding_block(block* blk) {
