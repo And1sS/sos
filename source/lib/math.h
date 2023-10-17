@@ -14,7 +14,7 @@ i8 msb_u32(u32 value) {
    return 32 - __builtin_clz(value);
 }
 
-i8 most_significant_bit(u64 value) {
+i8 msb_u64(u64 value) {
     if (value == 0) {
         return -1;
     }

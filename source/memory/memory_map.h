@@ -28,7 +28,7 @@
 #define paddr u64
 #define vaddr u64
 
-#define RESERVED_LOWER_PMEM_SIZE (1024 * 1024) // 1MB
+#define RESERVED_LOWER_PMEM_SIZE 0x100000 // 1MB
 
 #define KERNEL_START_VADDR 0xFFFF800000000000             // 256 entry in p4
 #define KERNEL_VMAPPED_RAM_START_VADDR 0XFFFF888000000000 // 273 entry in p4

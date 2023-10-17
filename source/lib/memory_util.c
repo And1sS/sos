@@ -1,7 +1,5 @@
 #include "memory_util.h"
 
-#define LONG_MASK (sizeof(u64) - 1)
-
 void* memset(void* dst, u8 val, u64 len) {
     u8* _dst = (u8*) dst;
     u8* _rem_dst = _dst + len % sizeof(u64);

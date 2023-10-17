@@ -8,16 +8,23 @@
 #include "../../memory/vmm.h"
 #include "../../spin_lock.h"
 
+// This is simplified version of Doug Lea`s malloc
+
 #define SIZE_UNUSED_BITS 3
+
+#ifdef KHEAP_DEBUG
+#define BLOCK_HEADER_MAGIC 0xDEADBEEF
+#define BLOCK_FOOTER_MAGIC 0xCAFEBABE
+#endif
 
 typedef struct __attribute__((__packed__)) _header {
 #ifdef KHEAP_DEBUG
     u64 magic;
 #endif
 
-    u64 size : 61; // since blocks are 8 bytes aligned, 3 lower bits are unused,
+    u64 size : 61; // Since blocks are 8 bytes aligned, 3 lower bits are unused,
                    // so we can pack size.
-                   // Should be touched only via BLOCK_SIZE macro.
+                   // Should be touched only via block_size function.
                    // sizeof(header) + sizeof(footer) included
 
     u8 reserved : 2;
@@ -36,18 +43,6 @@ typedef struct __attribute__((__packed__)) {
 } footer;
 
 #define block header
-
-#define BLOCK_ADDR(blk) ((vaddr) (blk))
-#define BLOCK_SIZE(blk) ((blk)->size << SIZE_UNUSED_BITS)
-#define FREE_SIZE_FROM_BLOCK_SIZE(block_size)                                  \
-    ((block_size) - sizeof(header) - sizeof(footer))
-#define BLOCK_SIZE_FROM_FREE_SIZE(free_size)                                   \
-    ((free_size) + sizeof(header) + sizeof(footer))
-#define BLOCK_FREE_SIZE(blk) (FREE_SIZE_FROM_BLOCK_SIZE(BLOCK_SIZE((blk))))
-
-#define FREE_SPACE_FROM_BLOCK(blk) ((void*) ((vaddr) (blk) + sizeof(header)))
-#define BLOCK_FROM_FREE_SPACE(free_space)                                      \
-    ((block*) ((vaddr) (free_space) - sizeof(header)))
 #define MIN_BLOCK_SIZE (2 * (sizeof(header) + sizeof(footer)))
 
 typedef struct {
@@ -70,11 +65,91 @@ typedef struct {
 
 static heap kheap;
 
-#define BIN_ENTRY_MAX_SIZE(bin_num) ((u64) 1 << (bin_num))
-#define NEXT_BIN(bin_ptr) ((bin_ptr + 1))
-#define IS_BIN_VALID(bin_ptr)                                                  \
-    ((u64) (bin_ptr) <= (u64) &kheap.bins[BINS_COUNT - 1])                     \
-        && ((u64) (bin_ptr) >= (u64) &kheap.bins[0])
+void allocate_initial_heap_array();
+
+bin* find_best_fit_bin(u64 size);
+bin* find_best_fit_bin_for_block(block* blk);
+void insert_block(bin* bin, block* to_insert);
+block* remove_block(bin* block_bin, block* to_remove);
+
+block* init_block(vaddr addr, u64 size, header* prev, header* next);
+block* init_orphan_block(vaddr addr, u64 size);
+u64 block_size(block* blk);
+block* preceding_block(block* blk);
+block* succeeding_block(block* blk);
+block* find_best_fit_block(bin* bin, u64 size);
+split_result split_block(bin* block_bin, block* to_split, u64 split_size);
+void move_to_valid_bin(bin* block_bin, block* blk);
+block* shrink_block(bin* block_bin, block* cut_from, u64 shrink_size);
+block* coalesce_blocks(block* left, block* right);
+
+void kmalloc_init() {
+    init_lock(&kheap.lock);
+
+    bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
+    for (u8 i = 0; i < BINS_COUNT; i++) {
+        kheap.bins[i].blocks = 0;
+        kheap.bins[i].first = NULL;
+        kheap.bins[i].blocks = NULL;
+    }
+    kheap.capacity = KHEAP_INITIAL_SIZE;
+
+    allocate_initial_heap_array();
+    block* initial_block =
+        init_orphan_block(KHEAP_START_VADDR, KHEAP_INITIAL_SIZE);
+    bin* initial_block_bin = find_best_fit_bin(KHEAP_INITIAL_SIZE);
+    insert_block(initial_block_bin, initial_block);
+
+    spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+}
+
+void* kmalloc(u64 size) {
+    u64 block_size = align_to_upper(size + sizeof(header) + sizeof(footer), 8);
+    bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
+
+    block* best_fit_block = NULL;
+    bin* best_fit_bin = find_best_fit_bin(block_size);
+
+    while (best_fit_block == NULL
+           && best_fit_bin <= &kheap.bins[BINS_COUNT - 1]) {
+
+        best_fit_block = find_best_fit_block(best_fit_bin, block_size);
+        if (best_fit_block == NULL) {
+            best_fit_bin++;
+        }
+    }
+
+    if (best_fit_block == NULL) {
+        return NULL; // TODO: try growing heap
+    }
+
+    block* result = shrink_block(best_fit_bin, best_fit_block, block_size);
+    result->used = true;
+
+    spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+    return (void*) ((vaddr) result + sizeof(header));
+}
+
+void kfree(void* addr) {
+    block* coalesced = (block*) ((vaddr) addr - sizeof(header));
+    bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
+
+    block* preceding = preceding_block(coalesced);
+    block* succeeding = succeeding_block(coalesced);
+
+    if (preceding != NULL && preceding->used == false) {
+        coalesced = coalesce_blocks(preceding, coalesced);
+    }
+    if (succeeding != NULL && succeeding->used == false) {
+        coalesced = coalesce_blocks(coalesced, succeeding);
+    }
+
+    coalesced->used = false;
+    bin* coalesced_block_bin = find_best_fit_bin_for_block(coalesced);
+    insert_block(coalesced_block_bin, coalesced);
+
+    spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+}
 
 void allocate_initial_heap_array() {
     for (u64 vframe = KHEAP_START_VADDR;
@@ -90,8 +165,40 @@ void allocate_initial_heap_array() {
 }
 
 bin* find_best_fit_bin(u64 size) {
-    return size == 0 ? NULL : &kheap.bins[most_significant_bit(size)];
+    return size == 0 ? NULL : &kheap.bins[msb_u64(size)];
 }
+
+bin* find_best_fit_bin_for_block(block* blk) {
+    return find_best_fit_bin(block_size(blk));
+}
+
+block* init_block(vaddr addr, u64 size, header* prev, header* next) {
+    header* head = (header*) addr;
+    head->size = size >> SIZE_UNUSED_BITS;
+    head->reserved = 0;
+    head->used = false;
+    head->prev = prev;
+    head->next = next;
+
+#ifdef KHEAP_DEBUG
+    head->magic = BLOCK_HEADER_MAGIC;
+#endif
+
+    footer* foot = (footer*) ((u64) head + block_size(head) - sizeof(footer));
+    foot->start = head;
+
+#ifdef KHEAP_DEBUG
+    foot->magic = BLOCK_FOOTER_MAGIC;
+#endif
+
+    return head;
+}
+
+block* init_orphan_block(vaddr addr, u64 size) {
+    return init_block(addr, size, NULL, NULL);
+}
+
+u64 block_size(block* blk) { return blk->size << SIZE_UNUSED_BITS; }
 
 block* preceding_block(block* blk) {
     vaddr prec_blk_footer_addr = (vaddr) (blk) - sizeof(footer);
@@ -103,7 +210,7 @@ block* preceding_block(block* blk) {
 }
 
 block* succeeding_block(block* blk) {
-    vaddr succ_blk_header_addr = (vaddr) blk + BLOCK_SIZE(blk);
+    vaddr succ_blk_header_addr = (vaddr) blk + block_size(blk);
     if (succ_blk_header_addr >= KHEAP_START_VADDR + kheap.capacity) {
         return NULL;
     }
@@ -118,34 +225,12 @@ block* find_best_fit_block(bin* bin, u64 size) {
 
     block* cur = bin->first;
     while (cur != NULL) {
-        if (BLOCK_SIZE(cur) > size) {
+        if (block_size(cur) > size) {
             return cur;
         }
     }
 
     return NULL;
-}
-
-block* init_block(vaddr addr, u64 size, header* prev, header* next) {
-    header* head = (header*) addr;
-    head->size = size >> SIZE_UNUSED_BITS;
-    head->reserved = 0;
-    head->used = false;
-    head->prev = prev;
-    head->next = next;
-
-#ifdef KHEAP_DEBUG
-    head->magic = 0xDEADBEEF;
-#endif
-
-    footer* foot = (footer*) ((u64) head + BLOCK_SIZE(head) - sizeof(footer));
-    foot->start = head;
-
-#ifdef KHEAP_DEBUG
-    foot->magic = 0xCAFEBABE;
-#endif
-
-    return head;
 }
 
 void insert_block(bin* bin, block* to_insert) {
@@ -159,7 +244,7 @@ void insert_block(bin* bin, block* to_insert) {
 
     // (spot)a->b->c->null
     // case:
-    if (BLOCK_SIZE(to_insert) < BLOCK_SIZE(first_block)) {
+    if (block_size(to_insert) < block_size(first_block)) {
         to_insert->next = first_block;
         first_block->prev = to_insert;
         bin->first = to_insert;
@@ -171,7 +256,7 @@ void insert_block(bin* bin, block* to_insert) {
         block* prev = first_block;
         block* cur = first_block;
 
-        while (cur != NULL && BLOCK_SIZE(to_insert) > BLOCK_SIZE(cur)) {
+        while (cur != NULL && block_size(to_insert) > block_size(cur)) {
             prev = cur;
             cur = cur->next;
         }
@@ -211,7 +296,7 @@ split_result split_block(bin* block_bin, block* to_split, u64 split_size) {
     block* next = to_split->next;
 
     u64 left_size = split_size;
-    u64 right_size = BLOCK_SIZE(to_split) - split_size;
+    u64 right_size = block_size(to_split) - split_size;
 
     block* left_split = to_split;
     block* right_split = (block*) ((vaddr) to_split + split_size);
@@ -229,15 +314,15 @@ split_result split_block(bin* block_bin, block* to_split, u64 split_size) {
 }
 
 void move_to_valid_bin(bin* block_bin, block* blk) {
-    bin* valid_bin = find_best_fit_bin(BLOCK_SIZE(blk));
+    bin* valid_bin = find_best_fit_bin_for_block(blk);
     if (valid_bin != block_bin) {
         blk = remove_block(block_bin, blk);
         insert_block(valid_bin, blk);
     }
 }
 
-block* cut_block(bin* block_bin, block* cut_from, u64 shrink_size) {
-    u64 new_block_size = BLOCK_SIZE(cut_from) - shrink_size;
+block* shrink_block(bin* block_bin, block* cut_from, u64 shrink_size) {
+    u64 new_block_size = block_size(cut_from) - shrink_size;
     if (new_block_size < MIN_BLOCK_SIZE) {
         return remove_block(block_bin, cut_from);
     }
@@ -250,71 +335,15 @@ block* cut_block(bin* block_bin, block* cut_from, u64 shrink_size) {
     return left_split;
 }
 
-block* coalesce(block* left, block* right) {
-    // TODO: optimize so that we don't reinsert block if coaelsed version is
+block* coalesce_blocks(block* left, block* right) {
+    // TODO: optimize so that we don't reinsert block if coalesced version is
     //       already in right bin
-    bin* left_bin = find_best_fit_bin(BLOCK_SIZE(left));
+    bin* left_bin = find_best_fit_bin_for_block(left);
     remove_block(left_bin, left);
-    bin* right_bin = find_best_fit_bin(BLOCK_SIZE(right));
+    bin* right_bin = find_best_fit_bin_for_block(right);
     remove_block(right_bin, right);
 
-    u64 coalesced_size = BLOCK_SIZE(left) + BLOCK_SIZE(right);
-    init_block((vaddr) left, coalesced_size, NULL, NULL);
+    u64 coalesced_size = block_size(left) + block_size(right);
+    init_orphan_block((vaddr) left, coalesced_size);
     return left;
-}
-
-void* kmalloc(u64 size) {
-    u64 block_size = align_to_upper(BLOCK_SIZE_FROM_FREE_SIZE(size), 8);
-
-    block* best_fit_block = NULL;
-    bin* best_fit_bin = find_best_fit_bin(block_size);
-
-    while (best_fit_block == NULL && IS_BIN_VALID(best_fit_bin)) {
-        best_fit_block = find_best_fit_block(best_fit_bin, block_size);
-        if (best_fit_block == NULL) {
-            best_fit_bin = NEXT_BIN(best_fit_bin);
-        }
-    }
-
-    if (best_fit_block == NULL) {
-        return NULL; // TODO: try growing heap
-    }
-
-    block* result = cut_block(best_fit_bin, best_fit_block, block_size);
-    result->used = true;
-
-    return FREE_SPACE_FROM_BLOCK(result);
-}
-
-void kfree(void* addr) {
-    block* coalesced = BLOCK_FROM_FREE_SPACE(addr);
-    block* preceding = preceding_block(coalesced);
-    block* succeeding = succeeding_block(coalesced);
-
-    if (preceding != NULL && preceding->used == false) {
-        coalesced = coalesce(preceding, coalesced);
-    }
-    if (succeeding != NULL && succeeding->used == false) {
-        coalesced = coalesce(coalesced, succeeding);
-    }
-
-    coalesced->used = false;
-    bin* coalesced_block_bin = find_best_fit_bin(BLOCK_SIZE(coalesced));
-    insert_block(coalesced_block_bin, coalesced);
-}
-
-void kmalloc_init() {
-    init_lock(&kheap.lock);
-    for (u8 i = 0; i < BINS_COUNT; i++) {
-        kheap.bins[i].blocks = 0;
-        kheap.bins[i].first = NULL;
-        kheap.bins[i].blocks = NULL;
-    }
-    kheap.capacity = KHEAP_INITIAL_SIZE;
-
-    allocate_initial_heap_array();
-    block* initial_block =
-        init_block(KHEAP_START_VADDR, KHEAP_INITIAL_SIZE, NULL, NULL);
-    bin* initial_block_bin = find_best_fit_bin(KHEAP_INITIAL_SIZE);
-    insert_block(initial_block_bin, initial_block);
 }
