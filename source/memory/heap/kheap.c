@@ -219,18 +219,12 @@ block* succeeding_block(block* blk) {
 }
 
 block* find_best_fit_block(bin* bin, u64 size) {
-    if (bin->blocks == 0) {
-        return NULL;
-    }
-
     block* cur = bin->first;
-    while (cur != NULL) {
-        if (block_size(cur) > size) {
-            return cur;
-        }
+    while (cur != NULL && block_size(cur) <= size) {
+        cur = cur->next;
     }
 
-    return NULL;
+    return cur;
 }
 
 void insert_block(bin* bin, block* to_insert) {
