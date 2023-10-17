@@ -47,7 +47,10 @@ typedef struct __attribute__((__packed__)) {
 
 typedef struct {
     block* first;
+
+#ifdef KHEAP_DEBUG
     u64 blocks;
+#endif
 } bin;
 
 #define BINS_COUNT 64
@@ -91,22 +94,11 @@ block* shrink_block(bin* block_bin, block* cut_from, u64 shrink_size);
 block* coalesce_blocks(block* left, block* right);
 
 void kmalloc_init() {
+    memset(&kheap, 0, sizeof(kheap));
     init_lock(&kheap.lock);
 
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
-    for (u8 i = 0; i < BINS_COUNT; i++) {
-        kheap.bins[i].blocks = 0;
-        kheap.bins[i].first = NULL;
-        kheap.bins[i].blocks = NULL;
-    }
-    kheap.capacity = 0;
-
     grow_heap(KHEAP_INITIAL_SIZE);
-    block* initial_block =
-        init_orphan_block(KHEAP_START_VADDR, KHEAP_INITIAL_SIZE);
-    bin* initial_block_bin = find_best_fit_bin(KHEAP_INITIAL_SIZE);
-    insert_block(initial_block_bin, initial_block);
-
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 }
 
@@ -129,10 +121,10 @@ void kfree(void* addr) {
     block* preceding = preceding_block(coalesced);
     block* succeeding = succeeding_block(coalesced);
 
-    if (preceding != NULL && preceding->used == false) {
+    if (preceding != NULL && !preceding->used) {
         coalesced = coalesce_blocks(preceding, coalesced);
     }
-    if (succeeding != NULL && succeeding->used == false) {
+    if (succeeding != NULL && !succeeding->used) {
         coalesced = coalesce_blocks(coalesced, succeeding);
     }
 
@@ -154,8 +146,13 @@ void grow_heap(u64 size) {
             map_page(vframe, pframe, 1 | 2 | 4);
         }
     }
-
     memset((void*) start, 0, size);
+
+    init_orphan_block(start, size);
+    block* blk = (block*) start;
+    bin* block_bin = find_best_fit_bin(size);
+    insert_block(block_bin, blk);
+
     kheap.capacity += size;
 }
 
@@ -246,8 +243,7 @@ best_fit_result find_best_fit_or_grow(u64 size) {
 }
 
 void insert_block(bin* bin, block* to_insert) {
-    if (bin->blocks == 0) {
-        bin->blocks = 1;
+    if (bin->first == NULL) {
         bin->first = to_insert;
         return;
     }
@@ -281,7 +277,9 @@ void insert_block(bin* bin, block* to_insert) {
             cur->prev = to_insert;
         }
     }
+#ifdef KHEAP_DEBUG
     bin->blocks++;
+#endif
 }
 
 block* remove_block(bin* block_bin, block* to_remove) {
@@ -296,8 +294,9 @@ block* remove_block(bin* block_bin, block* to_remove) {
     if (next != NULL) {
         next->prev = prev;
     }
+#ifdef KHEAP_DEBUG
     block_bin->blocks--;
-
+#endif
     to_remove->prev = NULL;
     to_remove->next = NULL;
     return to_remove;
@@ -319,7 +318,10 @@ split_result split_block(bin* block_bin, block* to_split, u64 split_size) {
         block_bin->first = left_split;
     }
 
+#ifdef KHEAP_DEBUG
     block_bin->blocks++;
+#endif
+
     split_result result = {.left_split = left_split,
                            .right_split = right_split};
     return result;
@@ -351,9 +353,13 @@ block* coalesce_blocks(block* left, block* right) {
     // TODO: optimize so that we don't reinsert block if coalesced version is
     //       already in right bin
     bin* left_bin = find_best_fit_bin_for_block(left);
-    remove_block(left_bin, left);
+    if (!left->used) {
+        remove_block(left_bin, left);
+    }
     bin* right_bin = find_best_fit_bin_for_block(right);
-    remove_block(right_bin, right);
+    if (!right->used) {
+        remove_block(right_bin, right);
+    }
 
     u64 coalesced_size = block_size(left) + block_size(right);
     init_orphan_block((vaddr) left, coalesced_size);
