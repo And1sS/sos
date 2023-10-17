@@ -63,12 +63,20 @@ typedef struct {
     block* right_split;
 } split_result;
 
+typedef struct {
+    block* blk;
+    bin* blk_bin;
+} best_fit_result;
+
 static heap kheap;
 
-void allocate_initial_heap_array();
+void grow_heap(u64 size);
 
 bin* find_best_fit_bin(u64 size);
 bin* find_best_fit_bin_for_block(block* blk);
+block* find_best_fit_block(bin* bin, u64 size);
+best_fit_result find_best_fit_or_grow(u64 size);
+
 void insert_block(bin* bin, block* to_insert);
 block* remove_block(bin* block_bin, block* to_remove);
 
@@ -77,7 +85,6 @@ block* init_orphan_block(vaddr addr, u64 size);
 u64 block_size(block* blk);
 block* preceding_block(block* blk);
 block* succeeding_block(block* blk);
-block* find_best_fit_block(bin* bin, u64 size);
 split_result split_block(bin* block_bin, block* to_split, u64 split_size);
 void move_to_valid_bin(bin* block_bin, block* blk);
 block* shrink_block(bin* block_bin, block* cut_from, u64 shrink_size);
@@ -92,9 +99,9 @@ void kmalloc_init() {
         kheap.bins[i].first = NULL;
         kheap.bins[i].blocks = NULL;
     }
-    kheap.capacity = KHEAP_INITIAL_SIZE;
+    kheap.capacity = 0;
 
-    allocate_initial_heap_array();
+    grow_heap(KHEAP_INITIAL_SIZE);
     block* initial_block =
         init_orphan_block(KHEAP_START_VADDR, KHEAP_INITIAL_SIZE);
     bin* initial_block_bin = find_best_fit_bin(KHEAP_INITIAL_SIZE);
@@ -107,23 +114,8 @@ void* kmalloc(u64 size) {
     u64 block_size = align_to_upper(size + sizeof(header) + sizeof(footer), 8);
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
 
-    block* best_fit_block = NULL;
-    bin* best_fit_bin = find_best_fit_bin(block_size);
-
-    while (best_fit_block == NULL
-           && best_fit_bin <= &kheap.bins[BINS_COUNT - 1]) {
-
-        best_fit_block = find_best_fit_block(best_fit_bin, block_size);
-        if (best_fit_block == NULL) {
-            best_fit_bin++;
-        }
-    }
-
-    if (best_fit_block == NULL) {
-        return NULL; // TODO: try growing heap
-    }
-
-    block* result = shrink_block(best_fit_bin, best_fit_block, block_size);
+    best_fit_result best_fit = find_best_fit_or_grow(block_size);
+    block* result = shrink_block(best_fit.blk_bin, best_fit.blk, block_size);
     result->used = true;
 
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
@@ -151,17 +143,20 @@ void kfree(void* addr) {
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 }
 
-void allocate_initial_heap_array() {
-    for (u64 vframe = KHEAP_START_VADDR;
-         vframe < KHEAP_START_VADDR + KHEAP_INITIAL_SIZE; vframe++) {
+void grow_heap(u64 size) {
+    u64 start = KHEAP_START_VADDR + kheap.capacity;
+    u64 end = start + size;
 
+    for (u64 vframe = start; vframe < end; vframe++) {
         u64 page = get_page(vframe);
         if (!(page & 1)) {
             paddr pframe = allocate_frame();
             map_page(vframe, pframe, 1 | 2 | 4);
         }
     }
-    memset((void*) KHEAP_START_VADDR, 0, KHEAP_INITIAL_SIZE);
+
+    memset((void*) start, 0, size);
+    kheap.capacity += size;
 }
 
 bin* find_best_fit_bin(u64 size) {
@@ -225,6 +220,29 @@ block* find_best_fit_block(bin* bin, u64 size) {
     }
 
     return cur;
+}
+
+best_fit_result find_best_fit_or_grow(u64 size) {
+    block* best_fit_block = NULL;
+    bin* best_fit_bin = find_best_fit_bin(size);
+
+    while (best_fit_block == NULL
+           && best_fit_bin <= &kheap.bins[BINS_COUNT - 1]) {
+
+        best_fit_block = find_best_fit_block(best_fit_bin, size);
+        if (best_fit_block == NULL) {
+            best_fit_bin++;
+        }
+    }
+
+    if (best_fit_block == NULL) {
+        // TODO: add kheap limit checks
+        grow_heap(kheap.capacity / 2);
+        return find_best_fit_or_grow(size);
+    }
+
+    best_fit_result result = {.blk = best_fit_block, .blk_bin = best_fit_bin};
+    return result;
 }
 
 void insert_block(bin* bin, block* to_insert) {
