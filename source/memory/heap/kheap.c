@@ -79,7 +79,7 @@ typedef struct {
 
 typedef struct {
     bool fits;
-    block* aligned_block_start;
+    block* aligned_block;
     u64 alignment_gap;
     bin* aligned_block_bin;
 } aligned_best_fit_result;
@@ -148,29 +148,25 @@ void* kmalloc_aligned(u64 size, u64 alignment) {
     aligned_best_fit_result best_fit =
         find_best_fit_or_grow_aligned(block_size, alignment);
 
-    if (best_fit.alignment_gap == 0) {
-        shrink_result result =
-            shrink_block(best_fit.aligned_block_bin,
-                         best_fit.aligned_block_start, block_size);
-        block* result_block = result.orphan;
+    u64 alignment_gap = best_fit.alignment_gap;
+    block* blk = best_fit.aligned_block;
+    bin* blk_bin = best_fit.aligned_block_bin;
+
+    if (alignment_gap == 0) {
+        block* result_block = shrink_block(blk_bin, blk, block_size).orphan;
         result_block->used = true;
+        spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 
         return free_space(result_block);
     }
 
-    shrink_result alignment_gap_result =
-        shrink_block(best_fit.aligned_block_bin, best_fit.aligned_block_start,
-                     best_fit.alignment_gap);
+    shrink_result gap_result = shrink_block(blk_bin, blk, alignment_gap);
+    block* gap_block = gap_result.orphan;
+    block* remainder = gap_result.remaining;
+    bin* remainder_bin = gap_result.remaining_bin;
 
-    block* alignment_gap_block = alignment_gap_result.orphan;
-    block* aligned_remainder = alignment_gap_result.remaining;
-    bin* aligned_remainder_bin = alignment_gap_result.remaining_bin;
-
-    shrink_result result =
-        shrink_block(aligned_remainder_bin, aligned_remainder, block_size);
-
-    insert_block(find_best_fit_bin_for_block(alignment_gap_block),
-                 alignment_gap_block);
+    shrink_result result = shrink_block(remainder_bin, remainder, block_size);
+    insert_block(find_best_fit_bin_for_block(gap_block), gap_block);
 
     block* result_block = result.orphan;
     result_block->used = true;
@@ -219,8 +215,7 @@ void grow_heap(u64 size) {
     memset((void*) start, 0, aligned_size);
 
     block* blk = init_orphan_block(start, aligned_size);
-    void* free = free_space(blk);
-    kfree_unsafe(free);
+    kfree_unsafe(free_space(blk));
 
     kheap.capacity += aligned_size;
 }
@@ -312,7 +307,7 @@ aligned_block_fit_result block_fits_for_aligned_allocation(block* blk, u64 size,
             block_end > free_space_start ? block_end - free_space_start : 0;
     }
 
-    if (free_space_aligned_size > size && gap_size > MIN_BLOCK_SIZE) {
+    if (free_space_aligned_size >= size && gap_size >= MIN_BLOCK_SIZE) {
         aligned_block_fit_result result = {.fits = true,
                                            .aligned_block_start = blk,
                                            .alignment_gap = gap_size};
@@ -363,7 +358,7 @@ aligned_best_fit_result find_best_fit_aligned(u64 size, u64 alignment) {
     bool fits = best_fit.fits;
     aligned_best_fit_result result = {
         .fits = fits,
-        .aligned_block_start = fits ? best_fit_block : NULL,
+        .aligned_block = fits ? best_fit_block : NULL,
         .alignment_gap = fits ? best_fit.alignment_gap : 0,
         .aligned_block_bin = fits ? best_fit_bin : NULL};
 
@@ -426,7 +421,7 @@ void insert_block(bin* bin, block* to_insert) {
 
     // (spot)a->b->c->null
     // case:
-    if (block_size(to_insert) < block_size(first_block)) {
+    if (block_size(to_insert) <= block_size(first_block)) {
         to_insert->next = first_block;
         first_block->prev = to_insert;
         bin->first = to_insert;
@@ -435,7 +430,7 @@ void insert_block(bin* bin, block* to_insert) {
     // a->b->c->(spot)null
     // cases:
     else {
-        block* prev = first_block;
+        block* prev = NULL;
         block* cur = first_block;
 
         while (cur && block_size(to_insert) > block_size(cur)) {
@@ -443,7 +438,11 @@ void insert_block(bin* bin, block* to_insert) {
             cur = cur->next;
         }
 
-        prev->next = to_insert;
+        if (prev) {
+            prev->next = to_insert;
+        } else {
+            bin->first = to_insert;
+        }
         to_insert->next = cur;
         to_insert->prev = prev;
 
