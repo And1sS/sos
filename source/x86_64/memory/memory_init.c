@@ -4,8 +4,6 @@
 
 #include "identity_map.h"
 
-void init_kheap();
-
 void init_memory(const multiboot_info* const mboot_info) {
     init_pmm();
     identity_map_ram(mboot_info);
@@ -18,11 +16,11 @@ void init_memory(const multiboot_info* const mboot_info) {
     print_u64(KHEAP_INITIAL_SIZE);
     println("");
 
-    //1-, 2-, 3-, gap(1872), 4-, 5+
-    //1+, 2-, 3-, gap(1872), 4-, 5+
-    //1+, 2-, gap(2904), 4-, 5+
-    //gap(4072), 4-, 5+
-    //1+, 2-, gap(2904), 4-
+    // 1-, 2-, 3-, gap(1872), 4-, 5+
+    // 1+, 2-, 3-, gap(1872), 4-, 5+
+    // 1+, 2-, gap(2904), 4-, 5+
+    // gap(4072), 4-, 5+
+    // 1+, 2-, gap(2904), 4-
     void* test1 = kmalloc(100);
     void* test2 = kmalloc(1000);
     void* test3 = kmalloc(1000);
