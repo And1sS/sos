@@ -8,6 +8,7 @@
 
 void kmalloc_init();
 void* kmalloc(u64 size);
+// alignment must be multiple of 8
 void* kmalloc_aligned(u64 size, u64 alignment);
 void kfree(void* addr);
 
