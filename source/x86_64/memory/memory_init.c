@@ -17,4 +17,25 @@ void init_memory(const multiboot_info* const mboot_info) {
     print("Finished kernel heap initialization! Heap initial size: ");
     print_u64(KHEAP_INITIAL_SIZE);
     println("");
+
+    //1-, 2-, 3-, gap(1872), 4-, 5+
+    //1+, 2-, 3-, gap(1872), 4-, 5+
+    //1+, 2-, gap(2904), 4-, 5+
+    //gap(4072), 4-, 5+
+    //1+, 2-, gap(2904), 4-
+    void* test1 = kmalloc(100);
+    void* test2 = kmalloc(1000);
+    void* test3 = kmalloc(1000);
+    void* test4 = kmalloc_aligned(10000, FRAME_SIZE);
+
+    kfree(test1);
+    kfree(test3);
+    kfree(test2);
+    kfree(test4);
+
+    for (int i = 0; i < 10000; ++i) {
+        kmalloc(1000);
+    }
+
+    println("here!");
 }

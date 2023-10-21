@@ -71,6 +71,25 @@ typedef struct {
     bin* blk_bin;
 } best_fit_result;
 
+typedef struct {
+    bool fits;
+    block* aligned_block_start;
+    u64 alignment_gap;
+} aligned_block_fit_result;
+
+typedef struct {
+    bool fits;
+    block* aligned_block_start;
+    u64 alignment_gap;
+    bin* aligned_block_bin;
+} aligned_best_fit_result;
+
+typedef struct {
+    block* orphan;
+    block* remaining;
+    bin* remaining_bin;
+} shrink_result;
+
 static heap kheap;
 
 void kfree_unsafe(void* addr);
@@ -81,6 +100,7 @@ bin* find_best_fit_bin_for_block(block* blk);
 block* find_best_fit_block(bin* bin, u64 size);
 best_fit_result find_best_fit(u64 size);
 best_fit_result find_best_fit_or_grow(u64 size);
+aligned_best_fit_result find_best_fit_or_grow_aligned(u64 size, u64 alignment);
 
 void insert_block(bin* bin, block* to_insert);
 block* remove_block(bin* block_bin, block* to_remove);
@@ -91,9 +111,11 @@ u64 block_size(block* blk);
 block* preceding_block(block* blk);
 block* succeeding_block(block* blk);
 split_result split_block(bin* block_bin, block* to_split, u64 split_size);
-void move_to_valid_bin(bin* block_bin, block* blk);
-block* shrink_block(bin* block_bin, block* cut_from, u64 shrink_size);
+bin* move_to_valid_bin(bin* block_bin, block* blk);
+shrink_result shrink_block(bin* block_bin, block* cut_from, u64 shrink_size);
 block* coalesce_blocks(block* left, block* right);
+
+void* free_space(block* blk);
 
 void kmalloc_init() {
     memset(&kheap, 0, sizeof(kheap));
@@ -109,11 +131,53 @@ void* kmalloc(u64 size) {
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
 
     best_fit_result best_fit = find_best_fit_or_grow(block_size);
-    block* result = shrink_block(best_fit.blk_bin, best_fit.blk, block_size);
-    result->used = true;
+    shrink_result result =
+        shrink_block(best_fit.blk_bin, best_fit.blk, block_size);
+    block* result_block = result.orphan;
+    result_block->used = true;
 
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
-    return (void*) ((vaddr) result + sizeof(header));
+
+    return free_space(result_block);
+}
+
+void* kmalloc_aligned(u64 size, u64 alignment) {
+    u64 block_size = align_to_upper(size + sizeof(header) + sizeof(footer), 8);
+    bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
+
+    aligned_best_fit_result best_fit =
+        find_best_fit_or_grow_aligned(block_size, alignment);
+
+    if (best_fit.alignment_gap == 0) {
+        shrink_result result =
+            shrink_block(best_fit.aligned_block_bin,
+                         best_fit.aligned_block_start, block_size);
+        block* result_block = result.orphan;
+        result_block->used = true;
+
+        return free_space(result_block);
+    }
+
+    shrink_result alignment_gap_result =
+        shrink_block(best_fit.aligned_block_bin, best_fit.aligned_block_start,
+                     best_fit.alignment_gap);
+
+    block* alignment_gap_block = alignment_gap_result.orphan;
+    block* aligned_remainder = alignment_gap_result.remaining;
+    bin* aligned_remainder_bin = alignment_gap_result.remaining_bin;
+
+    shrink_result result =
+        shrink_block(aligned_remainder_bin, aligned_remainder, block_size);
+
+    insert_block(find_best_fit_bin_for_block(alignment_gap_block),
+                 alignment_gap_block);
+
+    block* result_block = result.orphan;
+    result_block->used = true;
+
+    spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+
+    return free_space(result_block);
 }
 
 void kfree(void* addr) {
@@ -155,8 +219,8 @@ void grow_heap(u64 size) {
     memset((void*) start, 0, aligned_size);
 
     block* blk = init_orphan_block(start, aligned_size);
-    void* free_space = (void*) ((vaddr) blk + sizeof(header));
-    kfree_unsafe(free_space);
+    void* free = free_space(blk);
+    kfree_unsafe(free);
 
     kheap.capacity += aligned_size;
 }
@@ -215,6 +279,66 @@ block* succeeding_block(block* blk) {
     return (block*) succ_blk_header_addr;
 }
 
+aligned_block_fit_result block_fits_for_aligned_allocation(block* blk, u64 size,
+                                                           u64 alignment) {
+
+    vaddr block_start = (vaddr) blk;
+    vaddr free = (vaddr) free_space(blk);
+    vaddr free_space_aligned = align_to_upper(free, alignment);
+    if (free == free_space_aligned) {
+        aligned_block_fit_result result = {
+            .fits = true, .aligned_block_start = blk, .alignment_gap = 0};
+        return result;
+    }
+
+    vaddr block_end = block_start + block_size(blk);
+    vaddr free_space_start = free_space_aligned;
+    vaddr aligned_block_start = free_space_start - sizeof(header);
+
+    u64 gap_size = aligned_block_start > block_start
+                       ? aligned_block_start - block_start
+                       : 0;
+    u64 free_space_aligned_size = block_end - free_space_start;
+
+    while (free_space_start < block_end && free_space_aligned_size > size
+           && gap_size < MIN_BLOCK_SIZE) {
+        free_space_start += alignment;
+
+        aligned_block_start = free_space_start - sizeof(header);
+        gap_size = aligned_block_start > block_start
+                       ? aligned_block_start - block_start
+                       : 0;
+        free_space_aligned_size =
+            block_end > free_space_start ? block_end - free_space_start : 0;
+    }
+
+    if (free_space_aligned_size > size && gap_size > MIN_BLOCK_SIZE) {
+        aligned_block_fit_result result = {.fits = true,
+                                           .aligned_block_start = blk,
+                                           .alignment_gap = gap_size};
+        return result;
+    }
+
+    aligned_block_fit_result result = {
+        .fits = false, .aligned_block_start = NULL, .alignment_gap = 0};
+    return result;
+}
+
+aligned_block_fit_result find_best_fit_block_aligned(bin* bin, u64 size,
+                                                     u64 alignment) {
+    block* cur = bin->first;
+    aligned_block_fit_result res = {
+        .fits = false, .aligned_block_start = NULL, .alignment_gap = 0};
+
+    while (cur
+           && !((res = block_fits_for_aligned_allocation(cur, size, alignment))
+                    .fits)) {
+        cur = cur->next;
+    }
+
+    return res;
+}
+
 block* find_best_fit_block(bin* bin, u64 size) {
     block* cur = bin->first;
     while (cur && block_size(cur) <= size) {
@@ -222,6 +346,28 @@ block* find_best_fit_block(bin* bin, u64 size) {
     }
 
     return cur;
+}
+
+aligned_best_fit_result find_best_fit_aligned(u64 size, u64 alignment) {
+    aligned_block_fit_result best_fit = {.fits = false,
+                                         .aligned_block_start = NULL};
+    block* best_fit_block = NULL;
+    bin* best_fit_bin = find_best_fit_bin(size);
+
+    while (!best_fit_block && best_fit_bin <= &kheap.bins[BINS_COUNT - 1]) {
+        best_fit = find_best_fit_block_aligned(best_fit_bin, size, alignment);
+        best_fit_block = best_fit.aligned_block_start;
+        best_fit_bin += !best_fit_block ? 1 : 0;
+    }
+
+    bool fits = best_fit.fits;
+    aligned_best_fit_result result = {
+        .fits = fits,
+        .aligned_block_start = fits ? best_fit_block : NULL,
+        .alignment_gap = fits ? best_fit.alignment_gap : 0,
+        .aligned_block_bin = fits ? best_fit_bin : NULL};
+
+    return result;
 }
 
 best_fit_result find_best_fit(u64 size) {
@@ -237,6 +383,21 @@ best_fit_result find_best_fit(u64 size) {
                               .blk_bin = best_fit_block ? best_fit_bin : NULL};
 
     return result;
+}
+
+aligned_best_fit_result find_best_fit_or_grow_aligned(u64 size, u64 alignment) {
+    aligned_best_fit_result result;
+
+    while (true) {
+        result = find_best_fit_aligned(size, alignment);
+        bool found = result.fits;
+
+        if (!found) {
+            grow_heap(size);
+        } else {
+            return result;
+        }
+    }
 }
 
 best_fit_result find_best_fit_or_grow(u64 size) {
@@ -340,26 +501,36 @@ split_result split_block(bin* block_bin, block* to_split, u64 split_size) {
     return result;
 }
 
-void move_to_valid_bin(bin* block_bin, block* blk) {
+bin* move_to_valid_bin(bin* block_bin, block* blk) {
     bin* valid_bin = find_best_fit_bin_for_block(blk);
     if (valid_bin != block_bin) {
         blk = remove_block(block_bin, blk);
         insert_block(valid_bin, blk);
     }
+
+    return valid_bin;
 }
 
-block* shrink_block(bin* block_bin, block* cut_from, u64 shrink_size) {
+shrink_result shrink_block(bin* block_bin, block* cut_from, u64 shrink_size) {
+    shrink_result result = {
+        .orphan = NULL, .remaining = NULL, .remaining_bin = NULL};
+
     u64 new_block_size = block_size(cut_from) - shrink_size;
     if (new_block_size < MIN_BLOCK_SIZE) {
-        return remove_block(block_bin, cut_from);
+        result.orphan = remove_block(block_bin, cut_from);
+        return result;
     }
 
     split_result splits = split_block(block_bin, cut_from, shrink_size);
     block* left_split = remove_block(block_bin, splits.left_split);
     block* right_split = splits.right_split;
-    move_to_valid_bin(block_bin, right_split);
+    bin* right_split_bin = move_to_valid_bin(block_bin, right_split);
 
-    return left_split;
+    result.orphan = left_split;
+    result.remaining = right_split;
+    result.remaining_bin = right_split_bin;
+
+    return result;
 }
 
 block* coalesce_blocks(block* left, block* right) {
@@ -378,3 +549,5 @@ block* coalesce_blocks(block* left, block* right) {
     init_orphan_block((vaddr) left, coalesced_size);
     return left;
 }
+
+void* free_space(block* blk) { return (void*) ((vaddr) blk + sizeof(header)); }

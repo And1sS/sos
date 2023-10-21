@@ -8,6 +8,7 @@
 
 void kmalloc_init();
 void* kmalloc(u64 size);
+void* kmalloc_aligned(u64 size, u64 alignment);
 void kfree(void* addr);
 
 #endif // SOS_KHEAP_H
