@@ -73,11 +73,13 @@ typedef struct {
 
 static heap kheap;
 
+void kfree_unsafe(void* addr);
 void grow_heap(u64 size);
 
 bin* find_best_fit_bin(u64 size);
 bin* find_best_fit_bin_for_block(block* blk);
 block* find_best_fit_block(bin* bin, u64 size);
+best_fit_result find_best_fit(u64 size);
 best_fit_result find_best_fit_or_grow(u64 size);
 
 void insert_block(bin* bin, block* to_insert);
@@ -115,8 +117,13 @@ void* kmalloc(u64 size) {
 }
 
 void kfree(void* addr) {
-    block* coalesced = (block*) ((vaddr) addr - sizeof(header));
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
+    kfree_unsafe(addr);
+    spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+}
+
+void kfree_unsafe(void* addr) {
+    block* coalesced = (block*) ((vaddr) addr - sizeof(header));
 
     block* preceding = preceding_block(coalesced);
     block* succeeding = succeeding_block(coalesced);
@@ -131,13 +138,12 @@ void kfree(void* addr) {
     coalesced->used = false;
     bin* coalesced_block_bin = find_best_fit_bin_for_block(coalesced);
     insert_block(coalesced_block_bin, coalesced);
-
-    spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 }
 
 void grow_heap(u64 size) {
+    u64 aligned_size = align_to_upper(size, FRAME_SIZE);
     u64 start = KHEAP_START_VADDR + kheap.capacity;
-    u64 end = start + size;
+    u64 end = start + aligned_size;
 
     for (u64 vframe = start; vframe < end; vframe++) {
         u64 page = get_page(vframe);
@@ -146,14 +152,13 @@ void grow_heap(u64 size) {
             map_page(vframe, pframe, 1 | 2 | 4);
         }
     }
-    memset((void*) start, 0, size);
+    memset((void*) start, 0, aligned_size);
 
-    init_orphan_block(start, size);
-    block* blk = (block*) start;
-    bin* block_bin = find_best_fit_bin(size);
-    insert_block(block_bin, blk);
+    block* blk = init_orphan_block(start, aligned_size);
+    void* free_space = (void*) ((vaddr) blk + sizeof(header));
+    kfree_unsafe(free_space);
 
-    kheap.capacity += size;
+    kheap.capacity += aligned_size;
 }
 
 bin* find_best_fit_bin(u64 size) {
@@ -212,38 +217,46 @@ block* succeeding_block(block* blk) {
 
 block* find_best_fit_block(bin* bin, u64 size) {
     block* cur = bin->first;
-    while (cur != NULL && block_size(cur) <= size) {
+    while (cur && block_size(cur) <= size) {
         cur = cur->next;
     }
 
     return cur;
 }
 
-best_fit_result find_best_fit_or_grow(u64 size) {
+best_fit_result find_best_fit(u64 size) {
     block* best_fit_block = NULL;
     bin* best_fit_bin = find_best_fit_bin(size);
 
-    while (best_fit_block == NULL
-           && best_fit_bin <= &kheap.bins[BINS_COUNT - 1]) {
-
+    while (!best_fit_block && best_fit_bin <= &kheap.bins[BINS_COUNT - 1]) {
         best_fit_block = find_best_fit_block(best_fit_bin, size);
-        if (best_fit_block == NULL) {
-            best_fit_bin++;
-        }
+        best_fit_bin += !best_fit_block ? 1 : 0;
     }
 
-    if (best_fit_block == NULL) {
-        // TODO: add kheap limit checks
-        grow_heap(kheap.capacity / 2);
-        return find_best_fit_or_grow(size);
-    }
+    best_fit_result result = {.blk = best_fit_block,
+                              .blk_bin = best_fit_block ? best_fit_bin : NULL};
 
-    best_fit_result result = {.blk = best_fit_block, .blk_bin = best_fit_bin};
     return result;
 }
 
+best_fit_result find_best_fit_or_grow(u64 size) {
+    while (true) {
+        best_fit_result best_fit = find_best_fit(size);
+        block* best_fit_block = best_fit.blk;
+        bin* best_fit_bin = best_fit.blk_bin;
+
+        if (!best_fit_block) {
+            grow_heap(size);
+        } else {
+            best_fit_result result = {.blk = best_fit_block,
+                                      .blk_bin = best_fit_bin};
+            return result;
+        }
+    }
+}
+
 void insert_block(bin* bin, block* to_insert) {
-    if (bin->first == NULL) {
+    if (!bin->first) {
         bin->first = to_insert;
         return;
     }
@@ -264,7 +277,7 @@ void insert_block(bin* bin, block* to_insert) {
         block* prev = first_block;
         block* cur = first_block;
 
-        while (cur != NULL && block_size(to_insert) > block_size(cur)) {
+        while (cur && block_size(to_insert) > block_size(cur)) {
             prev = cur;
             cur = cur->next;
         }
@@ -273,7 +286,7 @@ void insert_block(bin* bin, block* to_insert) {
         to_insert->next = cur;
         to_insert->prev = prev;
 
-        if (cur != NULL) { // a->b->(spot)c->null
+        if (cur) { // a->b->(spot)c->null
             cur->prev = to_insert;
         }
     }
@@ -314,7 +327,7 @@ split_result split_block(bin* block_bin, block* to_split, u64 split_size) {
     init_block((vaddr) left_split, left_size, prev, right_split);
     init_block((vaddr) right_split, right_size, left_split, next);
 
-    if (prev == NULL) {
+    if (!prev) {
         block_bin->first = left_split;
     }
 
