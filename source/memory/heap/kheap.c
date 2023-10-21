@@ -141,6 +141,7 @@ void* kmalloc(u64 size) {
     return free_space(result_block);
 }
 
+// alignment must be multiple of 8
 void* kmalloc_aligned(u64 size, u64 alignment) {
     u64 block_size = align_to_upper(size + sizeof(header) + sizeof(footer), 8);
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
@@ -205,7 +206,7 @@ void grow_heap(u64 size) {
     u64 start = KHEAP_START_VADDR + kheap.capacity;
     u64 end = start + aligned_size;
 
-    for (u64 vframe = start; vframe < end; vframe++) {
+    for (u64 vframe = start; vframe < end; vframe += FRAME_SIZE) {
         u64 page = get_page(vframe);
         if (!(page & 1)) {
             paddr pframe = allocate_frame();
@@ -280,12 +281,6 @@ aligned_block_fit_result block_fits_for_aligned_allocation(block* blk, u64 size,
     vaddr block_start = (vaddr) blk;
     vaddr free = (vaddr) free_space(blk);
     vaddr free_space_aligned = align_to_upper(free, alignment);
-    if (free == free_space_aligned) {
-        aligned_block_fit_result result = {
-            .fits = true, .aligned_block_start = blk, .alignment_gap = 0};
-        return result;
-    }
-
     vaddr block_end = block_start + block_size(blk);
     vaddr free_space_start = free_space_aligned;
     vaddr aligned_block_start = free_space_start - sizeof(header);
@@ -294,6 +289,12 @@ aligned_block_fit_result block_fits_for_aligned_allocation(block* blk, u64 size,
                        ? aligned_block_start - block_start
                        : 0;
     u64 free_space_aligned_size = block_end - free_space_start;
+
+    if (free == free_space_aligned && free_space_aligned_size >= size) {
+        aligned_block_fit_result result = {
+            .fits = true, .aligned_block_start = blk, .alignment_gap = 0};
+        return result;
+    }
 
     while (free_space_start < block_end && free_space_aligned_size > size
            && gap_size < MIN_BLOCK_SIZE) {
