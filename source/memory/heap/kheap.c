@@ -72,13 +72,11 @@ typedef struct {
 } best_fit_result;
 
 typedef struct {
-    bool fits;
-    block* aligned_block_start;
+    block* aligned_block;
     u64 alignment_gap;
 } aligned_block_fit_result;
 
 typedef struct {
-    bool fits;
     block* aligned_block;
     u64 alignment_gap;
     bin* aligned_block_bin;
@@ -93,7 +91,7 @@ typedef struct {
 static heap kheap;
 
 void kfree_unsafe(void* addr);
-void grow_heap(u64 size);
+bool grow_heap(u64 size);
 
 bin* find_best_fit_bin(u64 size);
 bin* find_best_fit_bin_for_block(block* blk);
@@ -122,7 +120,7 @@ void kmalloc_init() {
     init_lock(&kheap.lock);
 
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
-    grow_heap(KHEAP_INITIAL_SIZE);
+    grow_heap(KHEAP_INITIAL_SIZE); // TODO: add panic in case we cant grow heap
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 }
 
@@ -131,8 +129,12 @@ void* kmalloc(u64 size) {
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
 
     best_fit_result best_fit = find_best_fit_or_grow(block_size);
-    shrink_result result =
-        shrink_block(best_fit.blk_bin, best_fit.blk, block_size);
+    block* blk = best_fit.blk;
+    if (!blk) {
+        return NULL;
+    }
+
+    shrink_result result = shrink_block(best_fit.blk_bin, blk, block_size);
     block* result_block = result.orphan;
     result_block->used = true;
 
@@ -149,8 +151,12 @@ void* kmalloc_aligned(u64 size, u64 alignment) {
     aligned_best_fit_result best_fit =
         find_best_fit_or_grow_aligned(block_size, alignment);
 
-    u64 alignment_gap = best_fit.alignment_gap;
     block* blk = best_fit.aligned_block;
+    if (!blk) {
+        return NULL;
+    }
+
+    u64 alignment_gap = best_fit.alignment_gap;
     bin* blk_bin = best_fit.aligned_block_bin;
 
     if (alignment_gap == 0) {
@@ -201,7 +207,7 @@ void kfree_unsafe(void* addr) {
     insert_block(coalesced_block_bin, coalesced);
 }
 
-void grow_heap(u64 size) {
+bool grow_heap(u64 size) {
     u64 aligned_size = align_to_upper(size, FRAME_SIZE);
     u64 start = KHEAP_START_VADDR + kheap.capacity;
     u64 end = start + aligned_size;
@@ -210,6 +216,10 @@ void grow_heap(u64 size) {
         u64 page = get_page(vframe);
         if (!(page & 1)) {
             paddr pframe = allocate_frame();
+            if (!pframe) {
+                return false;
+            }
+
             map_page(vframe, pframe, 1 | 2 | 4);
         }
     }
@@ -219,6 +229,7 @@ void grow_heap(u64 size) {
     kfree_unsafe(free_space(blk));
 
     kheap.capacity += aligned_size;
+    return true;
 }
 
 bin* find_best_fit_bin(u64 size) {
@@ -291,8 +302,8 @@ aligned_block_fit_result block_fits_for_aligned_allocation(block* blk, u64 size,
     u64 free_space_aligned_size = block_end - free_space_start;
 
     if (free == free_space_aligned && free_space_aligned_size >= size) {
-        aligned_block_fit_result result = {
-            .fits = true, .aligned_block_start = blk, .alignment_gap = 0};
+        aligned_block_fit_result result = {.aligned_block = blk,
+                                           .alignment_gap = 0};
         return result;
     }
 
@@ -309,26 +320,24 @@ aligned_block_fit_result block_fits_for_aligned_allocation(block* blk, u64 size,
     }
 
     if (free_space_aligned_size >= size && gap_size >= MIN_BLOCK_SIZE) {
-        aligned_block_fit_result result = {.fits = true,
-                                           .aligned_block_start = blk,
+        aligned_block_fit_result result = {.aligned_block = blk,
                                            .alignment_gap = gap_size};
         return result;
     }
 
-    aligned_block_fit_result result = {
-        .fits = false, .aligned_block_start = NULL, .alignment_gap = 0};
+    aligned_block_fit_result result = {.aligned_block = NULL,
+                                       .alignment_gap = 0};
     return result;
 }
 
 aligned_block_fit_result find_best_fit_block_aligned(bin* bin, u64 size,
                                                      u64 alignment) {
     block* cur = bin->first;
-    aligned_block_fit_result res = {
-        .fits = false, .aligned_block_start = NULL, .alignment_gap = 0};
+    aligned_block_fit_result res = {.aligned_block = NULL, .alignment_gap = 0};
 
     while (cur
            && !((res = block_fits_for_aligned_allocation(cur, size, alignment))
-                    .fits)) {
+                    .aligned_block)) {
         cur = cur->next;
     }
 
@@ -345,23 +354,20 @@ block* find_best_fit_block(bin* bin, u64 size) {
 }
 
 aligned_best_fit_result find_best_fit_aligned(u64 size, u64 alignment) {
-    aligned_block_fit_result best_fit = {.fits = false,
-                                         .aligned_block_start = NULL};
+    aligned_block_fit_result best_fit = {.aligned_block = NULL,
+                                         .alignment_gap = 0};
     block* best_fit_block = NULL;
     bin* best_fit_bin = find_best_fit_bin(size);
 
     while (!best_fit_block && best_fit_bin <= &kheap.bins[BINS_COUNT - 1]) {
         best_fit = find_best_fit_block_aligned(best_fit_bin, size, alignment);
-        best_fit_block = best_fit.aligned_block_start;
+        best_fit_block = best_fit.aligned_block;
         best_fit_bin += !best_fit_block ? 1 : 0;
     }
 
-    bool fits = best_fit.fits;
-    aligned_best_fit_result result = {
-        .fits = fits,
-        .aligned_block = fits ? best_fit_block : NULL,
-        .alignment_gap = fits ? best_fit.alignment_gap : 0,
-        .aligned_block_bin = fits ? best_fit_bin : NULL};
+    aligned_best_fit_result result = {.aligned_block = best_fit_block,
+                                      .alignment_gap = best_fit.alignment_gap,
+                                      .aligned_block_bin = best_fit_bin};
 
     return result;
 }
@@ -386,11 +392,9 @@ aligned_best_fit_result find_best_fit_or_grow_aligned(u64 size, u64 alignment) {
 
     while (true) {
         result = find_best_fit_aligned(size, alignment);
-        bool found = result.fits;
 
-        if (!found) {
-            grow_heap(size);
-        } else {
+        if ((!result.aligned_block && !grow_heap(size))
+            || result.aligned_block) {
             return result;
         }
     }
@@ -399,15 +403,9 @@ aligned_best_fit_result find_best_fit_or_grow_aligned(u64 size, u64 alignment) {
 best_fit_result find_best_fit_or_grow(u64 size) {
     while (true) {
         best_fit_result best_fit = find_best_fit(size);
-        block* best_fit_block = best_fit.blk;
-        bin* best_fit_bin = best_fit.blk_bin;
 
-        if (!best_fit_block) {
-            grow_heap(size);
-        } else {
-            best_fit_result result = {.blk = best_fit_block,
-                                      .blk_bin = best_fit_bin};
-            return result;
+        if ((!best_fit.blk && !grow_heap(size)) || best_fit.blk) {
+            return best_fit;
         }
     }
 }
