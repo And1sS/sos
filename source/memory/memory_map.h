@@ -20,9 +20,9 @@
 //                                                | Kernel-space virtual memory
 //________________________________________________|_____________________________
 // ffff800000000000 | -128  TB | ffff87ffffffffff | Kernel code
-// ffff888000000000 | -119.5TB | ffffc87fffffffff | direct mapping of all
+// ffff888000000000 | -119.5TB | ffffc87fffffffff | Direct mapping of all
 //                  |          |                  | physical memory
-// ffffc88000000000 | -55.5 TB |
+// ffffc88000000000 | -55.5 TB |                  | Kernel heap
 //__________________|__________|__________________|_____________________________
 
 #define paddr u64
