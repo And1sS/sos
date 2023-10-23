@@ -131,6 +131,8 @@ void* kmalloc(u64 size) {
     best_fit_result best_fit = find_best_fit_or_grow(block_size);
     block* blk = best_fit.blk;
     if (!blk) {
+        spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+
         return NULL;
     }
 
@@ -153,6 +155,8 @@ void* kmalloc_aligned(u64 size, u64 alignment) {
 
     block* blk = best_fit.aligned_block;
     if (!blk) {
+        spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+
         return NULL;
     }
 
