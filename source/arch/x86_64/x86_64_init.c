@@ -1,4 +1,4 @@
-#include "../arch_init.h"
+#include "../../arch_init.h"
 #include "gdt.h"
 #include "interrupts/idt.h"
 #include "memory/memory_init.h"

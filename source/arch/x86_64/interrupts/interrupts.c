@@ -1,4 +1,4 @@
-#include "../../interrupts/interrupts.h"
+#include "../../../interrupts/interrupts.h"
 
 bool interrupts_enabled() {
     u64 flags;

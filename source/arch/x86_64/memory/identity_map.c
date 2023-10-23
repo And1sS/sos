@@ -1,7 +1,7 @@
 #include "identity_map.h"
 
-#include "../../memory/pmm.h"
-#include "../../memory/vmm.h"
+#include "../../../memory/pmm.h"
+#include "../../../memory/vmm.h"
 
 #define IS_INSIDE(frame, start, end)                                           \
     (((frame) >= (start)) && ((frame) <= (end)))

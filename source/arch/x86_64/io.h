@@ -1,7 +1,7 @@
 #ifndef IO_H
 #define IO_H
 
-#include "../lib/types.h"
+#include "../../lib/types.h"
 
 static inline u8 inb(u16 addr) {
     u8 result;

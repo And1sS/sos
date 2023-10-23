@@ -1,5 +1,5 @@
-#include "../../memory/vmm.h"
-#include "../../memory/pmm.h"
+#include "../../../memory/vmm.h"
+#include "../../../memory/pmm.h"
 #include "paging.h"
 
 u64 get_page(vaddr virtual_page) {

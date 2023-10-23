@@ -1,5 +1,5 @@
 #include "interrupt_handlers.h"
-#include "../util.h"
+#include "../../util.h"
 #include "interrupts/idt.h"
 #include "io.h"
 

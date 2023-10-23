@@ -1,5 +1,5 @@
-#include "../vga_print.h"
-#include "../memory/memory_map.h"
+#include "../../vga_print.h"
+#include "../../memory/memory_map.h"
 
 const u16 COLUMN_WIDTH = 80;
 const u16 ROW_NUMBER = 25;
