@@ -1,8 +1,7 @@
 #include "interrupt_handlers.h"
-#include "idt.h"
+#include "../../util.h"
+#include "interrupts/idt.h"
 #include "io.h"
-#include "util.h"
-#include "vga_print.h"
 
 #define DEFINE_SOFTWARE_INTERRUPT_HANDLER(i)                                   \
     __attribute__((__interrupt__)) void handle_interrupt_##i(void* frame) {    \
@@ -32,8 +31,7 @@ void* interrupt_handlers[48] = {
     handle_interrupt_36, handle_interrupt_37, handle_interrupt_38,
     handle_interrupt_39, handle_interrupt_40, handle_interrupt_41,
     handle_interrupt_42, handle_interrupt_43, handle_interrupt_44,
-    handle_interrupt_45, handle_interrupt_46, handle_interrupt_47
-};
+    handle_interrupt_45, handle_interrupt_46, handle_interrupt_47};
 
 const u8 OCW2_EOI_OFFSET = 5;
 
@@ -41,11 +39,13 @@ __attribute__((no_caller_saved_registers)) void handle_interrupt(
     u8 interrupt_number) {
     static u32 count = 0;
 
-    print("Received interrupt #");
-    print_u32(interrupt_number);
-    print(": ");
-    print_u32(count++);
-    print_char('\n');
+    UNUSED(count);
+    UNUSED(interrupt_number);
+    //    print("Received interrupt #");
+    //    print_u32(interrupt_number);
+    //    print(": ");
+    //    print_u32(count++);
+    //    print_char('\n');
 }
 
 __attribute__((no_caller_saved_registers)) void handle_hardware_interrupt(

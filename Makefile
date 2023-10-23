@@ -15,7 +15,7 @@ ISO_FILE = $(BUILD_FOLDER)/sos.iso
 CROSS_COMPILE = x86_64-elf-
 ASM = nasm
 CC = gcc
-CC_FLAGS = -c -g -O3 -m64 -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
+CC_FLAGS = -c -g -O3 -m64 -mcmodel=large -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
 		   -Wall -Wextra -Werror
 QEMU_FLAGS = -D ./log.txt -d int,cpu_reset -no-reboot
 LINKER = ld
@@ -44,7 +44,7 @@ $(ISO_GRUB_CFG): grub.cfg
 $(KERNEL_ELF): $(BOOTSTRAP_ELF) $(OBJ_FILES) linker.ld
 	$(CROSS_COMPILE)$(LINKER) -melf_x86_64 -z max-page-size=0x1000 -Tlinker.ld $(BOOTSTRAP_ELF) $(OBJ_FILES) -o $(KERNEL_ELF)
 
-$(BOOTSTRAP_ELF): source/bootstrap.asm
+$(BOOTSTRAP_ELF): source/arch/x86_64/bootstrap.asm
 	mkdir -p $(@D)
 	$(ASM) -f elf64 -o $@ $<
 

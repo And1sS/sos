@@ -1,7 +1,7 @@
 bits 32
 
 
-section .text
+section .multiboot.data
 ; Multiboot2 header
 
 MAGIC_NUMBER equ 0xE85250D6
@@ -24,16 +24,24 @@ dd 8
 
 ; Multiboot2 header end
 
+KERNEL_START_VADDR                  equ 0xFFFF800000000000
+KERNEL_VMAPPED_RAM_START_VADDR      equ 0XFFFF888000000000
+KERNEL_START_ADDRESS                equ 0x100000
+
+%define V2P(addr) ((addr) - KERNEL_START_VADDR) ; virtual address to physical
+
+section .multiboot.text
 
 extern kernel_main
 extern _start
 _start:
-    mov esp, kernel_stack + KERNEL_STACK_SIZE
+    mov esp, V2P(kernel_stack + KERNEL_STACK_SIZE)
 
+    push ebx ; to preserve multiboot structure address loaded by grub
     push eax ; to preserve eax register which should hold multiboot magic
 
     call clear_screen
-    mov esi, KERNEL_STARTUP_MESSAGE_STR
+    mov esi, V2P(KERNEL_STARTUP_MESSAGE_STR)
     call print_string
     call move_cursor_next_line
 
@@ -47,8 +55,8 @@ _start:
     call set_up_page_tables
     call enable_paging
 
-    lgdt [GDT64.pointer]
-    jmp CODE_SEGMENT_SELECTOR:long_mode_start
+    lgdt [V2P(GDT64.pointer)]
+    jmp CODE_SEGMENT_SELECTOR:V2P(long_mode_start)
 
 
 MULTIBOOT2_MAGIC equ 0x36D76289
@@ -58,7 +66,7 @@ check_multiboot:
     jne .no_multiboot
     ret
 .no_multiboot:
-    mov esi, MULTIBOOT_ERROR_STR
+    mov esi, V2P(MULTIBOOT_ERROR_STR)
     call print_error
 
 
@@ -84,7 +92,7 @@ check_cpuid:
     je .no_cpuid
     ret
 .no_cpuid:
-    mov esi, CPUID_ERROR_STR
+    mov esi, V2P(CPUID_ERROR_STR)
     call print_error
 
 CPUID_LONG_MODE_ATTR                equ 1 << 29
@@ -104,35 +112,43 @@ check_long_mode:
     jz .no_long_mode       
     ret
 .no_long_mode:
-    mov esi, LONG_MODE_ERROR_STR
+    mov esi, V2P(LONG_MODE_ERROR_STR)
     call print_error
 
 
-WRITABLE_ATTR   equ 1 << 0
-PRESENT_ATTR    equ 1 << 1
-HUGE_ATTR       equ 1 << 7
-HUGE_PAGE_SIZE  equ 0x200000
+PRESENT_ATTR                            equ 1 << 0
+WRITABLE_ATTR                           equ 1 << 1
+PAGE_SIZE                               equ 4096
+PT_ENTRIES                              equ 512
+PT_KERNEL_SPACE_START_IDX               equ 256 ; 0xFFFF800000000000
+PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX   equ 273 ; 0XFFFF888000000000
 
 set_up_page_tables:
-    mov eax, p3_table
+    mov eax, V2P(p3_table)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
-    mov [p4_table], eax
+    mov [V2P(kernel_p4_table)], eax
 
-    mov eax, p2_table
+    mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_START_IDX * 8], eax
+    mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX * 8], eax
+
+    mov eax, V2P(p2_table)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
-    mov [p3_table], eax
+    mov [V2P(p3_table)], eax
 
-    mov ecx, 0
+    mov eax, V2P(p1_table)
+    or eax, PRESENT_ATTR | WRITABLE_ATTR
+    mov [V2P(p2_table)], eax
 
-.map_p2_table:
-    mov eax, HUGE_PAGE_SIZE
-    mul ecx
-    or eax, HUGE_ATTR | PRESENT_ATTR | WRITABLE_ATTR
-    mov [p2_table + ecx * 8], eax
+    mov ebx, 0
+.identity_map_first_2mb:
+    mov eax, PAGE_SIZE
+    mul ebx
+    or eax, PRESENT_ATTR | WRITABLE_ATTR
+    mov [V2P(p1_table) + ebx * 8], eax
 
-    inc ecx
-    cmp ecx, 512
-    jne .map_p2_table
+    inc ebx
+    cmp ebx, PT_ENTRIES
+    jne .identity_map_first_2mb
 
     ret
 
@@ -142,7 +158,7 @@ EFER_LONG_MODE_ATTR     equ 1 << 8
 PAGING_ENABLED_ATTR     equ 1 << 31
 
 enable_paging:
-    mov eax, p4_table
+    mov eax, V2P(kernel_p4_table)
     mov cr3, eax
 
     mov eax, cr4
@@ -174,7 +190,7 @@ CONSOLE_HEIGHT          equ 25
 print_error:
     push esi
 
-    mov esi, ERROR_PREFIX_STR
+    mov esi, V2P(ERROR_PREFIX_STR)
     mov dh, WHITE_ON_RED_ATTR
     call print_string_with_attr
 
@@ -199,22 +215,22 @@ print_string_with_attr:
 
     mov ah, dh
 
-    mov dword ecx, [cursor_col]
+    mov dword ecx, [V2P(cursor_col)]
     imul ecx, ecx, 2
 
-    mov dword ebx, [cursor_row]
+    mov dword ebx, [V2P(cursor_row)]
     imul ebx, ebx, 2 * CONSOLE_WIDTH
 
     mov word [VGA_MEMORY_ADDR + ebx + ecx], ax
 
-    mov eax, [cursor_col]
+    mov eax, [V2P(cursor_col)]
     inc eax
-    mov [cursor_col], eax
+    mov [V2P(cursor_col)], eax
     cmp eax, CONSOLE_WIDTH
     jne .print_next_char
 
 .proceed_on_new_line:
-    cmp dword [cursor_row], CONSOLE_HEIGHT
+    cmp dword [V2P(cursor_row)], CONSOLE_HEIGHT
     je .done
 
     call move_cursor_next_line
@@ -227,42 +243,42 @@ print_string_with_attr:
 
 
 clear_screen:
-    mov dword [cursor_col], 0
-    mov dword [cursor_row], 0
+    mov dword [V2P(cursor_col)], 0
+    mov dword [V2P(cursor_row)], 0
 
 .clear_row:
     mov ah, WHITE_ON_BLACK_ATTR
     mov al, ' '
 
-    mov dword ecx, [cursor_col]
+    mov dword ecx, [V2P(cursor_col)]
     imul ecx, ecx, 2
 
-    mov dword ebx, [cursor_row]
+    mov dword ebx, [V2P(cursor_row)]
     imul ebx, ebx, 2 * CONSOLE_WIDTH
 
     mov word [VGA_MEMORY_ADDR + ebx + ecx], ax
 
-    mov dword eax, [cursor_col]
+    mov dword eax, [V2P(cursor_col)]
     inc eax
-    mov dword [cursor_col], eax
+    mov dword [V2P(cursor_col)], eax
     cmp eax, CONSOLE_WIDTH
     jne .clear_row
 
 .done_clearing_row:
     call move_cursor_next_line
 
-    cmp dword [cursor_row], CONSOLE_HEIGHT
+    cmp dword [V2P(cursor_row)], CONSOLE_HEIGHT
     jne .clear_row
 
 .done:
-    mov dword [cursor_row], 0
-    mov dword [cursor_col], 0
+    mov dword [V2P(cursor_row)], 0
+    mov dword [V2P(cursor_col)], 0
     ret
 
 
 move_cursor_next_line:
-    inc dword [cursor_row]
-    mov dword [cursor_col], 0
+    inc dword [V2P(cursor_row)]
+    mov dword [V2P(cursor_col)], 0
     ret
 
 
@@ -277,13 +293,16 @@ section .bss
 
 KERNEL_STACK_SIZE equ 8192
 
+global kernel_p4_table
 ; temporary page tables mappings to get to long mode and resetup it later properly
 align 4096
-p4_table:
+kernel_p4_table:
     resb 4096
 p3_table:
     resb 4096
 p2_table:
+    resb 4096
+p1_table:
     resb 4096
 
 align 4
@@ -319,4 +338,23 @@ section .text
 extern kernel_main
 
 long_mode_start:
-    jmp kernel_main
+    ; now rsp contains physical address, we need to adjust it to with virtual
+    mov rax, KERNEL_START_VADDR
+    add rsp, rax
+
+    mov rax, qword .upper_memory
+    jmp rax
+
+.upper_memory:
+    mov qword rax, 0
+    mov [qword kernel_p4_table], rax
+
+    mov rax, cr3
+    mov cr3, rax
+
+    ; here stack contains argument of multiboot structure, which should be passed wia rdi register
+    ; following System V AMD64 ABI calling convention
+    pop rdi
+    call kernel_main
+
+    jmp $

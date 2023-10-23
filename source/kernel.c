@@ -1,29 +1,20 @@
-#include "gdt.h"
-#include "idt.h"
-#include "types.h"
+#include "arch_init.h"
+#include "lib/types.h"
+#include "multiboot.h"
 #include "vga_print.h"
-#include "timer.h"
 
-void init(void);
-
-_Noreturn void kernel_main(void) {
-    init();
+_Noreturn void kernel_main(paddr multiboot_structure) {
+    init_console();
 
     clear_screen();
-    for (char i = '0'; i < '2'; i++) {
-        for (char j = '0'; j <= '9'; j++) {
-            print_char(i);
-            print_char(j);
-            print_char('\n');
-        }
-    }
+    println("Starting initialization");
+    multiboot_info multiboot_info =
+        parse_multiboot_info((void*) P2V(multiboot_structure));
+    arch_init(&multiboot_info);
+
+    print_multiboot_info(&multiboot_info);
+    println("Finished initialization!");
 
     while (true) {
     }
-}
-
-void init(void) {
-    init_gdt();
-    init_timer();
-    init_idt();
 }
