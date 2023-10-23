@@ -39,7 +39,9 @@ void free_frame(paddr frame) {
 }
 
 u64 get_available_frames_count() {
-    // TODO: think of guarding whith lock or smth else, since this should be
-    // platform independent
-    return available;
+    bool interrupts_enabled = spin_lock_irq_save(&pmm_lock);
+    u64 result = available;
+    spin_unlock_irq_restore(&pmm_lock, interrupts_enabled);
+
+    return result;
 }
