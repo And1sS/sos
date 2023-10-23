@@ -26,6 +26,10 @@ paddr allocate_frame() {
 
 paddr allocate_zeroed_frame() {
     paddr frame = allocate_frame();
+    if (frame == NULL) {
+        return NULL;
+    }
+
     memset((void*) P2V(frame), 0, FRAME_SIZE);
     return frame;
 }
