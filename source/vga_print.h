@@ -28,8 +28,8 @@ extern const u16 ROW_NUMBER;
 void init_console();
 
 __attribute__((no_caller_saved_registers)) void print_u32(u32 x);
-__attribute__((no_caller_saved_registers)) void print_u64(u64 x);
 __attribute__((no_caller_saved_registers)) void print_u32_hex(u32 x);
+__attribute__((no_caller_saved_registers)) void print_u64(u64 x);
 __attribute__((no_caller_saved_registers)) void print_u64_hex(u64 x);
 __attribute__((no_caller_saved_registers)) void print_char(char ch);
 __attribute__((no_caller_saved_registers)) void print(const char* str);

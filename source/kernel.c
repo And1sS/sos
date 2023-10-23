@@ -4,6 +4,8 @@
 #include "vga_print.h"
 
 _Noreturn void kernel_main(paddr multiboot_structure) {
+    init_console();
+
     clear_screen();
     println("Starting initialization");
     multiboot_info multiboot_info =
