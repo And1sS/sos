@@ -10,15 +10,16 @@ thread t1;
 thread t2;
 
 _Noreturn void t1_func() {
+    int i = 0;
     while (true) {
-        println("hello from t1");
+        print_u32(i++);
         switch_context(&t2);
     }
 }
 
 _Noreturn void t2_func() {
     while (true) {
-        println("hello from t2");
+        println("       hello  ");
         switch_context(&t1);
     }
 }

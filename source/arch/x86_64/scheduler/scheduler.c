@@ -1,13 +1,9 @@
 #include "../../../scheduler/scheduler.h"
 #include "../../../interrupts/interrupts.h"
-#include "../../../lib/memory_util.h"
-#include "../../../memory/heap/kheap.h"
-#include "../../../memory/memory_map.h"
 #include "../../../spin_lock.h"
 
-lock scheduler_lock;
-
-thread* current_thread = NULL;
+static lock scheduler_lock;
+static thread* current_thread = NULL;
 
 void init_scheduler() { init_lock(&scheduler_lock); }
 
@@ -23,7 +19,7 @@ void resume_thread(thread* thrd) {
                      : "memory");
 }
 
-extern void _context_switch(u64* rsp_old, u64* rsp_new, bool irq_enabled);
+extern void _context_switch(u64* rsp_old, u64* rsp_new);
 void switch_context(thread* thrd) {
     disable_interrupts();
 
