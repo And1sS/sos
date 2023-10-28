@@ -1,6 +1,6 @@
 #include "interrupt_handlers.h"
+#include "../../scheduler/scheduler.h"
 #include "../../util.h"
-#include "../../vga_print.h"
 #include "interrupts/idt.h"
 #include "io.h"
 
@@ -42,17 +42,18 @@ __attribute__((no_caller_saved_registers)) void handle_interrupt(
 
     UNUSED(count);
     UNUSED(interrupt_number);
-        print("Received interrupt #");
-        print_u32(interrupt_number);
-        print(": ");
-        print_u32(count++);
-        print_char('\n');
+//    print("Received interrupt #");
+//    print_u32(interrupt_number);
+//    print(": ");
+//    print_u32(count++);
+//    print_char('\n');
+    if (interrupt_number == 32) {
+        switch_context();
+    }
 }
 
 __attribute__((no_caller_saved_registers)) void handle_hardware_interrupt(
     u8 interrupt_number) {
-
-    handle_interrupt(interrupt_number);
 
     outb(MASTER_PIC_COMMAND_ADDR, 1 << OCW2_EOI_OFFSET);
     io_wait();
@@ -62,6 +63,8 @@ __attribute__((no_caller_saved_registers)) void handle_hardware_interrupt(
         outb(SLAVE_PIC_COMMAND_ADDR, 1 << OCW2_EOI_OFFSET);
         io_wait();
     }
+
+    handle_interrupt(interrupt_number);
 }
 
 __attribute__((no_caller_saved_registers)) void handle_software_interrupt(

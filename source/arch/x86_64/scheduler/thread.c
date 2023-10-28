@@ -3,6 +3,7 @@
 #include "../../../lib/memory_util.h"
 #include "../../../memory/heap/kheap.h"
 #include "../../../memory/memory_map.h"
+#include "../../../scheduler/scheduler.h"
 
 typedef struct __attribute__((__packed__)) {
     u64 rax;
@@ -28,28 +29,18 @@ static id_generator id_gen;
 
 void init_thread_creator() { init_id_generator(&id_gen); }
 
-void thread_exit() {}
-
 void kernel_thread_wrapper(thread_func* func) {
     func();
-    thread_exit();
+    schedule_thread_exit();
 }
 
-thread* init_thread(thread* thrd, string name, thread_func* func) {
-    if (thrd == NULL) {
-        thrd = kmalloc(sizeof(thrd));
-    }
-
-    if (thrd == NULL) {
-        return NULL;
-    }
+bool init_thread(thread* thrd, string name, thread_func* func) {
     memset(thrd, 0, sizeof(thread));
-
     thrd->id = get_id(&id_gen);
 
     void* stack = kmalloc_aligned(THREAD_STACK_SIZE, FRAME_SIZE);
     if (stack == NULL) {
-        return NULL;
+        return false;
     }
     memset(stack, 0, THREAD_STACK_SIZE);
 
@@ -65,5 +56,5 @@ thread* init_thread(thread* thrd, string name, thread_func* func) {
     context->kernel_wrapper_func = kernel_thread_wrapper;
     context->rdi = (u64) func;
 
-    return thrd;
+    return true;
 }

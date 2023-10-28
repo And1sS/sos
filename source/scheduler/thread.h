@@ -24,6 +24,6 @@ typedef struct {
 } thread;
 
 void init_thread_creator();
-thread* init_thread(thread* thrd, string name, thread_func* func);
+bool init_thread(thread* thrd, string name, thread_func* func);
 
 #endif // SOS_THREAD_H

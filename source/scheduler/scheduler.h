@@ -5,8 +5,10 @@
 
 void init_scheduler();
 
-thread* init_thread(thread* thrd, string name, thread_func* func);
-void switch_context(thread* thrd);
+void add_thread(thread* thrd);
+void switch_context();
+
+void schedule_thread_exit();
 
 void resume_thread(thread* thrd);
 void stop_thread(thread* thrd);
