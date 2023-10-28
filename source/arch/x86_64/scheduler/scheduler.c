@@ -1,8 +1,7 @@
 #include "../../../scheduler/scheduler.h"
-#include "../../../interrupts/interrupts.h"
 #include "../../../spin_lock.h"
 
-static lock scheduler_lock;
+lock scheduler_lock;
 static thread* current_thread = NULL;
 
 void init_scheduler() { init_lock(&scheduler_lock); }
@@ -19,9 +18,11 @@ void resume_thread(thread* thrd) {
                      : "memory");
 }
 
+// this one will release scheduler_lock and enable interrupts
 extern void _context_switch(u64* rsp_old, u64* rsp_new);
+
 void switch_context(thread* thrd) {
-    disable_interrupts();
+    spin_lock_irq(&scheduler_lock);
 
     thread* old_thrd = current_thread;
     old_thrd->state = STOPPED;

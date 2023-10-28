@@ -2,9 +2,16 @@ bits 64
 
 section .text
 
+extern scheduler_lock
+extern spin_unlock
+
 global _context_switch
 global _resume_thread
 
+; Calling convention - System V ABI
+; arguments:
+;   rdi - pointer to rsp of current thread to be saved
+;   rsi - pointer to rsp of next running thread to be restored
 _context_switch:
     push r14
     push r13
@@ -22,6 +29,13 @@ _context_switch:
     push rax
 
     mov [rdi], rsp
+
+    ; now release the lock before jumping to next thread
+    push rsi
+    mov rdi, scheduler_lock
+    call spin_unlock
+    pop rsi
+
     mov rsp, [rsi]
 
 _resume_thread:
