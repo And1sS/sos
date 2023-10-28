@@ -1,16 +1,25 @@
 #include "arch_init.h"
+#include "interrupts/interrupts.h"
 #include "lib/types.h"
 #include "multiboot.h"
 #include "scheduler/scheduler.h"
 #include "scheduler/thread.h"
-#include "interrupts/interrupts.h"
 #include "vga_print.h"
 
-extern void resume_thread();
+thread t1;
+thread t2;
 
-_Noreturn void test_func() {
+_Noreturn void t1_func() {
     while (true) {
-        println("hello from thread func!");
+        println("hello from t1");
+        switch_context(&t2);
+    }
+}
+
+_Noreturn void t2_func() {
+    while (true) {
+        println("hello from t2");
+        switch_context(&t1);
     }
 }
 
@@ -26,17 +35,9 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     print_multiboot_info(&multiboot_info);
     println("Finished initialization!");
 
-    init_scheduler();
-    disable_interrupts();
-
-    thread thrd;
-    init_thread(&thrd, "test-thread", test_func);
-
-    __asm__ volatile("movq %0, %%rsp\n"
-                     "jmp resume_thread"
-                     :
-                     : "g"(thrd.rsp)
-                     : "memory");
+    init_thread(&t1, "test-thread-1", t1_func);
+    init_thread(&t2, "test-thread-2", t2_func);
+    resume_thread(&t1);
 
     while (true) {
     }

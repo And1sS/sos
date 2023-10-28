@@ -45,7 +45,7 @@ $(ISO_GRUB_CFG): grub.cfg
 $(KERNEL_ELF): $(BOOTSTRAP_ELF) $(CONTEXT_SWITCH_ELF) $(OBJ_FILES) linker.ld
 	$(CROSS_COMPILE)$(LINKER) -melf_x86_64 -z max-page-size=0x1000 -Tlinker.ld $(BOOTSTRAP_ELF) $(CONTEXT_SWITCH_ELF) $(OBJ_FILES) -o $(KERNEL_ELF)
 
-$(CONTEXT_SWITCH_ELF): source/scheduler/context_switch.asm
+$(CONTEXT_SWITCH_ELF): source/arch/x86_64/scheduler/context_switch.asm
 	mkdir -p $(@D)
 	$(ASM) -f elf64 -o $@ $<
 

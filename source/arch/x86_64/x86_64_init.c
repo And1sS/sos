@@ -1,4 +1,5 @@
 #include "../../arch_init.h"
+#include "../../scheduler/scheduler.h"
 #include "gdt.h"
 #include "interrupts/idt.h"
 #include "memory/memory_init.h"
@@ -9,4 +10,7 @@ void arch_init(const multiboot_info* const mboot_info) {
     init_memory(mboot_info);
     init_timer();
     init_idt();
+
+    init_thread_creator();
+    init_scheduler();
 }
