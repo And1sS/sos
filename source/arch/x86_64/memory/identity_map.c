@@ -93,10 +93,10 @@ bool is_frame_available(const multiboot_info* mboot_info, paddr frame) {
         u64 entry_start = entry->base_addr;
         u64 entry_end = entry_start + entry->length - 1;
 
-        if (IS_INSIDE(frame, entry_start, entry_end) && entry->type != 1) {
-            return false;
+        if (IS_INSIDE(frame, entry_start, entry_end) && entry->type == 1) {
+            return true;
         }
     }
 
-    return true;
+    return false;
 }
