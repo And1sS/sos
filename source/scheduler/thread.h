@@ -11,7 +11,8 @@ typedef enum {
     INITIALISED = 0,
     RUNNING = 1,
     STOPPED = 2,
-    BLOCKED = 3
+    BLOCKED = 3,
+    DEAD = 4
 } thread_state;
 
 typedef struct {

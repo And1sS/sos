@@ -4,8 +4,9 @@
 #include "thread.h"
 
 void init_scheduler();
+void start_scheduler();
 
-void add_thread(thread* thrd);
+void start_thread(thread* thrd);
 void switch_context();
 
 void schedule_thread_exit();
