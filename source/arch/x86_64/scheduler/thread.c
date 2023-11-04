@@ -20,6 +20,7 @@ typedef struct __attribute__((__packed__)) {
     u64 r12;
     u64 r13;
     u64 r14;
+    u64 r15;
 
     void* kernel_wrapper_func;
     void* unused_return_addr;

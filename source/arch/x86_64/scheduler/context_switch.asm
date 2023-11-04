@@ -13,6 +13,7 @@ global _resume_thread
 ;   rdi - pointer to rsp of current thread to be saved
 ;   rsi - pointer to rsp of next running thread to be restored
 _context_switch:
+    push r15
     push r14
     push r13
     push r12
@@ -53,6 +54,7 @@ _resume_thread:
     pop r12
     pop r13
     pop r14
+    pop r15
 
     sti
     ret
