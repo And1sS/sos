@@ -5,9 +5,42 @@
 #include "scheduler/thread.h"
 #include "vga_print.h"
 
-_Noreturn void t1_func() {
+#define PRINT_THRESHOLD 1000000
+#define PRINT_TIMES 2000
+
+void t2_func() {
+    u64 i = 0;
+    u64 printed = 0;
+
     while (true) {
-        println("thread 1!");
+        if (i++ % PRINT_THRESHOLD == 0) {
+            println("thread 22222222222!");
+            printed++;
+        }
+
+        if (printed > PRINT_TIMES) {
+            return;
+        }
+    }
+}
+thread t2;
+
+void t1_func() {
+    init_thread(&t2, "thread-2", t2_func);
+    start_thread(&t2);
+
+    u64 i = 0;
+    u64 printed = 0;
+
+    while (true) {
+        if (i++ % PRINT_THRESHOLD == 0) {
+            println("thread 1!");
+            printed++;
+        }
+
+        if (printed > 2 * PRINT_TIMES) {
+            return;
+        }
     }
 }
 
@@ -28,6 +61,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     start_thread(&t1);
 
     start_scheduler();
+
     while (true) {
     }
 }

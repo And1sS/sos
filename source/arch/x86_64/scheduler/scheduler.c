@@ -1,4 +1,5 @@
 #include "../../../scheduler/scheduler.h"
+#include "../../../idle.h"
 #include "../../../lib/container/linked_list/linked_list.h"
 #include "../../../lib/container/queue/queue.h"
 #include "../../../memory/heap/kheap.h"
@@ -16,16 +17,20 @@ static linked_list* thread_list;
 static queue* run_queue;
 
 static thread* current_thread;
-static thread* kernel_thread;
+
+// shouldn't be present on run queue
+static thread* kernel_wait_thread;
 
 // this one will release scheduler_lock and enable interrupts
 extern void _context_switch(u64* rsp_old, u64* rsp_new);
 
 void start_thread_unsafe(thread* thrd);
+void switch_context_unsafe();
 
-_Noreturn void kernel_thread_func() {
+_Noreturn void kernel_wait_thread_func() {
     while (true) {
-        println("KERNEL THREAD!");
+        println("kernel wait thread!");
+        halt();
     }
 }
 
@@ -38,20 +43,23 @@ void init_scheduler() {
     thread_list = linked_list_create();
     run_queue = queue_create();
 
-    kernel_thread = (thread*) kmalloc(sizeof(thread));
-    init_thread(kernel_thread, "kernel-thread", kernel_thread_func);
+    kernel_wait_thread = (thread*) kmalloc(sizeof(thread));
+    init_thread(kernel_wait_thread, "kernel-wait-thread",
+                kernel_wait_thread_func);
 }
 
 void start_scheduler() {
-    spin_lock_irq(&scheduler_lock);
-
+    bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
     started = true;
-    start_thread_unsafe(kernel_thread);
-
-    spin_unlock_irq(&scheduler_lock);
+    spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 }
 
-void schedule_thread_exit() {}
+void schedule_thread_exit() {
+    spin_lock_irq(&scheduler_lock);
+    current_thread->state = DEAD;
+    kfree(current_thread->stack);
+    switch_context_unsafe();
+}
 
 // this one will enable interrupts
 void resume_thread(thread* thrd) {
@@ -76,6 +84,11 @@ void start_thread_unsafe(thread* thrd) {
 
 void switch_context() {
     spin_lock_irq(&scheduler_lock);
+    switch_context_unsafe();
+}
+
+// assumes that scheduler lock is held
+void switch_context_unsafe() {
     if (!started) {
         spin_unlock_irq(&scheduler_lock);
         return;
@@ -84,20 +97,33 @@ void switch_context() {
     thread* old_thread = current_thread;
     thread* new_thread = queue_pop(run_queue);
 
-    if (!new_thread) {
-        // at least one kernel thread will be running, so if run queue is empty,
-        // then we are running inside kernel waiting thread, so just continue
-        // waiting
+    // we are in one and only alive running thread, just resume it
+    if (!new_thread && old_thread && old_thread->state == RUNNING) {
         spin_unlock_irq(&scheduler_lock);
         return;
     }
 
+    // we came from last alive running thread, which can't continue running for
+    // some reason, so just wake up kernel wait thread
+    if (!new_thread && old_thread && old_thread->state != RUNNING) {
+        new_thread = kernel_wait_thread;
+    }
+
+    // now we have next thread to run for sure
     current_thread = new_thread;
     new_thread->state = RUNNING;
 
-    if (old_thread) {
-        queue_push(run_queue, old_thread);
-        old_thread->state = STOPPED;
+    // dead threads does not need saved context, so just resume next thread
+    if (old_thread && old_thread->state != DEAD) {
+        // if we came from kernel wait thread or a thread, that is not running
+        // anymore, then not add it to run queue
+        if (old_thread != kernel_wait_thread && old_thread->state == RUNNING) {
+            queue_push(run_queue, old_thread);
+        }
+
+        if (old_thread->state == RUNNING) {
+            old_thread->state = STOPPED;
+        }
 
         // no need to release the lock and enable interrupts here, since
         // _context_switch will do it
