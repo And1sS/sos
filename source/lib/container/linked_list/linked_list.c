@@ -15,13 +15,6 @@ void linked_list_init(linked_list* list) {
     memset(list, 0, sizeof(linked_list));
 }
 
-linked_list_node* linked_list_node_create(void* value);
-void linked_list_add_first_node(linked_list* list, linked_list_node* node);
-void linked_list_add_last_node(linked_list* list, linked_list_node* node);
-
-linked_list_node* linked_list_remove_first_node(linked_list* list);
-linked_list_node* linked_list_remove_last_node(linked_list* list);
-
 bool linked_list_add_first(linked_list* list, void* value) {
     linked_list_node* node = linked_list_node_create(value);
     if (!node) {
@@ -52,6 +45,7 @@ void* linked_list_remove_first(linked_list* list) {
 
     return value;
 }
+
 void* linked_list_remove_last(linked_list* list) {
     linked_list_node* node = linked_list_remove_last_node(list);
     void* value = NULL;
@@ -106,6 +100,23 @@ void linked_list_add_last_node(linked_list* list, linked_list_node* node) {
         list->tail = node;
     }
     list->size++;
+}
+
+void linked_list_remove_node(linked_list* list, linked_list_node* node) {
+    if (list->head == node) {
+        linked_list_remove_first_node(list);
+    } else if (list->tail == node) {
+        linked_list_remove_last_node(list);
+    } else {
+        linked_list_node* prev = node->prev;
+        linked_list_node* next = node->next;
+
+        node->prev = NULL;
+        node->next = NULL;
+
+        prev->next = next;
+        next->prev = prev;
+    }
 }
 
 linked_list_node* linked_list_remove_first_node(linked_list* list) {

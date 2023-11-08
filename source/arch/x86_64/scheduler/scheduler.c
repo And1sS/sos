@@ -1,6 +1,6 @@
 #include "../../../scheduler/scheduler.h"
 #include "../../../idle.h"
-#include "../../../lib/container/linked_list/linked_list.h"
+#include "../../../lib/container/array_list/array_list.h"
 #include "../../../lib/container/queue/queue.h"
 #include "../../../memory/heap/kheap.h"
 #include "../../../spin_lock.h"
@@ -11,9 +11,9 @@ lock scheduler_lock;
 
 static bool started;
 
-// TODO: rewrite to implementations that use array under the hood,
-//       since linked list requires too much heap allocations
-static linked_list* thread_list;
+static array_list* thread_list;
+// TODO: rewrite to circular buffer implementation, since it does not require
+//       whole array copy on pop operation
 static queue* run_queue;
 
 static thread* current_thread;
@@ -40,7 +40,7 @@ void init_scheduler() {
     started = false;
     current_thread = NULL;
 
-    thread_list = linked_list_create();
+    thread_list = array_list_create();
     run_queue = queue_create();
 
     kernel_wait_thread = (thread*) kmalloc(sizeof(thread));
@@ -78,7 +78,7 @@ void start_thread(thread* thrd) {
 }
 
 void start_thread_unsafe(thread* thrd) {
-    linked_list_add_last(thread_list, thrd);
+    array_list_add_last(thread_list, thrd);
     queue_push(run_queue, thrd);
 }
 
@@ -113,7 +113,7 @@ void switch_context_unsafe() {
     current_thread = new_thread;
     new_thread->state = RUNNING;
 
-    // dead threads does not need saved context, so just resume next thread
+    // dead thread does not need saved context, so just resume next thread
     if (old_thread && old_thread->state != DEAD) {
         // if we came from kernel wait thread or a thread, that is not running
         // anymore, then not add it to run queue

@@ -17,6 +17,7 @@ typedef struct {
 } linked_list;
 
 linked_list* linked_list_create();
+linked_list_node* linked_list_node_create(void* value);
 
 void linked_list_init(linked_list* list);
 
@@ -25,5 +26,12 @@ bool linked_list_add_last(linked_list* list, void* value);
 
 void* linked_list_remove_first(linked_list* list);
 void* linked_list_remove_last(linked_list* list);
+
+void linked_list_add_first_node(linked_list* list, linked_list_node* node);
+void linked_list_add_last_node(linked_list* list, linked_list_node* node);
+
+void linked_list_remove_node(linked_list* list, linked_list_node* node);
+linked_list_node* linked_list_remove_first_node(linked_list* list);
+linked_list_node* linked_list_remove_last_node(linked_list* list);
 
 #endif // OS_LINKED_LIST_H

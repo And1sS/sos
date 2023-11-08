@@ -187,6 +187,18 @@ void* kmalloc_aligned(u64 size, u64 alignment) {
     return free_space(result_block);
 }
 
+void* krealloc(void* addr, u64 size) {
+    block* old_block = (block*) ((vaddr) addr - sizeof(header));
+    u64 old_data_size = old_block->size - sizeof(header) - sizeof(footer);
+
+    u64 to_copy = MIN(old_data_size, size);
+    void* new_data = kmalloc(size);
+    memcpy(new_data, addr, to_copy);
+    kfree(addr);
+
+    return new_data;
+}
+
 void kfree(void* addr) {
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
     kfree_unsafe(addr);
