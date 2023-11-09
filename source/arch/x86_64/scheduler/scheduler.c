@@ -42,10 +42,23 @@ void init_scheduler() {
     kernel_wait_thread_node = linked_list_node_create(kernel_wait_thread);
 }
 
+linked_list_node* get_current_thread_node() {
+    bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
+    linked_list_node* current_node = current_thread_node;
+    spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
+    return current_node;
+}
+
 void schedule_thread_start(thread* thrd) {
     bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
     array_list_add_last(thread_list, thrd);
     queue_push(run_queue, queue_entry_create(thrd));
+    spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
+}
+
+void schedule_thread(linked_list_node* node) {
+    bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
+    queue_push(run_queue, node);
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 }
 
@@ -57,6 +70,12 @@ void schedule_thread_exit() {
     current_thread_node = NULL;
 
     schedule_unsafe();
+}
+
+void schedule_thread_block() {
+    bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
+    THREAD_STATE(current_thread_node) = BLOCKED;
+    spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 }
 
 void schedule() {
