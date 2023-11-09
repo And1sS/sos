@@ -137,5 +137,4 @@ void init_idt(void) {
     __asm__ volatile("lidt %0" : : "m"(idt));
 
     init_pic();
-    enable_interrupts();
 }

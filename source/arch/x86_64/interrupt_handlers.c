@@ -48,7 +48,7 @@ __attribute__((no_caller_saved_registers)) void handle_interrupt(
 //    print_u32(count++);
 //    print_char('\n');
     if (interrupt_number == 32) {
-        switch_context();
+        schedule();
     }
 }
 

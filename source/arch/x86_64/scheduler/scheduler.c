@@ -6,26 +6,20 @@
 #include "../../../spin_lock.h"
 #include "../../../vga_print.h"
 
+#define THREAD_VALUE(node) ((thread*) node->value)
+#define THREAD_STATE(node) THREAD_VALUE(node)->state
+#define THREAD_RSP(node) THREAD_VALUE(node)->stack_pointer
+
 // this is used by context_switch.asm
 lock scheduler_lock;
 
-static bool started;
-
 static array_list* thread_list;
-// TODO: rewrite to circular buffer implementation, since it does not require
-//       whole array copy on pop operation
 static queue* run_queue;
 
-static thread* current_thread;
+static linked_list_node* current_thread_node;
+static linked_list_node* kernel_wait_thread_node; // shouldn't enter run queue
 
-// shouldn't be present on run queue
-static thread* kernel_wait_thread;
-
-// this one will release scheduler_lock and enable interrupts
-extern void _context_switch(u64* rsp_old, u64* rsp_new);
-
-void start_thread_unsafe(thread* thrd);
-void switch_context_unsafe();
+void schedule_unsafe();
 
 _Noreturn void kernel_wait_thread_func() {
     while (true) {
@@ -37,101 +31,82 @@ _Noreturn void kernel_wait_thread_func() {
 void init_scheduler() {
     init_lock(&scheduler_lock);
 
-    started = false;
-    current_thread = NULL;
+    current_thread_node = NULL;
 
     thread_list = array_list_create();
     run_queue = queue_create();
 
-    kernel_wait_thread = (thread*) kmalloc(sizeof(thread));
+    thread* kernel_wait_thread = (thread*) kmalloc(sizeof(thread));
     init_thread(kernel_wait_thread, "kernel-wait-thread",
                 kernel_wait_thread_func);
+    kernel_wait_thread_node = linked_list_node_create(kernel_wait_thread);
 }
 
-void start_scheduler() {
+void schedule_thread_start(thread* thrd) {
     bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
-    started = true;
+    array_list_add_last(thread_list, thrd);
+    queue_push(run_queue, queue_entry_create(thrd));
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 }
 
 void schedule_thread_exit() {
     spin_lock_irq(&scheduler_lock);
-    current_thread->state = DEAD;
-    kfree(current_thread->stack);
-    switch_context_unsafe();
+    THREAD_STATE(current_thread_node) = DEAD;
+    kfree(THREAD_VALUE(current_thread_node)->stack);
+    kfree(current_thread_node);
+    current_thread_node = NULL;
+
+    schedule_unsafe();
 }
 
-// this one will enable interrupts
-void resume_thread(thread* thrd) {
-    __asm__ volatile(
-        "movq %0, %%rsp\n"
-        "jmp _resume_thread" // this label is defined in context_switch.asm
-        :
-        : "r"(thrd->stack_pointer)
-        : "memory");
-}
-
-void start_thread(thread* thrd) {
-    bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
-    start_thread_unsafe(thrd);
-    spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
-}
-
-void start_thread_unsafe(thread* thrd) {
-    array_list_add_last(thread_list, thrd);
-    queue_push(run_queue, thrd);
-}
-
-void switch_context() {
+void schedule() {
     spin_lock_irq(&scheduler_lock);
-    switch_context_unsafe();
+    schedule_unsafe();
 }
+
+// this one will release scheduler_lock and enable interrupts
+extern void _context_switch(u64* rsp_old, u64* rsp_new);
 
 // assumes that scheduler lock is held
-void switch_context_unsafe() {
-    if (!started) {
-        spin_unlock_irq(&scheduler_lock);
-        return;
-    }
-
-    thread* old_thread = current_thread;
-    thread* new_thread = queue_pop(run_queue);
+void schedule_unsafe() {
+    linked_list_node* old_node = current_thread_node;
+    linked_list_node* new_node = queue_pop(run_queue);
 
     // we are in one and only alive running thread, just resume it
-    if (!new_thread && old_thread && old_thread->state == RUNNING) {
+    if (!new_node && old_node && THREAD_STATE(old_node) == RUNNING) {
         spin_unlock_irq(&scheduler_lock);
         return;
     }
 
-    // we came from last alive running thread, which can't continue running for
-    // some reason, so just wake up kernel wait thread
-    if (!new_thread && old_thread && old_thread->state != RUNNING) {
-        new_thread = kernel_wait_thread;
-    }
-
-    // now we have next thread to run for sure
-    current_thread = new_thread;
-    new_thread->state = RUNNING;
+    // old thread can't continue running and no next thread, so just wake up
+    // kernel wait thread
+    new_node = new_node ? new_node : kernel_wait_thread_node;
+    current_thread_node = new_node;
+    THREAD_STATE(new_node) = RUNNING;
 
     // dead thread does not need saved context, so just resume next thread
-    if (old_thread && old_thread->state != DEAD) {
-        // if we came from kernel wait thread or a thread, that is not running
-        // anymore, then not add it to run queue
-        if (old_thread != kernel_wait_thread && old_thread->state == RUNNING) {
-            queue_push(run_queue, old_thread);
-        }
+    if (old_node) {
+        if (THREAD_STATE(old_node) == RUNNING) {
+            THREAD_STATE(old_node) = STOPPED;
 
-        if (old_thread->state == RUNNING) {
-            old_thread->state = STOPPED;
+            // if we came from kernel wait thread then not add it to run queue
+            if (old_node != kernel_wait_thread_node) {
+                queue_push(run_queue, old_node);
+            }
         }
 
         // no need to release the lock and enable interrupts here, since
         // _context_switch will do it
-        _context_switch(&old_thread->stack_pointer, &new_thread->stack_pointer);
+        _context_switch(&THREAD_RSP(old_node), &THREAD_RSP(new_node));
     } else {
-        // at the beginning of scheduling just release the lock, interrupts
-        // will be enabled by resume_thread
+        // no old thread - just resume next thread. only release the lock,
+        // interrupts will be enabled by _resume_thread
         spin_unlock(&scheduler_lock);
-        resume_thread(new_thread);
+        __asm__ volatile(
+            "movq %0, %%rsp\n"
+            "jmp _resume_thread" // this label is defined in context_switch.asm
+            :
+            : "r"(THREAD_RSP(new_node))
+            : "memory");
     }
 }
