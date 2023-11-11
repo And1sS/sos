@@ -1,6 +1,5 @@
 #include "../../../scheduler/scheduler.h"
 #include "../../../idle.h"
-#include "../../../lib/container/array_list/array_list.h"
 #include "../../../lib/container/queue/queue.h"
 #include "../../../memory/heap/kheap.h"
 #include "../../../spin_lock.h"
@@ -13,7 +12,6 @@
 // this is used by context_switch.asm
 lock scheduler_lock;
 
-static array_list* thread_list;
 static queue* run_queue;
 
 static linked_list_node* current_thread_node;
@@ -32,8 +30,6 @@ void init_scheduler() {
     init_lock(&scheduler_lock);
 
     current_thread_node = NULL;
-
-    thread_list = array_list_create();
     run_queue = queue_create();
 
     thread* kernel_wait_thread = (thread*) kmalloc(sizeof(thread));
@@ -51,7 +47,6 @@ linked_list_node* get_current_thread_node() {
 
 void schedule_thread_start(thread* thrd) {
     bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
-    array_list_add_last(thread_list, thrd);
     queue_push(run_queue, queue_entry_create(thrd));
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 }

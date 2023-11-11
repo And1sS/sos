@@ -8,23 +8,19 @@
 
 #define PRINT_THRESHOLD 1000000
 #define PRINT_TIMES 2000
+thread t2;
 
 void t2_func() {
     u64 i = 0;
     u64 printed = 0;
 
-    while (true) {
+    while (printed <= PRINT_TIMES) {
         if (i++ % PRINT_THRESHOLD == 0) {
             println("thread 22222222222!");
             printed++;
         }
-
-        if (printed > PRINT_TIMES) {
-            return;
-        }
     }
 }
-thread t2;
 
 void t1_func() {
     init_thread(&t2, "thread-2", t2_func);
@@ -33,14 +29,10 @@ void t1_func() {
     u64 i = 0;
     u64 printed = 0;
 
-    while (true) {
+    while (printed <= 2 * PRINT_TIMES) {
         if (i++ % PRINT_THRESHOLD == 0) {
             println("thread 1!");
             printed++;
-        }
-
-        if (printed > 2 * PRINT_TIMES) {
-            return;
         }
     }
 }
