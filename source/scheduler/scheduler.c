@@ -23,7 +23,7 @@ _Noreturn void kernel_wait_thread_func() {
     }
 }
 
-void init_scheduler() {
+void scheduler_init() {
     init_lock(&scheduler_lock);
 
     current_thread_node = NULL;

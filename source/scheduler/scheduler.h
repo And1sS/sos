@@ -4,7 +4,7 @@
 #include "../lib/container/linked_list/linked_list.h"
 #include "thread.h"
 
-void init_scheduler();
+void scheduler_init();
 
 linked_list_node* get_current_thread_node();
 
