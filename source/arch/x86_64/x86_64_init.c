@@ -3,12 +3,12 @@
 #include "gdt.h"
 #include "interrupts/idt.h"
 #include "memory/memory_init.h"
-#include "timer/timer.h"
+#include "timer/pit.h"
 
 void arch_init(const multiboot_info* const mboot_info) {
     init_gdt();
     init_memory(mboot_info);
-    init_timer();
+    pit_init();
     init_idt();
 
     threading_init();

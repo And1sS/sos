@@ -1,4 +1,4 @@
-#include "timer.h"
+#include "pit.h"
 #include "../../../lib/types.h"
 #include "../io.h"
 
@@ -28,7 +28,7 @@ const u16 CONTROL_WORD_ADDR = 0x43;
 // frequency = 1193182 Hz / FREQUENCY_DIVIDER
 const u16 FREQUENCY_DIVIDER = (1 << 16) - 1;
 
-void init_timer() {
+void pit_init() {
     outb(CONTROL_WORD_ADDR, gen_control_word(0, LSB_THEN_MSB, 2, false));
     io_wait();
 
