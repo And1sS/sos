@@ -21,7 +21,7 @@ const int PRESENT_OFFSET = 7;
 const int DPL_OFFSET = 5;
 const int INTERRUPT_TYPE_OFFSET = 0;
 
-interrupt_descriptor idt_data[48];
+interrupt_descriptor idt_data[256];
 const idt_descriptor idt = {.data = idt_data, .limit = sizeof(idt_data) - 1};
 
 u8 gen_interrupt_descriptor_flags(bool is_present, u8 dpl, bool is_trap_gate) {
@@ -179,6 +179,7 @@ void init_idt(void) {
     SET_IDT(45)
     SET_IDT(46)
     SET_IDT(47)
+    SET_IDT(250)
 
     __asm__ volatile("lidt %0" : : "m"(idt));
 

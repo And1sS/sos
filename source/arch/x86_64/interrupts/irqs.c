@@ -7,9 +7,10 @@ const u8 OCW2_EOI_OFFSET = 5;
 volatile u64 ticks = 0;
 
 u64 handle_interrupt(u8 interrupt_number, u64 rsp) {
-    ticks++;
-
     if (interrupt_number == 32) {
+        ticks++;
+        return (u64) context_switch((struct cpu_context*) rsp);
+    } else if (interrupt_number == 250) {
         return (u64) context_switch((struct cpu_context*) rsp);
     } else {
         print_u64(interrupt_number);
