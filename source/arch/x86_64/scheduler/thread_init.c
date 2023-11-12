@@ -1,8 +1,4 @@
-#include "../../../scheduler/thread.h"
-#include "../../../id_generator.h"
 #include "../../../lib/memory_util.h"
-#include "../../../memory/heap/kheap.h"
-#include "../../../memory/memory_map.h"
 #include "../../../scheduler/scheduler.h"
 #include "../gdt.h"
 
@@ -30,30 +26,13 @@ typedef struct __attribute__((__packed__)) {
     u64 ss;
 } cpu_context;
 
-static id_generator id_gen;
-
-void init_thread_creator() { init_id_generator(&id_gen); }
-
 void kernel_thread_wrapper(thread_func* func) {
     func();
     schedule_thread_exit();
 }
 
-bool init_thread(thread* thrd, string name, thread_func* func) {
-    memset(thrd, 0, sizeof(thread));
-    thrd->id = get_id(&id_gen);
-
-    void* stack = kmalloc_aligned(THREAD_STACK_SIZE, FRAME_SIZE);
-    if (stack == NULL) {
-        return false;
-    }
-    memset(stack, 0, THREAD_STACK_SIZE);
-
-    thrd->stack = stack;
-    thrd->name = name;
-    thrd->state = INITIALISED;
-
-    u64 start_rsp = (u64) stack + THREAD_STACK_SIZE - sizeof(cpu_context);
+struct cpu_context* arch_thread_context_init(thread* thrd, thread_func* func) {
+    u64 start_rsp = (u64) thrd->stack + THREAD_STACK_SIZE - sizeof(cpu_context);
 
     cpu_context* context = (cpu_context*) start_rsp;
     memset(context, 0, sizeof(cpu_context));
@@ -67,7 +46,5 @@ bool init_thread(thread* thrd, string name, thread_func* func) {
     context->ss = KERNEL_DATA_SEGMENT_SELECTOR;
     context->rdi = (u64) func;
 
-    thrd->context = (struct cpu_context*) start_rsp;
-
-    return true;
+    return (struct cpu_context*) start_rsp;
 }

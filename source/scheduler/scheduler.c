@@ -1,13 +1,13 @@
-#include "../../../scheduler/scheduler.h"
-#include "../../../idle.h"
-#include "../../../lib/container/queue/queue.h"
-#include "../../../memory/heap/kheap.h"
-#include "../../../spin_lock.h"
-#include "../../../vga_print.h"
+#include "scheduler.h"
+#include "../idle.h"
+#include "../lib/container/queue/queue.h"
+#include "../memory/heap/kheap.h"
+#include "../spin_lock.h"
+#include "../vga_print.h"
 
-#define THREAD_VALUE(node) ((thread*) node->value)
-#define THREAD_STATE(node) THREAD_VALUE(node)->state
-#define THREAD_CONTEXT(node) THREAD_VALUE(node)->context
+#define THREAD(node) ((thread*) node->value)
+#define THREAD_STATE(node) THREAD(node)->state
+#define THREAD_CONTEXT(node) THREAD(node)->context
 
 static lock scheduler_lock;
 
@@ -30,7 +30,7 @@ void init_scheduler() {
     run_queue = queue_create();
 
     thread* kernel_wait_thread = (thread*) kmalloc(sizeof(thread));
-    init_thread(kernel_wait_thread, "kernel-wait-thread",
+    thread_init(kernel_wait_thread, "kernel-wait-thread",
                 kernel_wait_thread_func);
     kernel_wait_thread_node = linked_list_node_create(kernel_wait_thread);
 }
@@ -57,7 +57,7 @@ void schedule_thread(linked_list_node* node) {
 void schedule_thread_exit() {
     bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
     THREAD_STATE(current_thread_node) = DEAD;
-    kfree(THREAD_VALUE(current_thread_node)->stack);
+    kfree(THREAD(current_thread_node)->stack);
     kfree(current_thread_node);
     current_thread_node = NULL;
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
@@ -109,5 +109,3 @@ struct cpu_context* context_switch(struct cpu_context* context) {
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
     return THREAD_CONTEXT(new_node);
 }
-
-void schedule() { __asm__ volatile("int $32" : : :); }

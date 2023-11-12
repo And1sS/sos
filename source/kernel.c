@@ -23,7 +23,7 @@ void t2_func() {
 }
 
 void t1_func() {
-    init_thread(&t2, "thread-2", t2_func);
+    thread_init(&t2, "thread-2", t2_func);
     schedule_thread_start(&t2);
 
     u64 i = 0;
@@ -50,7 +50,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Finished initialization!");
 
     thread t1;
-    init_thread(&t1, "test-thread-1", t1_func);
+    thread_init(&t1, "test-thread-1", t1_func);
     schedule_thread_start(&t1);
 
     enable_interrupts();

@@ -11,6 +11,6 @@ void arch_init(const multiboot_info* const mboot_info) {
     init_timer();
     init_idt();
 
-    init_thread_creator();
+    threading_init();
     init_scheduler();
 }
