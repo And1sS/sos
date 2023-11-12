@@ -3,6 +3,6 @@
 
 #include "../../../multiboot.h"
 
-void init_memory(const multiboot_info* mboot_info);
+void memory_init(const multiboot_info* mboot_info);
 
 #endif // SOS_MEMORY_INIT_H

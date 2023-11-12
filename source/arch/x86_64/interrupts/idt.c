@@ -130,7 +130,7 @@ void init_pic(void) {
     idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,       \
                                            (u64) isr_##i, true, 0, false);
 
-void init_idt(void) {
+void idt_init(void) {
     SET_ISR(0)
     SET_ISR(1)
     SET_ISR(2)

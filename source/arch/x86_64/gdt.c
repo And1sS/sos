@@ -140,7 +140,7 @@ u16 KERNEL_DATA_SEGMENT_SELECTOR = 2 << 3;
 u16 USER_CODE_SEGMENT_SELECTOR = 3 << 3;
 u16 USER_DATA_SEGMENT_SELECTOR = 4 << 4;
 
-void init_gdt(void) {
+void gdt_init(void) {
     gdt_data[0] = gen_null_segment_decriptor();
 
     // in long mode default operation size flag should be zero, base and limits

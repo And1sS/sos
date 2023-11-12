@@ -7,7 +7,7 @@ lock pmm_lock;
 volatile paddr last_available_frame = NULL;
 volatile u64 available = 0;
 
-void init_pmm() { init_lock(&pmm_lock); }
+void pmm_init() { init_lock(&pmm_lock); }
 
 paddr allocate_frame() {
     bool interrupts_enabled = spin_lock_irq_save(&pmm_lock);

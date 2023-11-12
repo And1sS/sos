@@ -6,10 +6,10 @@
 #include "timer/pit.h"
 
 void arch_init(const multiboot_info* const mboot_info) {
-    init_gdt();
-    init_memory(mboot_info);
+    gdt_init();
+    idt_init();
+    memory_init(mboot_info);
     pit_init();
-    init_idt();
 
     threading_init();
     scheduler_init();
