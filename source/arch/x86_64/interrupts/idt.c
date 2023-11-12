@@ -1,7 +1,5 @@
 #include "idt.h"
-#include "../../../interrupts/interrupts.h"
 #include "../gdt.h"
-#include "../interrupt_handlers.h"
 #include "../io.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
@@ -127,12 +125,60 @@ void init_pic(void) {
     io_wait();
 }
 
+#define SET_IDT(i)                                                             \
+    extern void isr_##i();                                                     \
+    idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,       \
+                                           (u64) isr_##i, true, 0, false);
+
 void init_idt(void) {
-    for (int i = 0; i < 48; i++) {
-        idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,
-                                               (u64) interrupt_handlers[i],
-                                               true, 0, false);
-    }
+    SET_IDT(0)
+    SET_IDT(1)
+    SET_IDT(2)
+    SET_IDT(3)
+    SET_IDT(4)
+    SET_IDT(5)
+    SET_IDT(6)
+    SET_IDT(7)
+    SET_IDT(8)
+    SET_IDT(9)
+    SET_IDT(10)
+    SET_IDT(11)
+    SET_IDT(12)
+    SET_IDT(13)
+    SET_IDT(14)
+    SET_IDT(15)
+    SET_IDT(16)
+    SET_IDT(17)
+    SET_IDT(18)
+    SET_IDT(19)
+    SET_IDT(20)
+    SET_IDT(21)
+    SET_IDT(22)
+    SET_IDT(23)
+    SET_IDT(24)
+    SET_IDT(25)
+    SET_IDT(26)
+    SET_IDT(27)
+    SET_IDT(28)
+    SET_IDT(29)
+    SET_IDT(30)
+    SET_IDT(31)
+    SET_IDT(32)
+    SET_IDT(33)
+    SET_IDT(34)
+    SET_IDT(35)
+    SET_IDT(36)
+    SET_IDT(37)
+    SET_IDT(38)
+    SET_IDT(39)
+    SET_IDT(40)
+    SET_IDT(41)
+    SET_IDT(42)
+    SET_IDT(43)
+    SET_IDT(44)
+    SET_IDT(45)
+    SET_IDT(46)
+    SET_IDT(47)
 
     __asm__ volatile("lidt %0" : : "m"(idt));
 

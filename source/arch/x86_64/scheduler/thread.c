@@ -4,6 +4,7 @@
 #include "../../../memory/heap/kheap.h"
 #include "../../../memory/memory_map.h"
 #include "../../../scheduler/scheduler.h"
+#include "../gdt.h"
 
 typedef struct __attribute__((__packed__)) {
     u64 rax;
@@ -22,9 +23,12 @@ typedef struct __attribute__((__packed__)) {
     u64 r14;
     u64 r15;
 
-    void* kernel_wrapper_func;
-    void* unused_return_addr;
-} thread_context;
+    u64 rip;
+    u64 cs;
+    u64 rflags;
+    u64 rsp;
+    u64 ss;
+} cpu_context;
 
 static id_generator id_gen;
 
@@ -48,14 +52,22 @@ bool init_thread(thread* thrd, string name, thread_func* func) {
     thrd->stack = stack;
     thrd->name = name;
     thrd->state = INITIALISED;
-    thrd->stack_pointer =
-        (u64) stack + THREAD_STACK_SIZE - sizeof(thread_context);
 
-    thread_context* context = (thread_context*) thrd->stack_pointer;
-    memset(context, 0, sizeof(thread_context));
+    u64 start_rsp = (u64) stack + THREAD_STACK_SIZE - sizeof(cpu_context);
 
-    context->kernel_wrapper_func = kernel_thread_wrapper;
+    cpu_context* context = (cpu_context*) start_rsp;
+    memset(context, 0, sizeof(cpu_context));
+
+    context->rip = (u64) kernel_thread_wrapper;
+    context->cs = KERNEL_CODE_SEGMENT_SELECTOR;
+    context->rflags = 0x202; // interrupts enabled + bit 2 reserved and should
+                             // be set to 1
+                             // TODO: add constants
+    context->rsp = start_rsp;
+    context->ss = KERNEL_DATA_SEGMENT_SELECTOR;
     context->rdi = (u64) func;
+
+    thrd->context = (struct cpu_context*) start_rsp;
 
     return true;
 }

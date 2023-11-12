@@ -7,17 +7,14 @@
 
 #define THREAD_VALUE(node) ((thread*) node->value)
 #define THREAD_STATE(node) THREAD_VALUE(node)->state
-#define THREAD_RSP(node) THREAD_VALUE(node)->stack_pointer
+#define THREAD_CONTEXT(node) THREAD_VALUE(node)->context
 
-// this is used by context_switch.asm
-lock scheduler_lock;
+static lock scheduler_lock;
 
 static queue* run_queue;
 
 static linked_list_node* current_thread_node;
 static linked_list_node* kernel_wait_thread_node; // shouldn't enter run queue
-
-void schedule_unsafe();
 
 _Noreturn void kernel_wait_thread_func() {
     while (true) {
@@ -58,13 +55,17 @@ void schedule_thread(linked_list_node* node) {
 }
 
 void schedule_thread_exit() {
-    spin_lock_irq(&scheduler_lock);
+    bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
     THREAD_STATE(current_thread_node) = DEAD;
     kfree(THREAD_VALUE(current_thread_node)->stack);
     kfree(current_thread_node);
     current_thread_node = NULL;
+    spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 
-    schedule_unsafe();
+    // we don't care about interrupts and lock in this case, because
+    // if interrupt comes in between, thread context will be switched and
+    // never returned here
+    schedule();
 }
 
 void schedule_thread_block() {
@@ -73,23 +74,17 @@ void schedule_thread_block() {
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 }
 
-void schedule() {
-    spin_lock_irq(&scheduler_lock);
-    schedule_unsafe();
-}
+struct cpu_context* context_switch(struct cpu_context* context) {
+    bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
 
-// this one will release scheduler_lock and enable interrupts
-extern void _context_switch(u64* rsp_old, u64* rsp_new);
-
-// assumes that scheduler lock is held
-void schedule_unsafe() {
     linked_list_node* old_node = current_thread_node;
     linked_list_node* new_node = queue_pop(run_queue);
 
     // we are in one and only alive running thread, just resume it
     if (!new_node && old_node && THREAD_STATE(old_node) == RUNNING) {
-        spin_unlock_irq(&scheduler_lock);
-        return;
+        THREAD_CONTEXT(old_node) = context;
+        spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
+        return context;
     }
 
     // old thread can't continue running and no next thread, so just wake up
@@ -98,8 +93,9 @@ void schedule_unsafe() {
     current_thread_node = new_node;
     THREAD_STATE(new_node) = RUNNING;
 
-    // dead thread does not need saved context, so just resume next thread
     if (old_node) {
+        THREAD_CONTEXT(old_node) = context;
+
         if (THREAD_STATE(old_node) == RUNNING) {
             THREAD_STATE(old_node) = STOPPED;
 
@@ -108,19 +104,10 @@ void schedule_unsafe() {
                 queue_push(run_queue, old_node);
             }
         }
-
-        // no need to release the lock and enable interrupts here, since
-        // _context_switch will do it
-        _context_switch(&THREAD_RSP(old_node), &THREAD_RSP(new_node));
-    } else {
-        // no old thread - just resume next thread. only release the lock,
-        // interrupts will be enabled by _resume_thread
-        spin_unlock(&scheduler_lock);
-        __asm__ volatile(
-            "movq %0, %%rsp\n"
-            "jmp _resume_thread" // this label is defined in context_switch.asm
-            :
-            : "r"(THREAD_RSP(new_node))
-            : "memory");
     }
+
+    spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
+    return THREAD_CONTEXT(new_node);
 }
+
+void schedule() { __asm__ volatile("int $32" : : :); }

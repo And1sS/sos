@@ -13,6 +13,7 @@ void schedule_thread_exit();
 void schedule_thread(linked_list_node* thread_node);
 void schedule_thread_block();
 
+struct cpu_context* context_switch(struct cpu_context* context);
 void schedule();
 
 void stop_thread(thread* thrd);

@@ -15,11 +15,13 @@ typedef enum {
     DEAD = 4
 } thread_state;
 
+struct cpu_context;
+
 typedef struct {
     u64 id;
     string name;
 
-    u64 stack_pointer;
+    struct cpu_context* context;
     void* stack;
     thread_state state;
 } thread;
