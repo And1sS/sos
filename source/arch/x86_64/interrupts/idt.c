@@ -1,6 +1,6 @@
 #include "idt.h"
-#include "../gdt.h"
-#include "../io.h"
+#include "../cpu/gdt.h"
+#include "../cpu/io.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 offset_0_15;

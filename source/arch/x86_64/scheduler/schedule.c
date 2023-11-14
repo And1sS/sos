@@ -1,4 +1,7 @@
+#include "../../../util.h"
+
+#define SCHEDULER_ISR_NUMBER 250 // TODO: think of gentrifying isr handlers
+
 void schedule() {
-    // TODO: add proper constant for soft irq, maybe rewrite to syscall
-    __asm__ volatile("int $250" : : : "memory");
+    __asm__ volatile("int $" STR(SCHEDULER_ISR_NUMBER) : : : "memory");
 }

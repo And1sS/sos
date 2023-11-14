@@ -1,15 +1,16 @@
 #include "../../../interrupts/interrupts.h"
+#include "../cpu/rflags.h"
 
 bool interrupts_enabled() {
-    u64 flags;
+    u64 rflags;
 
     __asm__ volatile("pushf\n\t"
                      "pop %0"
-                     : "=rm"(flags)
+                     : "=rm"(rflags)
                      :
                      : "memory");
 
-    return (flags >> 9) & 1;
+    return rflags & RFLAGS_IRQ_ENABLED_FLAG ? true : false;
 }
 
 void enable_interrupts() { __asm__ volatile("sti"); }

@@ -1,6 +1,6 @@
 #include "../../../scheduler/scheduler.h"
 #include "../../../vga_print.h"
-#include "../io.h"
+#include "../cpu/io.h"
 #include "idt.h"
 
 const u8 OCW2_EOI_OFFSET = 5;
