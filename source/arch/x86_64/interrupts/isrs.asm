@@ -1,7 +1,18 @@
+; Irq handlers entry-points.
+
+; Hardware irqs are handled with interrupts disabled.
+; For now software irqs are also handled with interrupts disabled,
+; but that might be changed in the future.
+
+; Each handler pushes current cpu context on the stack (each
+; general purpose register) and restores provided cpu context
+; after calling C handler.
+
 bits 64
 
 section .text
 
+; C handlers defined in isrs.c
 extern handle_software_interrupt
 extern handle_hardware_interrupt
 
@@ -48,7 +59,7 @@ isr_%1:
     push_regs
     mov rdi, %1  ; interrupt number
     mov rsi, 0   ; error code
-    mov rdx, rsp ; cpu_context
+    mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
     mov rsp, rax
     pop_regs
@@ -62,7 +73,7 @@ isr_%1:
     pop rsi      ; error code
     push_regs
     mov rdi, %1  ; interrupt number
-    mov rdx, rsp ; cpu_context
+    mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
     mov rsp, rax
     pop_regs

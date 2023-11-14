@@ -6,12 +6,14 @@
 const u8 OCW2_EOI_OFFSET = 5;
 volatile u64 ticks = 0;
 
-u64 handle_interrupt(u8 interrupt_number, u64 error_code, u64 rsp) {
+struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
+                                     struct cpu_context* context) {
+
     if (interrupt_number == 32) {
         ticks++;
-        return (u64) context_switch((struct cpu_context*) rsp);
+        return context_switch(context);
     } else if (interrupt_number == 250) {
-        return (u64) context_switch((struct cpu_context*) rsp);
+        return context_switch(context);
     } else {
         print("isr #");
         print_u64(interrupt_number);
@@ -20,10 +22,12 @@ u64 handle_interrupt(u8 interrupt_number, u64 error_code, u64 rsp) {
         println("");
     }
 
-    return rsp;
+    return context;
 }
 
-u64 handle_hardware_interrupt(u8 interrupt_number, u64 rsp) {
+struct cpu_context* handle_hardware_interrupt(u8 interrupt_number,
+                                              struct cpu_context* context) {
+
     outb(MASTER_PIC_COMMAND_ADDR, 1 << OCW2_EOI_OFFSET);
     io_wait();
 
@@ -33,9 +37,12 @@ u64 handle_hardware_interrupt(u8 interrupt_number, u64 rsp) {
         io_wait();
     }
 
-    return handle_interrupt(interrupt_number, 0, rsp);
+    return handle_interrupt(interrupt_number, 0, context);
 }
 
-u64 handle_software_interrupt(u8 interrupt_number, u64 error_code, u64 rsp) {
-    return handle_interrupt(interrupt_number, error_code, rsp);
+struct cpu_context* handle_software_interrupt(u8 interrupt_number,
+                                              u64 error_code,
+                                              struct cpu_context* context) {
+
+    return handle_interrupt(interrupt_number, error_code, context);
 }
