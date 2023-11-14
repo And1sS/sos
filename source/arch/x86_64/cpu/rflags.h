@@ -6,4 +6,6 @@
 #define RFLAGS_INIT_FLAGS 0x2
 #define RFLAGS_IRQ_ENABLED_FLAG (1 << RFLAGS_IRQ_ENABLED_OFFSET)
 
+u64 get_rflags();
+
 #endif // SOS_RFLAGS_H

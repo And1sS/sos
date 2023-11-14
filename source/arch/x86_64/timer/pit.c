@@ -1,6 +1,6 @@
 #include "pit.h"
 #include "../../../lib/types.h"
-#include "../io.h"
+#include "../cpu/io.h"
 
 const u8 SELECT_COUNTER_OFFSET = 6;
 const u8 READ_WRITE_MODE_OFFSET = 4;

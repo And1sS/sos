@@ -1,5 +1,5 @@
 #include "arch_init.h"
-#include "interrupts/interrupts.h"
+#include "interrupts/irq.h"
 #include "lib/types.h"
 #include "multiboot.h"
 #include "scheduler/scheduler.h"
@@ -53,7 +53,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     thread_init(&t1, "test-thread-1", t1_func);
     schedule_thread_start(&t1);
 
-    enable_interrupts();
+    local_irq_enable();
     while (true) {
     }
 }
