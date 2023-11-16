@@ -28,6 +28,9 @@ struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
 struct cpu_context* handle_hardware_interrupt(u8 interrupt_number,
                                               struct cpu_context* context) {
 
+    struct cpu_context* new_context =
+        handle_interrupt(interrupt_number, 0, context);
+
     outb(MASTER_PIC_COMMAND_ADDR, 1 << OCW2_EOI_OFFSET);
     io_wait();
 
@@ -37,7 +40,7 @@ struct cpu_context* handle_hardware_interrupt(u8 interrupt_number,
         io_wait();
     }
 
-    return handle_interrupt(interrupt_number, 0, context);
+    return new_context;
 }
 
 struct cpu_context* handle_software_interrupt(u8 interrupt_number,
