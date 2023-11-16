@@ -338,7 +338,7 @@ section .text
 extern kernel_main
 
 long_mode_start:
-    ; now stack_pointer contains physical address, we need to adjust it to with virtual
+    ; now rsp contains physical address, we need to adjust it to with virtual
     mov rax, KERNEL_START_VADDR
     add rsp, rax
 
