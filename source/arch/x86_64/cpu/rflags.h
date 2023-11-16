@@ -1,6 +1,8 @@
 #ifndef SOS_RFLAGS_H
 #define SOS_RFLAGS_H
 
+#include "../../../lib/types.h"
+
 #define RFLAGS_IRQ_ENABLED_OFFSET 9
 
 #define RFLAGS_INIT_FLAGS 0x2
