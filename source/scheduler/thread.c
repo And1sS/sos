@@ -3,6 +3,8 @@
 #include "../lib/memory_util.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/memory_map.h"
+#include "../vga_print.h"
+#include "scheduler.h"
 
 static id_generator id_gen;
 
@@ -27,4 +29,23 @@ bool thread_init(thread* thrd, string name, thread_func* func) {
     thrd->context = arch_thread_context_init(thrd, func);
 
     return true;
+}
+
+thread* thread_create(string name, thread_func* func) {
+    thread* thrd = (thread*) kmalloc(sizeof(thread));
+    if (!thrd)
+        return NULL;
+
+    thread_init(thrd, name, func);
+    return thrd;
+}
+
+void thread_destroy(thread* thrd) {
+    println(thrd->name);
+    kfree(thrd->stack);
+    kfree(thrd);
+}
+
+void thread_start(thread* thrd) {
+    schedule_thread_start(thrd);
 }

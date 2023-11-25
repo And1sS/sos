@@ -27,6 +27,10 @@ typedef struct {
 } thread;
 
 void threading_init();
-bool thread_init(thread* thrd, string name, thread_func* func);
+
+thread* thread_create(string name, thread_func* func);
+void thread_destroy(thread* thread);
+
+void thread_start(thread* thread);
 
 #endif // SOS_THREAD_H

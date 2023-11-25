@@ -8,7 +8,7 @@
 
 #define PRINT_THRESHOLD 1000000
 #define PRINT_TIMES 2000
-thread t2;
+thread* t2;
 
 void t2_func() {
     u64 i = 0;
@@ -23,8 +23,7 @@ void t2_func() {
 }
 
 void t1_func() {
-    thread_init(&t2, "thread-2", t2_func);
-    schedule_thread_start(&t2);
+    thread_start(t2);
 
     u64 i = 0;
     u64 printed = 0;
@@ -49,9 +48,9 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     print_multiboot_info(&multiboot_info);
     println("Finished initialization!");
 
-    thread t1;
-    thread_init(&t1, "test-thread-1", t1_func);
-    schedule_thread_start(&t1);
+    thread* t1 = thread_create("test-thread-1", t1_func);
+    t2 = thread_create("thread-2", t2_func);
+    thread_start(t1);
 
     local_irq_enable();
     while (true) {

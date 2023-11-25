@@ -29,10 +29,8 @@ void scheduler_init() {
     current_thread_node = NULL;
     run_queue = queue_create();
 
-    thread* kernel_wait_thread = (thread*) kmalloc(sizeof(thread));
-    thread_init(kernel_wait_thread, "kernel-wait-thread",
-                kernel_wait_thread_func);
-    kernel_wait_thread_node = linked_list_node_create(kernel_wait_thread);
+    kernel_wait_thread_node = linked_list_node_create(
+        thread_create("kernel-wait-thread", kernel_wait_thread_func));
 }
 
 linked_list_node* get_current_thread_node() {
@@ -56,15 +54,14 @@ void schedule_thread(linked_list_node* node) {
 
 void schedule_thread_exit() {
     bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
-    THREAD_STATE(current_thread_node) = DEAD;
-    kfree(THREAD(current_thread_node)->stack);
-    kfree(current_thread_node);
+    // TODO: think about who is responsible for calling thread destruction
+    thread_destroy(THREAD(current_thread_node));
     current_thread_node = NULL;
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 
-    // we don't care about interrupts and lock in this case, because
-    // if interrupt comes in between, thread context will be switched and
-    // never returned here
+    // We don't care about lost atomicity in this case, because
+    // if timer interrupt comes in between, thread context will be switched and
+    // never returned here. Other interrupts should not make a difference
     schedule();
 }
 
@@ -78,11 +75,14 @@ struct cpu_context* context_switch(struct cpu_context* context) {
     bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
 
     linked_list_node* old_node = current_thread_node;
+    if (old_node) {
+        THREAD_CONTEXT(old_node) = context;
+    }
+
     linked_list_node* new_node = queue_pop(run_queue);
 
     // we are in one and only alive running thread, just resume it
     if (!new_node && old_node && THREAD_STATE(old_node) == RUNNING) {
-        THREAD_CONTEXT(old_node) = context;
         spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
         return context;
     }
@@ -93,16 +93,12 @@ struct cpu_context* context_switch(struct cpu_context* context) {
     current_thread_node = new_node;
     THREAD_STATE(new_node) = RUNNING;
 
-    if (old_node) {
-        THREAD_CONTEXT(old_node) = context;
+    if (old_node && THREAD_STATE(old_node) == RUNNING) {
+        THREAD_STATE(old_node) = STOPPED;
 
-        if (THREAD_STATE(old_node) == RUNNING) {
-            THREAD_STATE(old_node) = STOPPED;
-
-            // if we came from kernel wait thread then not add it to run queue
-            if (old_node != kernel_wait_thread_node) {
-                queue_push(run_queue, old_node);
-            }
+        // if we came from kernel wait thread then not add it to run queue
+        if (old_node != kernel_wait_thread_node) {
+            queue_push(run_queue, old_node);
         }
     }
 
