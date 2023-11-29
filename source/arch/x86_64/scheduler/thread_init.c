@@ -10,9 +10,9 @@ void kernel_thread_wrapper(thread_func* func) {
 }
 
 struct cpu_context* arch_thread_context_init(thread* thrd, thread_func* func) {
-    u64 start_rsp = (u64) thrd->stack + THREAD_STACK_SIZE - sizeof(cpu_context);
+    u64 start_rsp = (u64) thrd->stack + THREAD_STACK_SIZE;
 
-    cpu_context* context = (cpu_context*) start_rsp;
+    cpu_context* context = (cpu_context*) (start_rsp - sizeof(cpu_context));
     memset(context, 0, sizeof(cpu_context));
 
     context->rip = (u64) kernel_thread_wrapper;
@@ -22,5 +22,5 @@ struct cpu_context* arch_thread_context_init(thread* thrd, thread_func* func) {
     context->ss = KERNEL_DATA_SEGMENT_SELECTOR;
     context->rdi = (u64) func;
 
-    return (struct cpu_context*) start_rsp;
+    return (struct cpu_context*) context;
 }
