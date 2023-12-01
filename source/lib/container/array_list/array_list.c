@@ -1,18 +1,42 @@
 #include "array_list.h"
 #include "../../../memory/heap/kheap.h"
+#include "../../memory_util.h"
 
 void array_list_grow(array_list* list);
 
-array_list* array_list_create() {
+array_list* array_list_create(u64 capacity) {
     array_list* list = (array_list*) kmalloc(sizeof(array_list));
-    array_list_init(list);
+    if (!list) {
+        return NULL;
+    }
+
+    array_list_init(list, capacity);
     return list;
 }
 
-void array_list_init(array_list* list) {
-    list->array = kmalloc(sizeof(void*) * INITIAL_CAPACITY);
+void array_list_init(array_list* list, u64 capacity) {
+    list->array = kmalloc(sizeof(void*) * capacity);
     list->capacity = INITIAL_CAPACITY;
     list->size = 0;
+}
+
+void array_list_clear(array_list* list) {
+    if (list->capacity > 0) {
+        memset(list->array, 0, sizeof(void*) * list->capacity);
+    }
+}
+
+void* array_list_get(array_list* list, u64 index) {
+    return index < list->size ? list->array[index] : NULL;
+}
+
+bool array_list_set(array_list* list, u64 index, void* value) {
+    if (index >= list->size) {
+        return false;
+    }
+
+    list->array[index] = value;
+    return true;
 }
 
 void array_list_add_first(array_list* list, void* value) {

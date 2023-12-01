@@ -11,11 +11,11 @@ static id_generator id_gen;
 extern struct cpu_context* arch_thread_context_init(thread* thrd,
                                                     thread_func* func);
 
-void threading_init() { init_id_generator(&id_gen); }
+void threading_init() { id_generator_init(&id_gen); }
 
 bool thread_init(thread* thrd, string name, thread_func* func) {
     memset(thrd, 0, sizeof(thread));
-    thrd->id = get_id(&id_gen);
+    thrd->id = id_generator_get_id(&id_gen);
 
     void* stack = kmalloc_aligned(THREAD_STACK_SIZE, FRAME_SIZE);
     if (stack == NULL) {
@@ -41,7 +41,7 @@ thread* thread_create(string name, thread_func* func) {
 }
 
 void thread_destroy(thread* thrd) {
-    println(thrd->name);
+    id_generator_free_id(&id_gen, thrd->id);
     kfree(thrd->stack);
     kfree(thrd);
 }

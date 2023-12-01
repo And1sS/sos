@@ -26,7 +26,9 @@ void init_console() { init_lock(&console_lock); }
 void print_u32_unsafe(u32 x);
 void print_u64_unsafe(u64 x);
 void print_u32_hex_unsafe(u32 x);
+void print_u32_binary_unsafe(u32 x);
 void print_u64_hex_unsafe(u64 x);
+void print_u64_binary_unsafe(u64 x);
 void print_char_unsafe(char ch);
 void print_unsafe(const char* str);
 void println_unsafe(const char* str);
@@ -38,9 +40,13 @@ void print_u32(u32 x) { WITH_CONSOLE_LOCK(print_u32_unsafe(x)); }
 
 void print_u32_hex(u32 x) { WITH_CONSOLE_LOCK(print_u32_hex_unsafe(x)); }
 
+void print_u32_binary(u32 x) { WITH_CONSOLE_LOCK(print_u32_binary_unsafe(x)); }
+
 void print_u64(u64 x) { WITH_CONSOLE_LOCK(print_u64_unsafe(x)); }
 
 void print_u64_hex(u64 x) { WITH_CONSOLE_LOCK(print_u64_hex_unsafe(x)); }
+
+void print_u64_binary(u64 x) { WITH_CONSOLE_LOCK(print_u64_binary_unsafe(x)); }
 
 void print_char(char ch) { WITH_CONSOLE_LOCK(print_char_unsafe(ch)); }
 
@@ -167,6 +173,13 @@ void print_u32_hex_unsafe(u32 x) {
     }
 }
 
+void print_u32_binary_unsafe(u32 x) {
+    print_unsafe("0b");
+    for (i8 i = 31; i >= 0; i--) {
+        print_char_unsafe((x >> i) & 1 ? '1' : '0');
+    }
+}
+
 void print_u64_hex_unsafe(u64 x) {
     char digits[16];
     for (u8 i = 0; i < 16; i++) {
@@ -177,5 +190,12 @@ void print_u64_hex_unsafe(u64 x) {
     print_char_unsafe('x');
     for (u8 i = 0; i < 16; i++) {
         print_char_unsafe(digits[15 - i]);
+    }
+}
+
+void print_u64_binary_unsafe(u64 x) {
+    print_unsafe("0b");
+    for (i8 i = 63; i >= 0; i--) {
+        print_char_unsafe((x >> i) & 1 ? '1' : '0');
     }
 }

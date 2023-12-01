@@ -11,8 +11,13 @@ typedef struct {
     u64 size;
 } array_list;
 
-array_list* array_list_create();
-void array_list_init(array_list* list);
+array_list* array_list_create(u64 capacity);
+void array_list_init(array_list* list, u64 capacity);
+
+void array_list_clear(array_list* list);
+
+void* array_list_get(array_list* list, u64 index);
+bool array_list_set(array_list* list, u64 index, void* value);
 
 void array_list_add_first(array_list* list, void* value);
 void array_list_add_last(array_list* list, void* value);

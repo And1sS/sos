@@ -29,8 +29,10 @@ void init_console();
 
 void print_u32(u32 x);
 void print_u32_hex(u32 x);
+void print_u32_binary(u32 x);
 void print_u64(u64 x);
 void print_u64_hex(u64 x);
+void print_u64_binary(u64 x);
 void print_char(char ch);
 void print(const char* str);
 void println(const char* str);
