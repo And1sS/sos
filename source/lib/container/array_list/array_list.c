@@ -22,6 +22,7 @@ void array_list_init(array_list* list, u64 capacity) {
 
 void array_list_clear(array_list* list) {
     if (list->capacity > 0) {
+        list->size = 0;
         memset(list->array, 0, sizeof(void*) * list->capacity);
     }
 }
