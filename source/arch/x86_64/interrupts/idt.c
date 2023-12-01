@@ -1,8 +1,6 @@
 #include "idt.h"
-#include "../../../interrupts/interrupts.h"
-#include "../gdt.h"
-#include "../interrupt_handlers.h"
-#include "../io.h"
+#include "../cpu/gdt.h"
+#include "../cpu/io.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 offset_0_15;
@@ -23,7 +21,7 @@ const int PRESENT_OFFSET = 7;
 const int DPL_OFFSET = 5;
 const int INTERRUPT_TYPE_OFFSET = 0;
 
-interrupt_descriptor idt_data[48];
+interrupt_descriptor idt_data[256];
 const idt_descriptor idt = {.data = idt_data, .limit = sizeof(idt_data) - 1};
 
 u8 gen_interrupt_descriptor_flags(bool is_present, u8 dpl, bool is_trap_gate) {
@@ -127,15 +125,63 @@ void init_pic(void) {
     io_wait();
 }
 
-void init_idt(void) {
-    for (int i = 0; i < 48; i++) {
-        idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,
-                                               (u64) interrupt_handlers[i],
-                                               true, 0, false);
-    }
+#define SET_ISR(i)                                                             \
+    extern void isr_##i();                                                     \
+    idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,       \
+                                           (u64) isr_##i, true, 0, false);
+
+void idt_init(void) {
+    SET_ISR(0)
+    SET_ISR(1)
+    SET_ISR(2)
+    SET_ISR(3)
+    SET_ISR(4)
+    SET_ISR(5)
+    SET_ISR(6)
+    SET_ISR(7)
+    SET_ISR(8)
+    SET_ISR(9)
+    SET_ISR(10)
+    SET_ISR(11)
+    SET_ISR(12)
+    SET_ISR(13)
+    SET_ISR(14)
+    SET_ISR(15)
+    SET_ISR(16)
+    SET_ISR(17)
+    SET_ISR(18)
+    SET_ISR(19)
+    SET_ISR(20)
+    SET_ISR(21)
+    SET_ISR(22)
+    SET_ISR(23)
+    SET_ISR(24)
+    SET_ISR(25)
+    SET_ISR(26)
+    SET_ISR(27)
+    SET_ISR(28)
+    SET_ISR(29)
+    SET_ISR(30)
+    SET_ISR(31)
+    SET_ISR(32)
+    SET_ISR(33)
+    SET_ISR(34)
+    SET_ISR(35)
+    SET_ISR(36)
+    SET_ISR(37)
+    SET_ISR(38)
+    SET_ISR(39)
+    SET_ISR(40)
+    SET_ISR(41)
+    SET_ISR(42)
+    SET_ISR(43)
+    SET_ISR(44)
+    SET_ISR(45)
+    SET_ISR(46)
+    SET_ISR(47)
+    SET_ISR(250)
 
     __asm__ volatile("lidt %0" : : "m"(idt));
 
     init_pic();
-    enable_interrupts();
 }

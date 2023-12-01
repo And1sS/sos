@@ -4,8 +4,8 @@
 
 #include "identity_map.h"
 
-void init_memory(const multiboot_info* const mboot_info) {
-    init_pmm();
+void memory_init(const multiboot_info* mboot_info) {
+    pmm_init();
     identity_map_ram(mboot_info);
     print("Finished memory mapping! Free frames: ");
     print_u64(get_available_frames_count());

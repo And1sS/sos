@@ -27,15 +27,17 @@ extern const u16 ROW_NUMBER;
 
 void init_console();
 
-__attribute__((no_caller_saved_registers)) void print_u32(u32 x);
-__attribute__((no_caller_saved_registers)) void print_u32_hex(u32 x);
-__attribute__((no_caller_saved_registers)) void print_u64(u64 x);
-__attribute__((no_caller_saved_registers)) void print_u64_hex(u64 x);
-__attribute__((no_caller_saved_registers)) void print_char(char ch);
-__attribute__((no_caller_saved_registers)) void print(const char* str);
-__attribute__((no_caller_saved_registers)) void println(const char* str);
-__attribute__((no_caller_saved_registers)) void print_char_with_color(
+void print_u32(u32 x);
+void print_u32_hex(u32 x);
+void print_u32_binary(u32 x);
+void print_u64(u64 x);
+void print_u64_hex(u64 x);
+void print_u64_binary(u64 x);
+void print_char(char ch);
+void print(const char* str);
+void println(const char* str);
+void print_char_with_color(
     u16 row, u16 col, char ch, VGA_Color foreground, VGA_Color background);
-__attribute__((no_caller_saved_registers)) void clear_screen(void);
+void clear_screen(void);
 
 #endif // VGA_PRINT_H

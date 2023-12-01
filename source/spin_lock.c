@@ -1,6 +1,6 @@
 #include "spin_lock.h"
 #include "idle.h"
-#include "interrupts/interrupts.h"
+#include "interrupts/irq.h"
 
 void init_lock(lock* lock) { atomic_set(lock, 1); }
 
@@ -15,17 +15,17 @@ void spin_lock(lock* lock) {
 void spin_unlock(lock* lock) { atomic_set(lock, 1); }
 
 void spin_lock_irq(lock* lock) {
-    disable_interrupts();
+    local_irq_disable();
     spin_lock(lock);
 }
 
 void spin_unlock_irq(lock* lock) {
     spin_unlock(lock);
-    enable_interrupts();
+    local_irq_enable();
 }
 
 bool spin_lock_irq_save(lock* lock) {
-    bool before = interrupts_enabled();
+    bool before = local_irq_enabled();
     spin_lock_irq(lock);
 
     return before;
@@ -34,6 +34,6 @@ bool spin_lock_irq_save(lock* lock) {
 void spin_unlock_irq_restore(lock* lock, bool interrupts_enabled) {
     spin_unlock(lock);
     if (interrupts_enabled) {
-        enable_interrupts();
+        local_irq_enable();
     }
 }

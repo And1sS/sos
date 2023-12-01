@@ -1,12 +1,16 @@
 #include "../../arch_init.h"
-#include "gdt.h"
+#include "../../scheduler/scheduler.h"
+#include "cpu/gdt.h"
 #include "interrupts/idt.h"
 #include "memory/memory_init.h"
-#include "timer/timer.h"
+#include "timer/pit.h"
 
 void arch_init(const multiboot_info* const mboot_info) {
-    init_gdt();
-    init_memory(mboot_info);
-    init_timer();
-    init_idt();
+    gdt_init();
+    idt_init();
+    memory_init(mboot_info);
+    pit_init();
+
+    threading_init();
+    scheduler_init();
 }

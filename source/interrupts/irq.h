@@ -3,8 +3,8 @@
 
 #include "../lib/types.h"
 
-bool interrupts_enabled();
-void enable_interrupts();
-void disable_interrupts();
+bool local_irq_enabled();
+void local_irq_enable();
+void local_irq_disable();
 
 #endif // SOS_INTERRUPTS_H

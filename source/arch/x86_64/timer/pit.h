@@ -1,6 +1,6 @@
 #ifndef SOS_TIMER_H
 #define SOS_TIMER_H
 
-void init_timer();
+void pit_init();
 
 #endif // SOS_TIMER_H
