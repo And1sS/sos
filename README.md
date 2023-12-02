@@ -3,6 +3,8 @@ SOS - hobby kernel for x86-64 compatible systems. </br>
 Written using C and Assembly. GCC is used as C compiler, NASM is used as assembler. </br>
 Kernel uses Multiboot 2 specification and GRUB 2 as bootloader. </br>
 
+![os_1](https://github.com/And1sS/sos/assets/28010702/c852d758-eea3-48be-b085-abdccf155fe9)
+
 <h3>This kernel for now works only in CSM(compatibility support mode) since it uses deprecated VGA 80x25 text mode (because its easy to get up and running). Main branch has been tested on real hardware.</h3>
 
 <h2>A bit of implementation details:</h2>
