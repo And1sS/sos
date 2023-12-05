@@ -1,6 +1,6 @@
 #include "../../vga_print.h"
 #include "../../memory/memory_map.h"
-#include "../../spin_lock.h"
+#include "../../synchronization/spin_lock.h"
 
 #define WITH_CONSOLE_LOCK(block)                                               \
     do {                                                                       \

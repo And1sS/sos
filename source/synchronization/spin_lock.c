@@ -1,6 +1,6 @@
 #include "spin_lock.h"
-#include "idle.h"
-#include "interrupts/irq.h"
+#include "../idle.h"
+#include "../interrupts/irq.h"
 
 void init_lock(lock* lock) { atomic_set(lock, 1); }
 

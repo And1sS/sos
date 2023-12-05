@@ -1,8 +1,7 @@
 #include "scheduler.h"
 #include "../idle.h"
 #include "../lib/container/queue/queue.h"
-#include "../memory/heap/kheap.h"
-#include "../spin_lock.h"
+#include "../synchronization/spin_lock.h"
 #include "../vga_print.h"
 
 #define THREAD(node) ((thread*) node->value)

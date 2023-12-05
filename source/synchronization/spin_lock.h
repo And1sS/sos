@@ -1,8 +1,8 @@
 #ifndef SOS_SPIN_LOCK_H
 #define SOS_SPIN_LOCK_H
 
+#include "../lib/types.h"
 #include "atomics.h"
-#include "lib/types.h"
 
 typedef volatile u64 lock;
 

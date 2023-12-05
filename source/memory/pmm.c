@@ -1,6 +1,6 @@
 #include "pmm.h"
 #include "../lib/memory_util.h"
-#include "../spin_lock.h"
+#include "../synchronization/spin_lock.h"
 
 lock pmm_lock;
 
