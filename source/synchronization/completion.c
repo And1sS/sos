@@ -17,7 +17,8 @@ void completion_wait(completion* completion) {
 void completion_wait_irq(completion* completion) {
     bool interrupts_enabled = spin_lock_irq_save(&completion->lock);
     while (!completion->completed) {
-        con_var_wait(&completion->cvar, &completion->lock);
+        interrupts_enabled = con_var_wait_irq_save(
+            &completion->cvar, &completion->lock, interrupts_enabled);
     }
     spin_unlock_irq_restore(&completion->lock, interrupts_enabled);
 }
