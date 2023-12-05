@@ -5,10 +5,10 @@
 #include "spin_lock.h"
 
 /*
- * Basic mutual exclusion primitive, should be used to coordinate access to huge
- * critical sections. Can be used inside any thread that needs
- * synchronization, but not inside irq handlers, since this will lead to
- * deadlock.
+ * Basic mutual exclusion primitive, effectively - binary semaphore. Should be
+ * used to coordinate access to huge critical sections. Can be used inside any
+ * thread that needs synchronization, but not inside irq handlers, since this
+ * will lead to deadlock.
  */
 
 typedef struct {
