@@ -2,7 +2,6 @@
 #define SOS_CON_VAR_H
 
 #include "../lib/container/linked_list/linked_list.h"
-#include "mutex.h"
 #include "spin_lock.h"
 
 /*
