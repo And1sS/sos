@@ -17,8 +17,15 @@ typedef struct {
     con_var cvar;
 } mutex;
 
+#define MUTEX_STATIC_INITIALIZER                                               \
+    {                                                                          \
+        .lock = SPIN_LOCK_STATIC_INITIALIZER, .locked = false,                 \
+        .cvar = CON_VAR_STATIC_INITIALIZER                                     \
+    }
+
+#define DECLARE_MUTEX(name) mutex name = MUTEX_STATIC_INITIALIZER
+
 void mutex_init(mutex* mutex);
-void mutex_destroy(mutex* mutex);
 
 void mutex_lock(mutex* mutex);
 void mutex_unlock(mutex* mutex);

@@ -6,6 +6,11 @@
 
 typedef volatile u64 lock;
 
+typedef enum { LOCKED = 0, UNLOCKED = 1 } lock_state;
+
+#define SPIN_LOCK_STATIC_INITIALIZER UNLOCKED
+#define DECLARE_SPIN_LOCK(name) lock name = UNLOCKED
+
 void init_lock(lock* lock);
 bool try_lock(lock* lock);
 void spin_lock(lock* lock);

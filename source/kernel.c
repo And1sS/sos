@@ -24,7 +24,7 @@
  * t1: prints 1000 times
  * t1: dies
  */
-completion comp;
+DECLARE_COMPLETION(comp);
 
 void t2_func() {
     u64 i = 0, printed = 0;
@@ -42,7 +42,6 @@ void t1_func() {
     u64 i = 0, printed = 0;
     bool signaled = false;
 
-    completion_init(&comp);
     thread_start(thread_create("thread-2", t2_func));
 
     while (printed <= 2 * PRINT_TIMES) {
@@ -59,8 +58,6 @@ void t1_func() {
 }
 
 _Noreturn void kernel_main(paddr multiboot_structure) {
-    init_console();
-
     clear_screen();
     println("Starting initialization");
     multiboot_info multiboot_info =

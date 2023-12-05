@@ -5,6 +5,9 @@
 
 #define queue linked_list
 
+#define QUEUE_STATIC_INITIALIZER LINKED_LIST_STATIC_INITIALIZER
+#define DECLARE_QUEUE(name) DECLARE_LINKED_LIST(name)
+
 #define queue_create linked_list_create
 
 #define queue_init linked_list_init

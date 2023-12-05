@@ -18,6 +18,14 @@ typedef struct {
     bool completed;
 } completion;
 
+#define COMPLETION_STATIC_INITIALIZER                                          \
+    {                                                                          \
+        .lock = SPIN_LOCK_STATIC_INITIALIZER,                                  \
+        .cvar = CON_VAR_STATIC_INITIALIZER, .completed = false                 \
+    }
+
+#define DECLARE_COMPLETION(name) completion name = COMPLETION_STATIC_INITIALIZER
+
 void completion_init(completion* completion);
 
 void completion_wait(completion* completion);

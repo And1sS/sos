@@ -14,8 +14,13 @@
  */
 
 typedef struct {
-    linked_list* wait_list;
+    linked_list wait_list;
 } con_var;
+
+#define CON_VAR_STATIC_INITIALIZER                                             \
+    { .wait_list = LINKED_LIST_STATIC_INITIALIZER }
+
+#define DECLARE_CON_VAR(name) con_var name = CON_VAR_STATIC_INITIALIZER;
 
 void con_var_init(con_var* var);
 
