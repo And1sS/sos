@@ -4,7 +4,7 @@
 #include "multiboot.h"
 #include "scheduler/scheduler.h"
 #include "scheduler/thread.h"
-#include "synchronization/con_var.h"
+#include "synchronization/completion.h"
 #include "vga_print.h"
 
 #define PRINT_THRESHOLD 1000000
@@ -24,22 +24,12 @@
  * t1: prints 1000 times
  * t1: dies
  */
-lock condition_lock;
-con_var cvar;
-bool condition = false;
-
-thread* t2;
+completion comp;
 
 void t2_func() {
-    u64 i = 0;
-    u64 printed = 0;
+    u64 i = 0, printed = 0;
 
-    spin_lock(&condition_lock);
-    while (!condition) {
-        con_var_wait(&cvar, &condition_lock);
-    }
-    spin_unlock(&condition_lock);
-
+    completion_wait(&comp);
     while (printed <= PRINT_TIMES) {
         if (i++ % PRINT_THRESHOLD == 0) {
             println("thread 22222222222!");
@@ -49,16 +39,11 @@ void t2_func() {
 }
 
 void t1_func() {
-    t2 = thread_create("thread-2", t2_func);
-
-    init_lock(&condition_lock);
-    con_var_init(&cvar);
-
-    thread_start(t2);
-
-    u64 i = 0;
-    u64 printed = 0;
+    u64 i = 0, printed = 0;
     bool signaled = false;
+
+    completion_init(&comp);
+    thread_start(thread_create("thread-2", t2_func));
 
     while (printed <= 2 * PRINT_TIMES) {
         if (i++ % PRINT_THRESHOLD == 0) {
@@ -68,10 +53,7 @@ void t1_func() {
 
         if (printed >= CONDITION_MET_PRINT_THRESHOLD && !signaled) {
             signaled = true;
-            spin_lock(&condition_lock);
-            condition = true;
-            con_var_broadcast(&cvar);
-            spin_unlock(&condition_lock);
+            completion_complete(&comp);
         }
     }
 }
