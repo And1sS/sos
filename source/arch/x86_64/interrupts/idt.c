@@ -46,123 +46,49 @@ interrupt_descriptor gen_interrupt_descriptor(u16 segment_selector, u64 offset,
     return result;
 }
 
-const u8 ICW1_ICW4_OFFSET = 0;
-const u8 ICW1_SINGLE_MODE_OFFSET = 1;
-const u8 ICW1_CALL_ADDRESS_INTERVAL_OFFSET = 2;
-const u8 ICW1_LEVEL_TRIGGERED_MODE = 3;
-
-const u8 ICW4_8086_MODE_OFFSET = 0;
-const u8 ICW4_AUTO_EOI_OFFSET = 1;
-const u8 ICW4_BUFFERED_MODE_OFFSET = 2;
-const u8 ICW4_SPECIAL_FULLY_NESTED_MODE_OFFSET = 4;
-
-typedef enum {
-    NON_BUFFERED = 0,
-    SLAVE_BUFFERED_MODE = 0b10,
-    MASTER_BUFFERED_MODE = 0b11
-} pic_buffered_mode;
-
-u8 gen_icw1(bool icw4_needed, bool in_single_mode, bit call_address_interval,
-            bool in_level_triggered_mode) {
-
-    return ((icw4_needed & 1) << ICW1_ICW4_OFFSET)
-           | ((in_single_mode & 1) << ICW1_SINGLE_MODE_OFFSET)
-           | ((call_address_interval & 1) << ICW1_CALL_ADDRESS_INTERVAL_OFFSET)
-           | ((in_level_triggered_mode & 1) << ICW1_LEVEL_TRIGGERED_MODE)
-           | (1 << 4);
-}
-
-u8 gen_icw2(u8 interrupt_offset) { return interrupt_offset & 0b11111000; }
-
-// slave on irq 2
-u8 gen_icw3_master() { return 1 << 2; }
-
-u8 gen_icw3_slave() { return 2; }
-
-u8 gen_icw4(bool in_auto_eoi_mode, pic_buffered_mode buffered_mode,
-            bool in_special_fully_nested_mode) {
-
-    return (1 << ICW4_8086_MODE_OFFSET)
-           | ((in_auto_eoi_mode & 1) << ICW4_AUTO_EOI_OFFSET)
-           | ((buffered_mode & 0b11) << ICW4_BUFFERED_MODE_OFFSET)
-           | ((in_special_fully_nested_mode & 1)
-              << ICW4_SPECIAL_FULLY_NESTED_MODE_OFFSET);
-}
-
-const u16 MASTER_PIC_COMMAND_ADDR = 0x20;
-const u16 MASTER_PIC_DATA_ADDR = 0x21;
-const u16 SLAVE_PIC_COMMAND_ADDR = 0xA0;
-const u16 SLAVE_PIC_DATA_ADDR = 0xA1;
-
-void init_pic(void) {
-    u8 icw1 = gen_icw1(true, false, 0, false);
-    outb(MASTER_PIC_COMMAND_ADDR, icw1);
-    io_wait();
-    outb(SLAVE_PIC_COMMAND_ADDR, icw1);
-    io_wait();
-
-    outb(MASTER_PIC_DATA_ADDR, gen_icw2(32));
-    io_wait();
-    outb(SLAVE_PIC_DATA_ADDR, gen_icw2(40));
-    io_wait();
-
-    outb(MASTER_PIC_DATA_ADDR, gen_icw3_master());
-    io_wait();
-    outb(SLAVE_PIC_DATA_ADDR, gen_icw3_slave());
-    io_wait();
-
-    u8 icw4 = gen_icw4(false, NON_BUFFERED, false);
-    outb(MASTER_PIC_DATA_ADDR, icw4);
-    io_wait();
-    outb(SLAVE_PIC_DATA_ADDR, icw4);
-    io_wait();
-
-    // enable all interrupts
-    u8 ocw1 = 0;
-    outb(MASTER_PIC_DATA_ADDR, ocw1);
-    io_wait();
-    outb(SLAVE_PIC_DATA_ADDR, ocw1);
-    io_wait();
-}
-
 #define SET_ISR(i)                                                             \
     extern void isr_##i();                                                     \
     idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,       \
                                            (u64) isr_##i, true, 0, false);
 
+#define SET_ESR(i)                                                             \
+    extern void esr_##i();                                                     \
+    idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,       \
+                                           (u64) esr_##i, true, 0, false);
+
 void idt_init(void) {
-    SET_ISR(0)
-    SET_ISR(1)
-    SET_ISR(2)
-    SET_ISR(3)
-    SET_ISR(4)
-    SET_ISR(5)
-    SET_ISR(6)
-    SET_ISR(7)
-    SET_ISR(8)
-    SET_ISR(9)
-    SET_ISR(10)
-    SET_ISR(11)
-    SET_ISR(12)
-    SET_ISR(13)
-    SET_ISR(14)
-    SET_ISR(15)
-    SET_ISR(16)
-    SET_ISR(17)
-    SET_ISR(18)
-    SET_ISR(19)
-    SET_ISR(20)
-    SET_ISR(21)
-    SET_ISR(22)
-    SET_ISR(23)
-    SET_ISR(24)
-    SET_ISR(25)
-    SET_ISR(26)
-    SET_ISR(27)
-    SET_ISR(28)
-    SET_ISR(29)
-    SET_ISR(30)
-    SET_ISR(31)
+    SET_ESR(0)
+    SET_ESR(1)
+    SET_ESR(2)
+    SET_ESR(3)
+    SET_ESR(4)
+    SET_ESR(5)
+    SET_ESR(6)
+    SET_ESR(7)
+    SET_ESR(8)
+    SET_ESR(9)
+    SET_ESR(10)
+    SET_ESR(11)
+    SET_ESR(12)
+    SET_ESR(13)
+    SET_ESR(14)
+    SET_ESR(15)
+    SET_ESR(16)
+    SET_ESR(17)
+    SET_ESR(18)
+    SET_ESR(19)
+    SET_ESR(20)
+    SET_ESR(21)
+    SET_ESR(22)
+    SET_ESR(23)
+    SET_ESR(24)
+    SET_ESR(25)
+    SET_ESR(26)
+    SET_ESR(27)
+    SET_ESR(28)
+    SET_ESR(29)
+    SET_ESR(30)
+    SET_ESR(31)
     SET_ISR(32)
     SET_ISR(33)
     SET_ISR(34)
@@ -182,6 +108,4 @@ void idt_init(void) {
     SET_ISR(250)
 
     __asm__ volatile("lidt %0" : : "m"(idt));
-
-    init_pic();
 }

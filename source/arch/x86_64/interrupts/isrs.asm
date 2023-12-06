@@ -13,8 +13,9 @@ bits 64
 section .text
 
 ; C handlers defined in isrs.c
-extern handle_software_interrupt
-extern handle_hardware_interrupt
+extern handle_exception
+extern handle_soft_irq
+extern handle_hard_irq
 
 %macro push_regs 0
     push r15
@@ -52,79 +53,101 @@ extern handle_hardware_interrupt
    pop r15
 %endmacro
 
-%macro isr_soft_no_error_code 1
-global isr_%1
-isr_%1:
-    cli
-    push_regs
-    mov rdi, %1  ; interrupt number
-    mov rsi, 0   ; error code
-    mov rdx, rsp ; cpu_context pointer
-    call handle_software_interrupt
-    mov rsp, rax
-    pop_regs
-    iretq
-%endmacro
 
-%macro isr_soft_error_code 1
-global isr_%1
-isr_%1:
+; x86-64 exception with error code handler stub 
+%macro esr_error_code 1
+global esr_%1
+esr_%1:
     cli
     pop rsi      ; error code
     push_regs
     mov rdi, %1  ; interrupt number
     mov rdx, rsp ; cpu_context pointer
-    call handle_software_interrupt
-    mov rsp, rax
+    call handle_exception
+    mov rsp, rax ; returned cpu context
     pop_regs
     iretq
 %endmacro
 
+
+; x86-64 exception without error code handler stub 
+%macro esr_no_error_code 1
+global esr_%1
+esr_%1:
+    cli
+    push_regs
+    mov rdi, %1  ; interrupt number
+    mov rsi, 0   ; error code
+    mov rdx, rsp ; cpu_context pointer
+    call handle_exception
+    mov rsp, rax ; returned cpu context
+    pop_regs
+    iretq
+%endmacro
+
+
+; Software interrupts handler stub
+%macro isr_soft 1
+global isr_%1
+isr_%1:
+    cli
+    push_regs
+    mov rdi, %1  ; interrupt number
+    mov rsi, rsp ; cpu_context pointer
+    call handle_soft_irq
+    mov rsp, rax ; returned cpu context
+    pop_regs
+    iretq
+%endmacro
+
+
+; Hardware interrupts handler stub
 %macro isr_hard 1
 global isr_%1
 isr_%1:
     cli
     push_regs
-    mov rdi, %1
-    mov rsi, rsp
-    call handle_hardware_interrupt
-    mov rsp, rax
+    mov rdi, %1  ; interrupt number
+    mov rsi, rsp ; cpu_context pointer
+    call handle_hard_irq
+    mov rsp, rax ; returned cpu context
     pop_regs
     iretq
 %endmacro
 
-isr_soft_no_error_code 0
-isr_soft_no_error_code 1
-isr_soft_no_error_code 2
-isr_soft_no_error_code 3
-isr_soft_no_error_code 4
-isr_soft_no_error_code 5
-isr_soft_no_error_code 6
-isr_soft_no_error_code 7
-isr_soft_error_code 8
-isr_soft_no_error_code 9
-isr_soft_error_code 10
-isr_soft_error_code 11
-isr_soft_error_code 12
-isr_soft_error_code 13
-isr_soft_error_code 14
-isr_soft_no_error_code 15
-isr_soft_no_error_code 16
-isr_soft_error_code 17
-isr_soft_no_error_code 18
-isr_soft_no_error_code 19
-isr_soft_no_error_code 20
-isr_soft_error_code 21
-isr_soft_no_error_code 22
-isr_soft_no_error_code 23
-isr_soft_no_error_code 24
-isr_soft_no_error_code 25
-isr_soft_no_error_code 26
-isr_soft_no_error_code 27
-isr_soft_no_error_code 28
-isr_soft_error_code 29
-isr_soft_error_code 30
-isr_soft_no_error_code 31
+
+esr_no_error_code 0
+esr_no_error_code 1
+esr_no_error_code 2
+esr_no_error_code 3
+esr_no_error_code 4
+esr_no_error_code 5
+esr_no_error_code 6
+esr_no_error_code 7
+esr_error_code 8
+esr_no_error_code 9
+esr_error_code 10
+esr_error_code 11
+esr_error_code 12
+esr_error_code 13
+esr_error_code 14
+esr_no_error_code 15
+esr_no_error_code 16
+esr_error_code 17
+esr_no_error_code 18
+esr_no_error_code 19
+esr_no_error_code 20
+esr_error_code 21
+esr_no_error_code 22
+esr_no_error_code 23
+esr_no_error_code 24
+esr_no_error_code 25
+esr_no_error_code 26
+esr_no_error_code 27
+esr_no_error_code 28
+esr_error_code 29
+esr_error_code 30
+esr_no_error_code 31
 
 isr_hard 32
 isr_hard 33
@@ -143,4 +166,4 @@ isr_hard 45
 isr_hard 46
 isr_hard 47
 
-isr_soft_no_error_code 250
+isr_soft 250
