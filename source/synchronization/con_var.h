@@ -1,7 +1,7 @@
 #ifndef SOS_CON_VAR_H
 #define SOS_CON_VAR_H
 
-#include "../lib/container/linked_list/linked_list.h"
+#include "../lib/container/queue/queue.h"
 #include "spin_lock.h"
 
 /*
@@ -14,11 +14,11 @@
  */
 
 typedef struct {
-    linked_list wait_list;
+    queue wait_queue;
 } con_var;
 
 #define CON_VAR_STATIC_INITIALIZER                                             \
-    { .wait_list = LINKED_LIST_STATIC_INITIALIZER }
+    { .wait_queue = QUEUE_STATIC_INITIALIZER }
 
 #define DECLARE_CON_VAR(name) con_var name = CON_VAR_STATIC_INITIALIZER;
 
