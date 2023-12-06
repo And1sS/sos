@@ -18,6 +18,6 @@ void mutex_lock(mutex* mutex) {
 void mutex_unlock(mutex* mutex) {
     spin_lock(&mutex->lock);
     mutex->locked = false;
-    con_var_broadcast(&mutex->cvar);
+    con_var_signal(&mutex->cvar);
     spin_unlock(&mutex->lock);
 }
