@@ -1,10 +1,10 @@
 #include "spin_lock.h"
-#include "idle.h"
-#include "interrupts/irq.h"
+#include "../idle.h"
+#include "../interrupts/irq.h"
 
-void init_lock(lock* lock) { atomic_set(lock, 1); }
+void init_lock(lock* lock) { atomic_set(lock, UNLOCKED); }
 
-bool try_lock(lock* lock) { return atomic_exchange(lock, 0) == 1; }
+bool try_lock(lock* lock) { return atomic_exchange(lock, LOCKED) == UNLOCKED; }
 
 void spin_lock(lock* lock) {
     do {
@@ -12,7 +12,7 @@ void spin_lock(lock* lock) {
     } while (!try_lock(lock));
 }
 
-void spin_unlock(lock* lock) { atomic_set(lock, 1); }
+void spin_unlock(lock* lock) { atomic_set(lock, UNLOCKED); }
 
 void spin_lock_irq(lock* lock) {
     local_irq_disable();

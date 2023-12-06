@@ -1,6 +1,6 @@
 #include "../../vga_print.h"
 #include "../../memory/memory_map.h"
-#include "../../spin_lock.h"
+#include "../../synchronization/spin_lock.h"
 
 #define WITH_CONSOLE_LOCK(block)                                               \
     do {                                                                       \
@@ -9,7 +9,7 @@
         spin_unlock_irq_restore(&console_lock, interrupts_enabled);            \
     } while (0)
 
-lock console_lock;
+static lock console_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 const u16 COLUMN_WIDTH = 80;
 const u16 ROW_NUMBER = 25;
@@ -20,8 +20,6 @@ u16 cur_row = ROW_NUMBER - 1;
 u16 cur_col = 0;
 VGA_Color cur_foreground = WHITE;
 VGA_Color cur_background = BLACK;
-
-void init_console() { init_lock(&console_lock); }
 
 void print_u32_unsafe(u32 x);
 void print_u64_unsafe(u64 x);

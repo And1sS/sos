@@ -2,7 +2,7 @@
 #define SOS_ID_GENERATOR_H
 
 #include "lib/bitset.h"
-#include "spin_lock.h"
+#include "synchronization/spin_lock.h"
 
 typedef struct {
     bitset* set;

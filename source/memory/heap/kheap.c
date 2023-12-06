@@ -6,7 +6,7 @@
 #include "../../memory/memory_map.h"
 #include "../../memory/pmm.h"
 #include "../../memory/vmm.h"
-#include "../../spin_lock.h"
+#include "../../synchronization/spin_lock.h"
 
 // This is simplified version of Doug Lea`s malloc
 

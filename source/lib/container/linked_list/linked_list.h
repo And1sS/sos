@@ -16,6 +16,12 @@ typedef struct {
     u64 size;
 } linked_list;
 
+#define LINKED_LIST_STATIC_INITIALIZER                                         \
+    { .head = NULL, .tail = NULL, .size = 0 }
+
+#define DECLARE_LINKED_LIST(name)                                              \
+    linked_list name = LINKED_LIST_STATIC_INITIALIZER
+
 linked_list* linked_list_create();
 linked_list_node* linked_list_node_create(void* value);
 
