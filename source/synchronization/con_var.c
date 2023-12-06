@@ -12,7 +12,7 @@ void con_var_wait(con_var* var, lock* lock) {
     spin_unlock(lock);
     schedule();
 
-    return spin_lock(lock);
+    spin_lock(lock);
 }
 
 bool con_var_wait_irq_save(con_var* var, lock* lock, bool interrupts_enabled) {
