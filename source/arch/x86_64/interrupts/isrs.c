@@ -23,7 +23,7 @@ struct cpu_context* handle_unknown_irq(u8 irq_num,
 struct cpu_context* handle_irq(u8 irq_num, struct cpu_context* context) {
     rw_spin_lock_read_irq(&irq_handlers_lock);
     irq_handler* handler = irq_handlers[irq_num];
-    rw_spin_unlock_read(&irq_handlers_lock);
+    rw_spin_unlock_read_irq(&irq_handlers_lock);
 
     struct cpu_context* new_context =
         handler != NULL ? handler(context)
@@ -52,7 +52,6 @@ struct cpu_context* handle_unknown_exception(u8 exception_num, u64 error_code,
     print(", error code: ");
     print_u64_hex(error_code);
     println("");
-    halt();
     return context;
 }
 
@@ -61,7 +60,7 @@ struct cpu_context* handle_exception(u8 exception_num, u64 error_code,
 
     rw_spin_lock_read_irq(&exception_handlers_lock);
     exception_handler* handler = exception_handlers[exception_num];
-    rw_spin_unlock_read(&exception_handlers_lock);
+    rw_spin_unlock_read_irq(&exception_handlers_lock);
 
     struct cpu_context* new_context =
         handler != NULL
