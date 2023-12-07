@@ -2,6 +2,7 @@
 #include "../../../idle.h"
 #include "../../../synchronization/rw_spin_lock.h"
 #include "../../../vga_print.h"
+#include "../cpu/cpu_context.h"
 #include "pic.h"
 
 static rw_spin_lock irq_handlers_lock = RW_LOCK_STATIC_INITIALIZER;
@@ -13,7 +14,7 @@ static exception_handler* exception_handlers[32] = {0};
 struct cpu_context* handle_unknown_irq(u8 irq_num,
                                        struct cpu_context* context) {
 
-    print("hardware irq #");
+    print("Irq #");
     print_u64(irq_num);
     println("");
     return context;

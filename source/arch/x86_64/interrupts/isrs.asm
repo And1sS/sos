@@ -149,21 +149,14 @@ esr_error_code 29
 esr_error_code 30
 esr_no_error_code 31
 
-isr_hard 32
-isr_hard 33
-isr_hard 34
-isr_hard 35
-isr_hard 36
-isr_hard 37
-isr_hard 38
-isr_hard 39
-isr_hard 40
-isr_hard 41
-isr_hard 42
-isr_hard 43
-isr_hard 44
-isr_hard 45
-isr_hard 46
-isr_hard 47
+%assign i 32
+%rep   48 - 32
+       isr_hard i
+%assign i i+1
+%endrep
 
-isr_soft 250
+%assign i 48
+%rep    256 - 48
+        isr_soft i
+%assign i i+1
+%endrep
