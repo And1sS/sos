@@ -6,12 +6,10 @@
 
 void scheduler_init();
 
-linked_list_node* get_current_thread_node();
+thread* get_current_thread();
 
-void schedule_thread_start(thread* thrd);
+void schedule_thread(thread* thrd);
 void schedule_thread_exit();
-void schedule_thread(linked_list_node* thread_node);
-void schedule_thread_block();
 
 struct cpu_context* context_switch(struct cpu_context* context);
 void schedule();
