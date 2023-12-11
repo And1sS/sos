@@ -16,6 +16,9 @@ typedef struct {
     u64 size;
 } linked_list;
 
+#define LINKED_LIST_NODE_OF(val)                                               \
+    { .value = val, .prev = NULL, .next = NULL }
+
 #define LINKED_LIST_STATIC_INITIALIZER                                         \
     { .head = NULL, .tail = NULL, .size = 0 }
 

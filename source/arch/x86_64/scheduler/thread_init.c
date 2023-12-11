@@ -1,12 +1,12 @@
 #include "../../../lib/memory_util.h"
-#include "../../../scheduler/scheduler.h"
+#include "../../../scheduler/thread.h"
 #include "../cpu/cpu_context.h"
 #include "../cpu/gdt.h"
 #include "../cpu/rflags.h"
 
 void kernel_thread_wrapper(thread_func* func) {
     func();
-    schedule_thread_exit();
+    thread_exit();
 }
 
 struct cpu_context* arch_thread_context_init(thread* thrd, thread_func* func) {

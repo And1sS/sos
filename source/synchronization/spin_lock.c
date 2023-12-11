@@ -33,7 +33,5 @@ bool spin_lock_irq_save(lock* lock) {
 
 void spin_unlock_irq_restore(lock* lock, bool interrupts_enabled) {
     spin_unlock(lock);
-    if (interrupts_enabled) {
-        local_irq_enable();
-    }
+    local_irq_restore(interrupts_enabled);
 }
