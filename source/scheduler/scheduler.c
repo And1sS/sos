@@ -1,14 +1,15 @@
 #include "scheduler.h"
 #include "../idle.h"
-#include "../synchronization/spin_lock.h"
 #include "../lib/container/queue/queue.h"
+#include "../synchronization/spin_lock.h"
+#include "../threading/kthread.h"
 #include "../vga_print.h"
 
 static lock scheduler_lock = SPIN_LOCK_STATIC_INITIALIZER;
 static queue run_queue = QUEUE_STATIC_INITIALIZER;
 
 static thread* current_thread = NULL;
-static thread* kernel_wait_thread; // shouldn't enter run queue
+static kthread* kernel_wait_thread; // shouldn't enter run queue
 
 _Noreturn void kernel_wait_thread_func() {
     while (true) {
@@ -19,7 +20,7 @@ _Noreturn void kernel_wait_thread_func() {
 
 void scheduler_init() {
     kernel_wait_thread =
-        thread_create("kernel-wait-thread", kernel_wait_thread_func);
+        kthread_create("kernel-wait-thread", kernel_wait_thread_func);
 }
 
 thread* get_current_thread() {
@@ -41,6 +42,7 @@ void schedule_thread_exit() {
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 }
 
+// TODO: Add proper locking while accessing thread fields
 struct cpu_context* context_switch(struct cpu_context* context) {
     bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
 

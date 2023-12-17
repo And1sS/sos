@@ -25,4 +25,7 @@ void array_list_add_last(array_list* list, void* value);
 void* array_list_remove_first(array_list* list);
 void* array_list_remove_last(array_list* list);
 
+bool array_list_remove_idx(array_list* list, u64 idx);
+bool array_list_remove(array_list* list, void* value);
+
 #endif // SOS_ARRAY_LIST_H

@@ -1,10 +1,12 @@
 #include "arch_init.h"
 #include "interrupts/irq.h"
 #include "lib/types.h"
+#include "memory/heap/kheap.h"
 #include "multiboot.h"
 #include "scheduler/scheduler.h"
-#include "scheduler/thread.h"
 #include "synchronization/completion.h"
+#include "threading/thread.h"
+#include "threading/uthread.h"
 #include "vga_print.h"
 
 #define PRINT_THRESHOLD 1000000
@@ -26,7 +28,7 @@
  */
 DECLARE_COMPLETION(comp);
 
-void t2_func() {
+u64 t2_func() {
     u64 i = 0, printed = 0;
 
     completion_wait(&comp);
@@ -36,13 +38,17 @@ void t2_func() {
             printed++;
         }
     }
+
+    return 12;
 }
 
-void t1_func() {
+u64 t1_func() {
     u64 i = 0, printed = 0;
     bool signaled = false;
 
-    thread_start(thread_create("thread-2", t2_func));
+    uthread* t2 =
+        uthread_create("thread-2", kmalloc_aligned(8192, 4096), t2_func);
+    thread_start(t2);
 
     while (printed <= 2 * PRINT_TIMES) {
         if (i++ % PRINT_THRESHOLD == 0) {
@@ -55,6 +61,13 @@ void t1_func() {
             completion_complete(&comp);
         }
     }
+
+    u64 t2_exit_code = thread_join(t2);
+    print("child thread finished with exit code: ");
+    print_u64(t2_exit_code);
+    println("");
+
+    return 0;
 }
 
 _Noreturn void kernel_main(paddr multiboot_structure) {
@@ -67,7 +80,9 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     print_multiboot_info(&multiboot_info);
     println("Finished initialization!");
 
-    thread_start(thread_create("test-thread-1", t1_func));
+    uthread* t1 = uthread_create_orphan("test-thread-1",
+                                        kmalloc_aligned(8192, 4096), t1_func);
+    thread_start(t1);
 
     local_irq_enable();
     while (true) {

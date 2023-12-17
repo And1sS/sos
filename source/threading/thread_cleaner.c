@@ -1,6 +1,7 @@
 #include "../interrupts/irq.h"
 #include "../synchronization/con_var.h"
 #include "../vga_print.h"
+#include "kthread.h"
 #include "thread.h"
 
 static lock dead_lock = SPIN_LOCK_STATIC_INITIALIZER;
@@ -11,7 +12,7 @@ static linked_list dead_list = LINKED_LIST_STATIC_INITIALIZER;
 _Noreturn void thread_cleaner_daemon();
 
 void thread_cleaner_init() {
-    thread_run("kernel-thread-cleaner-daemon", thread_cleaner_daemon);
+    kthread_run("kernel-thread-cleaner-daemon", thread_cleaner_daemon);
 }
 
 _Noreturn void thread_cleaner_daemon() {
