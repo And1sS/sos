@@ -1,8 +1,8 @@
 #ifndef SOS_REF_COUNT_H
 #define SOS_REF_COUNT_H
 
-#include "../../lib/panic.h"
 #include "../../synchronization/con_var.h"
+#include "../panic.h"
 #include "../types.h"
 
 typedef struct {

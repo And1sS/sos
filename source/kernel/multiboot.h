@@ -74,14 +74,24 @@ typedef struct {
 } elf_sections;
 
 typedef struct {
+    tag_header header;
+    u32 mod_start;
+    u32 mod_end;
+    string passed_string;
+} module;
+
+typedef struct {
     paddr original_struct_addr;
     u32 size;
     memory_map mmap;
     elf_sections elf_sections;
+    u32 modules_count;
 } multiboot_info;
 
 multiboot_info parse_multiboot_info(void* multiboot_info_ptr);
+module get_module_info(multiboot_info* multiboot_info_ptr, u32 module_index);
 
 void print_multiboot_info(multiboot_info* multiboot_info_ptr);
+void print_module_info(module* mod);
 
 #endif // SOS_MULTIBOOT_H

@@ -3,10 +3,10 @@
 #include "../../lib/alignment.h"
 #include "../../lib/math.h"
 #include "../../lib/memory_util.h"
-#include "../../memory/memory_map.h"
-#include "../../memory/pmm.h"
-#include "../../memory/vmm.h"
 #include "../../synchronization/spin_lock.h"
+#include "../memory_map.h"
+#include "../pmm.h"
+#include "../vmm.h"
 
 // This is simplified version of Doug Lea`s malloc
 

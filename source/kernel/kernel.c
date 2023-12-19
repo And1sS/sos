@@ -10,8 +10,8 @@
 #include "vga_print.h"
 
 #define PRINT_THRESHOLD 1000000
-#define PRINT_TIMES 2000
-#define CONDITION_MET_PRINT_THRESHOLD 1000
+#define PRINT_TIMES 2
+#define CONDITION_MET_PRINT_THRESHOLD 1
 
 /*
  * Modeled flow:
@@ -78,11 +78,22 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     arch_init(&multiboot_info);
 
     print_multiboot_info(&multiboot_info);
+    module mod = get_module_info(&multiboot_info, 0);
+    print_module_info(&mod);
     println("Finished initialization!");
 
-    uthread* t1 = uthread_create_orphan("test-thread-1",
-                                        kmalloc_aligned(8192, 4096), t1_func);
-    thread_start(t1);
+//    for (u64 i = 0; i < mod.mod_end - mod.mod_start; ++i) {
+//        print_char(*(char*)P2V(mod.mod_start + i));
+//
+//        if (i % (80 * 25) == 0) {
+//            println("");
+//        }
+//    }
+
+    //    uthread* t1 = uthread_create_orphan("test-thread-1",
+    //                                        kmalloc_aligned(8192, 4096),
+    //                                        t1_func);
+    // thread_start(t1);
 
     local_irq_enable();
     while (true) {

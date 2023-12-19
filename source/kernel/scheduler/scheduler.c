@@ -13,7 +13,6 @@ static kthread* kernel_wait_thread; // shouldn't enter run queue
 
 _Noreturn void kernel_wait_thread_func() {
     while (true) {
-        println("kernel wait thread!");
         halt();
     }
 }

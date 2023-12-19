@@ -10,6 +10,7 @@ paddr find_end_of_memory(const multiboot_info* mboot_info);
 paddr find_kernel_start(const multiboot_info* mboot_info);
 paddr find_kernel_end(const multiboot_info* mboot_info);
 bool is_frame_available(const multiboot_info* mboot_info, paddr frame);
+bool is_inside_module(const multiboot_info* mboot_info, paddr frame);
 
 void identity_map_ram(const multiboot_info* const mboot_info) {
     paddr memory_end = find_end_of_memory(mboot_info);
