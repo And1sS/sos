@@ -1,6 +1,6 @@
 #include "../../arch_init.h"
 #include "../../scheduler/scheduler.h"
-#include "../../scheduler/thread_cleaner.h"
+#include "../../threading/threading.h"
 #include "cpu/gdt.h"
 #include "interrupts/idt.h"
 #include "memory/memory_init.h"
@@ -14,5 +14,4 @@ void arch_init(const multiboot_info* const mboot_info) {
 
     threading_init();
     scheduler_init();
-    thread_cleaner_init();
 }

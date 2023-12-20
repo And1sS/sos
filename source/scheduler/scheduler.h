@@ -2,7 +2,7 @@
 #define SOS_SCHEDULER_H
 
 #include "../lib/container/linked_list/linked_list.h"
-#include "thread.h"
+#include "../threading/thread.h"
 
 void scheduler_init();
 

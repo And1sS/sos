@@ -82,6 +82,29 @@ void* array_list_remove_last(array_list* list) {
     return list->array[list->size--];
 }
 
+bool array_list_remove_idx(array_list* list, u64 idx) {
+    if (idx >= list->size) {
+        return false;
+    }
+
+    for (u64 i = idx; i < list->size - 1; i++) {
+        list->array[i] = list->array[i + 1];
+    }
+    list->size--;
+    return true;
+}
+
+bool array_list_remove(array_list* list, void* value) {
+    for (u64 i = 0; i < list->size; ++i) {
+        if (list->array[i] == value) {
+            array_list_remove_idx(list, i);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void array_list_grow(array_list* list) {
     u64 new_capacity = list->capacity + list->capacity / 2 + 1;
 
