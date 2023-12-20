@@ -90,7 +90,7 @@ multiboot_info parse_multiboot_info(void* multiboot_info_ptr) {
     return result;
 }
 
-module get_module_info(multiboot_info* multiboot_info_ptr, u32 module_index) {
+module get_module_info(const multiboot_info* multiboot_info_ptr, u32 module_index) {
     module result;
 
     u64 start_ptr = P2V(multiboot_info_ptr->original_struct_addr);

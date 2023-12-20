@@ -26,11 +26,16 @@ void identity_map_ram(const multiboot_info* const mboot_info) {
             map_page(P2V(frame), frame, 1 | 2 | 4);
         }
 
+        // TODO: Change inclusion check to intersection check, because for now
+        //       this code relies on fact that grub places kernel, multiboot
+        //       struct and modules on addresses aligned on page size
         if (!is_frame_available(mboot_info, frame))
             continue;
         if (IS_INSIDE(frame, kernel_start, kernel_end))
             continue;
         if (IS_INSIDE(frame, mboot_start, mboot_end))
+            continue;
+        if (is_inside_module(mboot_info, frame))
             continue;
 
         free_frame(frame);
@@ -95,6 +100,18 @@ bool is_frame_available(const multiboot_info* mboot_info, paddr frame) {
         u64 entry_end = entry_start + entry->length - 1;
 
         if (IS_INSIDE(frame, entry_start, entry_end) && entry->type == 1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool is_inside_module(const multiboot_info* mboot_info, paddr frame) {
+    for (u64 i = 0; i < mboot_info->modules_count; i++) {
+        module mod = get_module_info(mboot_info, i);
+        if (IS_INSIDE(frame, mod.mod_start, mod.mod_end)) {
+            println("IN MODULE!");
             return true;
         }
     }

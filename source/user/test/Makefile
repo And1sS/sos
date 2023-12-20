@@ -1,26 +1,19 @@
-H_FILES := $(shell find ./ -name '*.h')
-С_FILES := $(shell find ./ -name '*.c')
-OBJ_FILES := $(patsubst ./%.c, $(BUILD_FOLDER)/%.o, $(С_FILES))
-
-RESULT_ELF = $(BUILD_FOLDER)/test.elf
+RESULT_BINARY = $(BUILD_FOLDER)/test.bin
 
 CROSS_COMPILE =
 CC = gcc
-CC_FLAGS = -c -g -O3 -m64 -mcmodel=large -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
-		   -Wall -Wextra -Werror
+CC_FLAGS = -nostartfiles -nostdlib
 
 LINKER = ld
 
-all: $(RESULT_ELF)
+all: $(RESULT_BINARY)
 
 clean:
 	rm -rf $(BUILD_FOLDER)
 
-$(RESULT_ELF): $(OBJ_FILES)
-	$(CROSS_COMPILE)$(LINKER) -melf_x86_64 $(OBJ_FILES) -o $(RESULT_ELF)
-
-$(BUILD_FOLDER)/%.o: ./%.c $(H_FILES)
-	mkdir -p $(@D)
-	$(CROSS_COMPILE)$(CC) $(CC_FLAGS) -o $@ $<
+$(RESULT_BINARY): test.c
+	mkdir -p $(BUILD_FOLDER)
+	$(CROSS_COMPILE)$(CC) $(CC_FLAGS) test.c -o $(BUILD_FOLDER)/test.o
+	objcopy -O binary -j .text $(BUILD_FOLDER)/test.o $(BUILD_FOLDER)/test.bin
 
 .PHONY: all

@@ -9,6 +9,7 @@ ISO_KERNEL_FOLDER = $(BUILD_FOLDER)iso/boot/
 ISO_KERNEL_FILE = $(ISO_KERNEL_FOLDER)$(KERNEL_ELF_NAME)
 
 USER_OUTPUT_FOLDER = $(BUILD_FOLDER)user/
+ISO_USER_FOLDER = $(BUILD_FOLDER)iso/user/
 
 ISO_FOLDER = $(BUILD_FOLDER)iso/
 
@@ -22,22 +23,24 @@ run: iso
 clean:
 	rm -rf $(BUILD_FOLDER)
 
-kernel: FORCE
-	$(MAKE) BUILD_FOLDER=$(BUILD_FOLDER)kernel -C kernel
+iso-kernel: kernel
 	mkdir -p $(ISO_KERNEL_FOLDER)
 	cp $(KERNEL_OUTPUT_ELF_FILE) $(ISO_KERNEL_FILE)
 
+kernel: FORCE
+	$(MAKE) BUILD_FOLDER=$(BUILD_FOLDER)kernel -C kernel
+
 iso-user: user
-	echo $(shell find $(USER_OUTPUT_FOLDER) -name "*.elf")
-	mkdir -p $(ISO_FOLDER)user
-	cp -r $(shell find $(USER_OUTPUT_FOLDER) -name "*.elf") $(ISO_FOLDER)user
+	mkdir -p $(ISO_USER_FOLDER)
+	#cp -r $(shell find $(USER_OUTPUT_FOLDER) -name "*.elf") $(ISO_FOLDER)user
+	cp -r $(shell find $(USER_OUTPUT_FOLDER) -name "*.bin") $(ISO_FOLDER)user/
 
 user: FORCE
 	$(MAKE) BUILD_FOLDER=$(USER_OUTPUT_FOLDER) -C user
 
 iso: $(ISO_FILE)
 
-$(ISO_FILE): $(ISO_GRUB_CFG_FILE) iso-user kernel
+$(ISO_FILE): $(ISO_GRUB_CFG_FILE) iso-user iso-kernel
 	grub-mkrescue -o $(ISO_FILE) $(BUILD_FOLDER)iso
 
 $(ISO_GRUB_CFG_FILE): grub.cfg
