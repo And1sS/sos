@@ -51,6 +51,3 @@ $(ISO_GRUB_CFG_FILE): grub.cfg
 	cp $< $@
 
 FORCE:
-
-
-

@@ -111,7 +111,6 @@ bool is_inside_module(const multiboot_info* mboot_info, paddr frame) {
     for (u64 i = 0; i < mboot_info->modules_count; i++) {
         module mod = get_module_info(mboot_info, i);
         if (IS_INSIDE(frame, mod.mod_start, mod.mod_end)) {
-            println("IN MODULE!");
             return true;
         }
     }

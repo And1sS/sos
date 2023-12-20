@@ -89,7 +89,8 @@ typedef struct {
 } multiboot_info;
 
 multiboot_info parse_multiboot_info(void* multiboot_info_ptr);
-module get_module_info(const multiboot_info* multiboot_info_ptr, u32 module_index);
+module get_module_info(const multiboot_info* multiboot_info_ptr,
+                       u32 module_index);
 
 void print_multiboot_info(multiboot_info* multiboot_info_ptr);
 void print_module_info(module* mod);
