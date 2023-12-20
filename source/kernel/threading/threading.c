@@ -1,5 +1,5 @@
 #include "threading.h"
-#include "../id_generator.h"
+#include "../lib/id_generator.h"
 #include "thread_cleaner.h"
 
 static id_generator id_gen;

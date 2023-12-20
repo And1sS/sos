@@ -1,5 +1,5 @@
+#include "../../../lib/kprint.h"
 #include "../../../scheduler/scheduler.h"
-#include "../../../vga_print.h"
 #include "../cpu/io.h"
 #include "idt.h"
 

@@ -1,13 +1,10 @@
+#include "../interrupts/irq.h"
+#include "../lib/kprint.h"
+#include "../memory/heap/kheap.h"
+#include "../scheduler/scheduler.h"
+#include "../threading/uthread.h"
 #include "arch_init.h"
-#include "interrupts/irq.h"
-#include "lib/types.h"
-#include "memory/heap/kheap.h"
 #include "multiboot.h"
-#include "scheduler/scheduler.h"
-#include "synchronization/completion.h"
-#include "threading/thread.h"
-#include "threading/uthread.h"
-#include "vga_print.h"
 
 #define PRINT_THRESHOLD 1000000
 #define PRINT_TIMES 2

@@ -1,7 +1,7 @@
 #ifndef VGA_PRINT_H
 #define VGA_PRINT_H
 
-#include "lib/types.h"
+#include "types.h"
 
 typedef enum {
     BLACK = 0,

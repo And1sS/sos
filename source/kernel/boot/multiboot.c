@@ -1,5 +1,5 @@
 #include "multiboot.h"
-#include "lib/alignment.h"
+#include "../lib/alignment.h"
 
 #define SKIP_FIELD(type, ptr)                                                  \
     do {                                                                       \

@@ -1,7 +1,7 @@
 #ifndef SOS_PAGING_H
 #define SOS_PAGING_H
 
-#include "../../../multiboot.h"
+#include "../../../boot/multiboot.h"
 
 #define PT_ENTRIES 512
 #define KERNEL_P4_ENTRY 256

@@ -1,9 +1,9 @@
 #include "scheduler.h"
 #include "../idle.h"
 #include "../lib/container/queue/queue.h"
+#include "../lib/kprint.h"
 #include "../synchronization/spin_lock.h"
 #include "../threading/kthread.h"
-#include "../vga_print.h"
 
 static lock scheduler_lock = SPIN_LOCK_STATIC_INITIALIZER;
 static queue run_queue = QUEUE_STATIC_INITIALIZER;

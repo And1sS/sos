@@ -1,5 +1,5 @@
 #include "kthread.h"
-#include "../id_generator.h"
+#include "../lib/id_generator.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/pmm.h"
 #include "../scheduler/scheduler.h"

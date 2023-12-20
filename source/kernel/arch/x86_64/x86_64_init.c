@@ -1,4 +1,4 @@
-#include "../../arch_init.h"
+#include "../../boot/arch_init.h"
 #include "../../scheduler/scheduler.h"
 #include "../../threading/threading.h"
 #include "cpu/gdt.h"

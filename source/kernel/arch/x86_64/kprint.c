@@ -1,4 +1,4 @@
-#include "../../vga_print.h"
+#include "../../lib/kprint.h"
 #include "../../memory/memory_map.h"
 #include "../../synchronization/spin_lock.h"
 

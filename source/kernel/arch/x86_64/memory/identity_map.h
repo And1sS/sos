@@ -1,7 +1,7 @@
 #ifndef SOS_IDENTITY_MAP_H
 #define SOS_IDENTITY_MAP_H
 
-#include "../../../multiboot.h"
+#include "../../../boot/multiboot.h"
 
 void identity_map_ram(const multiboot_info* const mboot_info);
 

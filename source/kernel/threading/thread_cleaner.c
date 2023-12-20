@@ -1,6 +1,6 @@
 #include "../interrupts/irq.h"
+#include "../lib/kprint.h"
 #include "../synchronization/con_var.h"
-#include "../vga_print.h"
 #include "kthread.h"
 #include "thread.h"
 

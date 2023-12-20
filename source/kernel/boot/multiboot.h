@@ -1,9 +1,9 @@
 #ifndef SOS_MULTIBOOT_H
 #define SOS_MULTIBOOT_H
 
-#include "lib/types.h"
-#include "memory/memory_map.h"
-#include "vga_print.h"
+#include "../lib/kprint.h"
+#include "../lib/types.h"
+#include "../memory/memory_map.h"
 
 typedef enum {
     EMPTY = 0,
