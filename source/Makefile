@@ -32,8 +32,11 @@ kernel: FORCE
 
 iso-user: user
 	mkdir -p $(ISO_USER_FOLDER)
-	#cp -r $(shell find $(USER_OUTPUT_FOLDER) -name "*.elf") $(ISO_FOLDER)user
-	cp -r $(shell find $(USER_OUTPUT_FOLDER) -name "*.bin") $(ISO_FOLDER)user/
+	$(eval FILES := $(shell find $(USER_OUTPUT_FOLDER) -name "*.bin"))
+	if [ ! -z "$(FILES)" -a "$(FILES)" != " " ]; then cp -r $(FILES) $(ISO_FOLDER)user; fi
+
+	$(eval FILES := $(shell find $(USER_OUTPUT_FOLDER) -name "*.elf"))
+	if [ ! -z "$(FILES)" -a "$(FILES)" != " " ]; then cp -r $(FILES) $(ISO_FOLDER)user; fi
 
 user: FORCE
 	$(MAKE) BUILD_FOLDER=$(USER_OUTPUT_FOLDER) -C user
