@@ -1,15 +1,12 @@
-BUILD_FOLDER = build_output
-SUBDIRS = $(filter-out $(BUILD_FOLDER)/., $(wildcard */.))
+SUBDIRS = $(wildcard */.)
 
 all: $(SUBDIRS)
 
 clean:
 	rm -rf $(BUILD_FOLDER)
 
-
 $(SUBDIRS): FORCE
-	$(MAKE) -C $@
-	python3 ../clone_elfs.py $@
+	$(MAKE) BUILD_FOLDER=$(BUILD_FOLDER)$(shell echo $@ | rev | cut -d'/' -f2- | rev) -C $@
 
 FORCE:
 

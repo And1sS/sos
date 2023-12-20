@@ -1,5 +1,3 @@
-BUILD_FOLDER = build_output
-
 H_FILES := $(shell find ./ -name '*.h')
 С_FILES := $(shell find ./ -name '*.c')
 OBJ_FILES := $(patsubst ./%.c, $(BUILD_FOLDER)/%.o, $(С_FILES))
