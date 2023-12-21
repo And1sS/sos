@@ -1,19 +1,19 @@
 #include "../../boot/arch_init.h"
-#include "../../scheduler/scheduler.h"
-#include "../../threading/threading.h"
+#include "../../memory/pmm.h"
 #include "cpu/gdt.h"
 #include "cpu/tss.h"
 #include "interrupts/idt.h"
-#include "memory/memory_init.h"
+#include "memory/identity_map.h"
 #include "timer/pit.h"
 
 void arch_init(const multiboot_info* const mboot_info) {
     gdt_init();
-    tss_set_up();
+    tss_init();
     idt_init();
-    memory_init(mboot_info);
     pit_init();
+    identity_map_ram(mboot_info);
 
-    threading_init();
-    scheduler_init();
+    print("Finished memory mapping! Free frames: ");
+    print_u64(get_available_frames_count());
+    println("");
 }

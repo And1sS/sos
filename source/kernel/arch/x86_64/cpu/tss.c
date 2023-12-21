@@ -5,7 +5,7 @@
 
 task_state_segment tss;
 
-void tss_set_up() {
+void tss_init() {
     memset(&tss, 0, sizeof(task_state_segment));
 
     __asm__ volatile("ltr %0" : : "r"((u16) TSS_SEGMENT_SELECTOR));

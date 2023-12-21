@@ -5,6 +5,7 @@
 #include "../memory/vmm.h"
 #include "../scheduler/scheduler.h"
 #include "../threading/kthread.h"
+#include "../threading/threading.h"
 #include "../threading/uthread.h"
 #include "arch_init.h"
 #include "multiboot.h"
@@ -20,15 +21,29 @@ void kernel_thread() {
     }
 }
 
-_Noreturn void kernel_main(paddr multiboot_structure) {
+void set_up(const multiboot_info* mboot_info) {
     clear_screen();
     println("Starting initialization");
+
+    arch_init(mboot_info);
+
+    kmalloc_init();
+    print("Finished kernel heap initialization! Heap initial size: ");
+    print_u64(KHEAP_INITIAL_SIZE);
+    println("");
+
+    threading_init();
+    scheduler_init();
+    println("Finished threading initialization!");
+
+    print_multiboot_info(mboot_info);
+    println("Finished initialization!");
+}
+
+_Noreturn void kernel_main(paddr multiboot_structure) {
     multiboot_info multiboot_info =
         parse_multiboot_info((void*) P2V(multiboot_structure));
-    arch_init(&multiboot_info);
-
-    print_multiboot_info(&multiboot_info);
-    println("Finished initialization!");
+    set_up(&multiboot_info);
 
     module first = get_module_info(&multiboot_info, 0);
 

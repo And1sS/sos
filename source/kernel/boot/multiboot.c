@@ -126,7 +126,7 @@ module get_module_info(const multiboot_info* multiboot_info_ptr,
     return result;
 }
 
-void print_multiboot_info(multiboot_info* multiboot_info_ptr) {
+void print_multiboot_info(const multiboot_info* multiboot_info_ptr) {
     multiboot_info mboot_info = *multiboot_info_ptr;
 
     println("Multiboot structure {");
@@ -201,7 +201,7 @@ void print_multiboot_info(multiboot_info* multiboot_info_ptr) {
     println("}");
 }
 
-void print_module_info(module* mod) {
+void print_module_info(const module* mod) {
     println("Module: ");
     print("    Size: ");
     print_u32(mod->mod_end - mod->mod_start);

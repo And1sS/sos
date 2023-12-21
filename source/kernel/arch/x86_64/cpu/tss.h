@@ -33,6 +33,6 @@ typedef struct __attribute__((__packed__)) {
 
 extern task_state_segment tss;
 
-void tss_set_up();
+void tss_init();
 
 #endif // SOS_TSS_H

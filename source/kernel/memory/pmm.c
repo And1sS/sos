@@ -2,12 +2,10 @@
 #include "../lib/memory_util.h"
 #include "../synchronization/spin_lock.h"
 
-lock pmm_lock;
+lock pmm_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 volatile paddr last_available_frame = NULL;
 volatile u64 available = 0;
-
-void pmm_init() { init_lock(&pmm_lock); }
 
 paddr allocate_frame() {
     bool interrupts_enabled = spin_lock_irq_save(&pmm_lock);
