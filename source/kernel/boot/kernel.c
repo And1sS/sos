@@ -28,13 +28,14 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     arch_init(&multiboot_info);
 
     print_multiboot_info(&multiboot_info);
-    module mod = get_module_info(&multiboot_info, 0);
-    print_module_info(&mod);
     println("Finished initialization!");
+
+    module first = get_module_info(&multiboot_info, 0);
+
     map_page(0x1000, allocate_zeroed_frame(), 1 | 2 | 4);
     *(u8*) 0x1000 = 3;
-    memcpy((void*) 0x1000, (void*) P2V(mod.mod_start),
-           mod.mod_end - mod.mod_start);
+    memcpy((void*) 0x1000, (void*) P2V(first.mod_start),
+           first.mod_end - first.mod_start);
 
     map_page(0xFFFF, allocate_zeroed_frame(), 1 | 2 | 4);
     map_page(0xFFFF + FRAME_SIZE, allocate_zeroed_frame(), 1 | 2 | 4);

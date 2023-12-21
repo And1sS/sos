@@ -23,7 +23,7 @@ void identity_map_ram(const multiboot_info* const mboot_info) {
          frame += FRAME_SIZE) {
         u64 page = get_page(P2V(frame));
         if (!(page & 1)) {
-            map_page(P2V(frame), frame, 1 | 2 | 4);
+            map_page(P2V(frame), frame, 1 | 2);
         }
 
         // TODO: Change inclusion check to intersection check, because for now
