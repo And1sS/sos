@@ -4,9 +4,21 @@
 #include "../memory/pmm.h"
 #include "../memory/vmm.h"
 #include "../scheduler/scheduler.h"
+#include "../threading/kthread.h"
 #include "../threading/uthread.h"
 #include "arch_init.h"
 #include "multiboot.h"
+
+void kernel_thread() {
+    u64 i = 0;
+    u64 print = 0;
+    while (print < 10) {
+        if (i++ % 1000000 == 0) {
+            println("kernel thread!");
+            print++;
+        }
+    }
+}
 
 _Noreturn void kernel_main(paddr multiboot_structure) {
     clear_screen();
@@ -31,6 +43,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
 
     uthread* t1 = uthread_create_orphan("test", stack, (uthread_func*) 0x1000);
     thread_start(t1);
+
+    kthread_run("kernel-test-thread", kernel_thread);
     local_irq_enable();
     while (true) {
     }

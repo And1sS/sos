@@ -34,6 +34,5 @@ typedef struct __attribute__((__packed__)) {
 extern task_state_segment tss;
 
 void tss_set_up();
-void tss_update_rsp(u64 rsp);
 
 #endif // SOS_TSS_H

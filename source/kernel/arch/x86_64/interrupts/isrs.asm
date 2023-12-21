@@ -18,7 +18,13 @@ extern handle_hardware_interrupt
 extern handle_syscall
 extern update_tss
 
-%macro push_regs 0
+%macro update_tss 0
+    push rax
+    call update_tss
+    pop rax
+%endmacro
+
+%macro save_state 0
     push r15
     push r14
     push r13
@@ -36,7 +42,9 @@ extern update_tss
     push rax
 %endmacro
 
-%macro pop_regs 0
+%macro restore_state 0
+   update_tss
+   mov rsp, rax
    pop rax
    pop rbx
    pop rcx
@@ -54,23 +62,16 @@ extern update_tss
    pop r15
 %endmacro
 
-%macro update_tss 0
-    push rax
-    call update_tss
-    pop rax
-%endmacro
-
 %macro isr_soft_no_error_code 1
 global isr_%1
 isr_%1:
     cli
-    push_regs
+    save_state
     mov rdi, %1  ; interrupt number
     mov rsi, 0   ; error code
     mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
-    mov rsp, rax
-    pop_regs
+    restore_state
     iretq
 %endmacro
 
@@ -79,13 +80,11 @@ global isr_%1
 isr_%1:
     cli
     pop rsi      ; error code
-    push_regs
+    save_state
     mov rdi, %1  ; interrupt number
     mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
-    update_tss
-    mov rsp, rax
-    pop_regs
+    restore_state
     iretq
 %endmacro
 
@@ -93,13 +92,11 @@ isr_%1:
 global isr_%1
 isr_%1:
     cli
-    push_regs
+    save_state
     mov rdi, %1
     mov rsi, rsp
     call handle_hardware_interrupt
-    update_tss
-    mov rsp, rax
-    pop_regs
+    restore_state
     iretq
 %endmacro
 
@@ -156,12 +153,10 @@ isr_hard 47
 global isr_80
 isr_80:
     cli
-    push_regs
+    save_state
     mov rsi, rsp   ; cpu context
     call handle_syscall
-    update_tss
-    mov rsp, rax
-    pop_regs
+    restore_state
     iretq
 
 isr_soft_no_error_code 250
