@@ -1,5 +1,6 @@
 #include "../../../lib/kprint.h"
 #include "../../../scheduler/scheduler.h"
+#include "../cpu/cpu_context.h"
 #include "../cpu/io.h"
 #include "idt.h"
 
@@ -48,4 +49,11 @@ struct cpu_context* handle_software_interrupt(u8 interrupt_number,
                                               struct cpu_context* context) {
 
     return handle_interrupt(interrupt_number, error_code, context);
+}
+
+struct cpu_context* handle_syscall(u64 arg0, struct cpu_context* context) {
+    print("syscall! arg0: ");
+    print_u64_hex(arg0);
+    println("");
+    return context;
 }

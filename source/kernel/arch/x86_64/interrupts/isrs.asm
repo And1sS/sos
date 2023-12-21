@@ -15,6 +15,8 @@ section .text
 ; C handlers defined in isrs.c
 extern handle_software_interrupt
 extern handle_hardware_interrupt
+extern handle_syscall
+extern update_tss
 
 %macro push_regs 0
     push r15
@@ -52,6 +54,12 @@ extern handle_hardware_interrupt
    pop r15
 %endmacro
 
+%macro update_tss 0
+    push rax
+    call update_tss
+    pop rax
+%endmacro
+
 %macro isr_soft_no_error_code 1
 global isr_%1
 isr_%1:
@@ -75,6 +83,7 @@ isr_%1:
     mov rdi, %1  ; interrupt number
     mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
+    update_tss
     mov rsp, rax
     pop_regs
     iretq
@@ -88,6 +97,7 @@ isr_%1:
     mov rdi, %1
     mov rsi, rsp
     call handle_hardware_interrupt
+    update_tss
     mov rsp, rax
     pop_regs
     iretq
@@ -142,5 +152,16 @@ isr_hard 44
 isr_hard 45
 isr_hard 46
 isr_hard 47
+
+global isr_80
+isr_80:
+    cli
+    push_regs
+    mov rsi, rsp   ; cpu context
+    call handle_syscall
+    update_tss
+    mov rsp, rax
+    pop_regs
+    iretq
 
 isr_soft_no_error_code 250

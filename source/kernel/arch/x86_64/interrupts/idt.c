@@ -128,7 +128,7 @@ void init_pic(void) {
 #define SET_ISR(i)                                                             \
     extern void isr_##i();                                                     \
     idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,       \
-                                           (u64) isr_##i, true, 0, false);
+                                           (u64) isr_##i, true, 3, false);
 
 void idt_init(void) {
     SET_ISR(0)
@@ -179,6 +179,7 @@ void idt_init(void) {
     SET_ISR(45)
     SET_ISR(46)
     SET_ISR(47)
+    SET_ISR(80)
     SET_ISR(250)
 
     __asm__ volatile("lidt %0" : : "m"(idt));

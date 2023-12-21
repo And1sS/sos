@@ -6,7 +6,7 @@ clean:
 	rm -rf $(BUILD_FOLDER)
 
 $(SUBDIRS): FORCE
-	$(MAKE) BUILD_FOLDER=$(BUILD_FOLDER)$(shell echo $@ | rev | cut -d'/' -f2- | rev) -C $@
+	$(MAKE) BUILD_FOLDER=$(BUILD_FOLDER)$(shell echo $@ | rev | cut -d'/' -f2- | rev)/ -C $@
 
 FORCE:
 

@@ -1,8 +1,7 @@
 #include "scheduler.h"
+#include "../arch/x86_64/cpu/tss.h"
 #include "../idle.h"
-#include "../lib/container/queue/queue.h"
 #include "../lib/kprint.h"
-#include "../synchronization/spin_lock.h"
 #include "../threading/kthread.h"
 
 static lock scheduler_lock = SPIN_LOCK_STATIC_INITIALIZER;
@@ -74,6 +73,7 @@ struct cpu_context* context_switch(struct cpu_context* context) {
     }
 
     struct cpu_context* new_context = new_thread->context;
+    tss_update_rsp((u64) new_thread->kernel_stack + 4096);
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 
     return new_context;

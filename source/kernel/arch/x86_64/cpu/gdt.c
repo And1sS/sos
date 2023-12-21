@@ -1,4 +1,5 @@
 #include "gdt.h"
+#include "tss.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 segment_limit_0_15;
@@ -8,10 +9,22 @@ typedef struct __attribute__((__aligned__(8), __packed__)) {
     u8 base_addr_24_31;
 } segment_descriptor;
 
+typedef struct __attribute__((__aligned__(8), __packed__)) {
+    u16 segment_limit_0_15;
+    u32 base_addr_0_23 : 24;
+    u8 flags_8_15;
+    u8 flags_16_23;
+    u8 base_addr_24_31;
+    u32 base_addr_32_63;
+    u32 reserved;
+} tss_segment_descriptor;
+
 typedef struct __attribute__((__packed__)) {
     const u16 limit;
     const segment_descriptor* data;
 } gdt_descriptor;
+
+typedef enum { PL_0 = 0, PL_1 = 1, PL_2 = 2, PL_3 = 3 } privilege_level;
 
 const u8 SEGMENT_PRESENT_OFFSET = 7;
 const u8 DESCRIPTOR_PRIVILEGE_LEVEL_OFFSET = 5;
@@ -24,11 +37,13 @@ const u8 READ_ENABLE_OFFSET = 1;
 const u8 BUSY_OFFSET = 1;
 const u8 ACCESSED_OFFSET = 0;
 
-segment_descriptor gdt_data[6];
+// 6 segments, last is tss which occupies two entries
+segment_descriptor gdt_data[7];
 const gdt_descriptor gdt = {.data = gdt_data, .limit = sizeof(gdt_data) - 1};
 
-u8 gen_code_segment_descriptor_8_15_flags(bit present, u8 dpl, bit conforming,
-                                          bit read_enabled, bit accessed) {
+u8 gen_code_segment_descriptor_8_15_flags(bit present, privilege_level dpl,
+                                          bit conforming, bit read_enabled,
+                                          bit accessed) {
 
     return ((present & 1) << SEGMENT_PRESENT_OFFSET)
            | ((dpl & 0b11) << DESCRIPTOR_PRIVILEGE_LEVEL_OFFSET)
@@ -38,7 +53,7 @@ u8 gen_code_segment_descriptor_8_15_flags(bit present, u8 dpl, bit conforming,
            | ((accessed & 1) << ACCESSED_OFFSET);
 }
 
-u8 gen_data_segment_descriptor_8_15_flags(bit present, u8 dpl,
+u8 gen_data_segment_descriptor_8_15_flags(bit present, privilege_level dpl,
                                           bit expansion_direction,
                                           bit write_enabled, bit accessed) {
 
@@ -50,7 +65,8 @@ u8 gen_data_segment_descriptor_8_15_flags(bit present, u8 dpl,
            | ((accessed & 1) << ACCESSED_OFFSET);
 }
 
-u8 gen_task_state_segment_descriptor_8_15_flags(bit present, u8 dpl, bit busy) {
+u8 gen_task_state_segment_descriptor_8_15_flags(bit present,
+                                                privilege_level dpl, bit busy) {
 
     return ((present & 1) << SEGMENT_PRESENT_OFFSET)
            | ((dpl & 0b11) << DESCRIPTOR_PRIVILEGE_LEVEL_OFFSET)
@@ -84,7 +100,8 @@ segment_descriptor gen_null_segment_decriptor(void) {
 segment_descriptor gen_code_segment_descriptor(
     u32 base_addr, u32 segment_limit, bit granularity,
     bit default_operation_size, bit long_mode, bit available_for_system,
-    bit present, bit dpl, bit conforming, bit read_enabled, bit accessed) {
+    bit present, privilege_level dpl, bit conforming, bit read_enabled,
+    bit accessed) {
 
     segment_descriptor result = {
         .segment_limit_0_15 = segment_limit & 0xFFFF,
@@ -118,27 +135,33 @@ segment_descriptor gen_data_segment_descriptor(
     return result;
 }
 
-segment_descriptor gen_task_state_segment_descriptor(
-    u32 base_addr, u32 segment_limit, bit granularity, bit available_for_system,
-    bit present, bit dpl, bit busy) {
+tss_segment_descriptor gen_task_state_segment_descriptor(
+    task_state_segment* tss, privilege_level dpl) {
 
-    segment_descriptor result = {
+    u64 base_addr = (u64) tss;
+    u32 segment_limit = sizeof(task_state_segment);
+    tss_segment_descriptor result = {
         .segment_limit_0_15 = segment_limit & 0xFFFF,
         .base_addr_0_23 = base_addr & 0xFFFFFF,
-        .flags_8_15 =
-            gen_task_state_segment_descriptor_8_15_flags(present, dpl, busy),
+        .flags_8_15 = gen_task_state_segment_descriptor_8_15_flags(1, dpl, 0),
         .flags_16_23 = gen_segment_descriptor_16_23_flags(
-            granularity, 0, 0, available_for_system,
-            (segment_limit >> 16) & 0xF),
-        .base_addr_24_31 = (base_addr >> 24) & 0xFF};
+            0, 0, 0, 0, (segment_limit >> 16) & 0xF),
+        .base_addr_24_31 = (base_addr >> 24) & 0xFF,
+        .base_addr_32_63 = (base_addr >> 32) & 0xFFFFFFFF,
+        .reserved = 0};
 
     return result;
 }
 
-u16 KERNEL_CODE_SEGMENT_SELECTOR = 1 << 3;
-u16 KERNEL_DATA_SEGMENT_SELECTOR = 2 << 3;
-u16 USER_CODE_SEGMENT_SELECTOR = 3 << 3;
-u16 USER_DATA_SEGMENT_SELECTOR = 4 << 4;
+u16 gen_segment_selector(u16 index, privilege_level rpl) {
+    return index << 3 | (rpl & 0b11);
+}
+
+u16 KERNEL_CODE_SEGMENT_SELECTOR;
+u16 KERNEL_DATA_SEGMENT_SELECTOR;
+u16 USER_CODE_SEGMENT_SELECTOR;
+u16 USER_DATA_SEGMENT_SELECTOR;
+u16 TSS_SEGMENT_SELECTOR;
 
 void gdt_init(void) {
     gdt_data[0] = gen_null_segment_decriptor();
@@ -153,8 +176,14 @@ void gdt_init(void) {
         gen_code_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 0, 1, 3, 0, 0, 0);
     gdt_data[4] =
         gen_data_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 0, 1, 3, 0, 1, 0);
-    // gdt_data[5] = gen_task_state_segment_descriptor(0, 0xFFFFF, 1, 1, 1, 0,
-    // 0);
+    *(tss_segment_descriptor*) &gdt_data[5] =
+        gen_task_state_segment_descriptor(&tss, PL_0);
+
+    KERNEL_CODE_SEGMENT_SELECTOR = gen_segment_selector(1, PL_0);
+    KERNEL_DATA_SEGMENT_SELECTOR = gen_segment_selector(2, PL_0);
+    USER_CODE_SEGMENT_SELECTOR = gen_segment_selector(3, PL_3);
+    USER_DATA_SEGMENT_SELECTOR = gen_segment_selector(4, PL_3);
+    TSS_SEGMENT_SELECTOR = gen_segment_selector(5, PL_0);
 
     __asm__ volatile("    lgdt %0\n"
                      "    pushq %1\n"

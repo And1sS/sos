@@ -23,8 +23,20 @@ struct cpu_context;
 typedef struct _thread {
     u64 id;
     string name;
+    bool kernel_thread;
+    void* kernel_stack;
+    void* user_stack;
 
-    // here should be pointer to process
+    // state and context should be modified only within the thread, so no
+    // locking required on accesses, visibility is carried by scheduler
+    thread_state state;
+    struct cpu_context* context;
+
+    linked_list_node scheduler_node; // this is used in threading and thread
+                                     // cleaner, never changes
+
+    lock lock; // guards fields below and also guards thread against
+               // de-allocation
 
     bool exiting;
     bool finished;
@@ -32,23 +44,14 @@ typedef struct _thread {
 
     ref_count refc;
 
-    bool kernel_thread;
     bool should_die; // used in kernel threads
 
-    struct cpu_context* context;
-    void* stack;
-    thread_state state;
+    // here should be pointer to process
 
     struct _thread* parent;
     array_list children; // children threads
 
     con_var finish_cvar;
-
-    lock lock; // guards above fields and also guards thread against
-               // de-allocation
-
-    linked_list_node scheduler_node; // this is used in threading and thread
-                                     // cleaner, never changes
 } thread;
 
 void thread_start(thread* thread);
