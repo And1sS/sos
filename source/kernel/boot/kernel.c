@@ -13,7 +13,7 @@
 void kernel_thread() {
     u64 i = 0;
     u64 print = 0;
-    while (print < 10) {
+    while (print < 1000) {
         if (i++ % 1000000 == 0) {
             println("kernel thread!");
             print++;
@@ -47,8 +47,9 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
 
     module first = get_module_info(&multiboot_info, 0);
 
+    // temporary hardcoded loading of first-userspace-program.bin for test
+    // which contains only code which start is mapped to 0x1000
     map_page(0x1000, allocate_zeroed_frame(), 1 | 2 | 4);
-    *(u8*) 0x1000 = 3;
     memcpy((void*) 0x1000, (void*) P2V(first.mod_start),
            first.mod_end - first.mod_start);
 
@@ -61,6 +62,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     thread_start(t1);
 
     kthread_run("kernel-test-thread", kernel_thread);
+
     local_irq_enable();
     while (true) {
     }

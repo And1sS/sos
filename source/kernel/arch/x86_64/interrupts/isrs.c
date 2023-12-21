@@ -13,15 +13,7 @@ struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
 
     if (interrupt_number == 32) {
         ticks++;
-        if (ticks % 100 == 0) {
-            print("TICKS:                  ");
-            print_u64(ticks);
-            println("");
-            struct cpu_context* next = context_switch(context);
-            return next;
-        }
-        return context;
-
+        return context_switch(context);
     } else if (interrupt_number == 250) {
         return context_switch(context);
     } else if (interrupt_number == 13) {

@@ -1,6 +1,7 @@
 #include "idt.h"
 #include "../cpu/gdt.h"
 #include "../cpu/io.h"
+#include "../cpu/privilege_level.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
     u16 offset_0_15;
@@ -24,14 +25,15 @@ const int INTERRUPT_TYPE_OFFSET = 0;
 interrupt_descriptor idt_data[256];
 const idt_descriptor idt = {.data = idt_data, .limit = sizeof(idt_data) - 1};
 
-u8 gen_interrupt_descriptor_flags(bool is_present, u8 dpl, bool is_trap_gate) {
+u8 gen_interrupt_descriptor_flags(bool is_present, privilege_level dpl,
+                                  bool is_trap_gate) {
 
     return ((is_present & 1) << PRESENT_OFFSET) | ((dpl & 0b11) << DPL_OFFSET)
            | ((is_trap_gate & 1) << INTERRUPT_TYPE_OFFSET) | 0b1110;
 }
 
 interrupt_descriptor gen_interrupt_descriptor(u16 segment_selector, u64 offset,
-                                              bool is_present, u8 dpl,
+                                              bool is_present, privilege_level dpl,
                                               bool is_trap_gate) {
 
     interrupt_descriptor result = {
@@ -128,7 +130,7 @@ void init_pic(void) {
 #define SET_ISR(i)                                                             \
     extern void isr_##i();                                                     \
     idt_data[i] = gen_interrupt_descriptor(KERNEL_CODE_SEGMENT_SELECTOR,       \
-                                           (u64) isr_##i, true, 3, false);
+                                           (u64) isr_##i, true, PL_3, false);
 
 void idt_init(void) {
     SET_ISR(0)

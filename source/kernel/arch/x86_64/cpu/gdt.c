@@ -1,4 +1,5 @@
 #include "gdt.h"
+#include "privilege_level.h"
 #include "tss.h"
 
 typedef struct __attribute__((__aligned__(8), __packed__)) {
@@ -24,7 +25,6 @@ typedef struct __attribute__((__packed__)) {
     const segment_descriptor* data;
 } gdt_descriptor;
 
-typedef enum { PL_0 = 0, PL_1 = 1, PL_2 = 2, PL_3 = 3 } privilege_level;
 
 const u8 SEGMENT_PRESENT_OFFSET = 7;
 const u8 DESCRIPTOR_PRIVILEGE_LEVEL_OFFSET = 5;
@@ -154,7 +154,7 @@ tss_segment_descriptor gen_task_state_segment_descriptor(
 }
 
 u16 gen_segment_selector(u16 index, privilege_level rpl) {
-    return index << 3 | (rpl & 0b11);
+    return (index << 3) | (rpl & 0b11);
 }
 
 u16 KERNEL_CODE_SEGMENT_SELECTOR;
