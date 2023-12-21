@@ -1,7 +1,8 @@
+#include "../../../interrupts/irq.h"
 #include "../../../lib/kprint.h"
 #include "../../../scheduler/scheduler.h"
-#include "../cpu/cpu_context.h"
 #include "../cpu/io.h"
+#include "../cpu/registers.h"
 #include "idt.h"
 
 const u8 OCW2_EOI_OFFSET = 5;
@@ -12,9 +13,28 @@ struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
 
     if (interrupt_number == 32) {
         ticks++;
-        return context_switch(context);
+        if (ticks % 100 == 0) {
+            print("TICKS:                  ");
+            print_u64(ticks);
+            println("");
+            struct cpu_context* next = context_switch(context);
+            return next;
+        }
+        return context;
+
     } else if (interrupt_number == 250) {
         return context_switch(context);
+    } else if (interrupt_number == 13) {
+        print("PROTECTION FAULT Error code: ");
+        print_u64_hex(error_code);
+        println("");
+    } else if (interrupt_number == 14) {
+        print("PAGE FAULT Error code: ");
+        print_u64_hex(error_code);
+        print(" CR2: ");
+        u64 cr2 = get_cr2();
+        print_u64_hex(cr2);
+        println("");
     } else {
         print("isr #");
         print_u64(interrupt_number);

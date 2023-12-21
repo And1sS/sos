@@ -169,13 +169,13 @@ void gdt_init(void) {
     // in long mode default operation size flag should be zero, base and limits
     // are ignored
     gdt_data[1] =
-        gen_code_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 1, 1, 0, 0, 0, 0);
+        gen_code_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 1, 1, PL_0, 0, 0, 0);
     gdt_data[2] =
-        gen_data_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 1, 1, 0, 0, 1, 0);
+        gen_data_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 1, 1, PL_0, 0, 1, 0);
     gdt_data[3] =
-        gen_code_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 0, 1, 3, 0, 0, 0);
+        gen_code_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 0, 1, PL_3, 0, 0, 0);
     gdt_data[4] =
-        gen_data_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 0, 1, 3, 0, 1, 0);
+        gen_data_segment_descriptor(0, 0xFFFFF, 1, 0, 1, 0, 1, PL_3, 0, 1, 0);
     *(tss_segment_descriptor*) &gdt_data[5] =
         gen_task_state_segment_descriptor(&tss, PL_0);
 

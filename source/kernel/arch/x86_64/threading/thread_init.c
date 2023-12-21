@@ -22,6 +22,7 @@ struct cpu_context* arch_kthread_context_init(kthread* thrd,
     context->cs = KERNEL_CODE_SEGMENT_SELECTOR;
     context->rflags = RFLAGS_IRQ_ENABLED_FLAG | RFLAGS_INIT_FLAGS;
     context->rsp = start_rsp;
+    context->ds = KERNEL_DATA_SEGMENT_SELECTOR;
     context->ss = KERNEL_DATA_SEGMENT_SELECTOR;
     context->rdi = (u64) func;
 
@@ -40,6 +41,7 @@ struct cpu_context* arch_uthread_context_init(uthread* thrd,
     context->cs = USER_CODE_SEGMENT_SELECTOR;
     context->rflags = RFLAGS_IRQ_ENABLED_FLAG | RFLAGS_INIT_FLAGS;
     context->rsp = start_rsp;
+    context->ds = USER_DATA_SEGMENT_SELECTOR;
     context->ss = USER_DATA_SEGMENT_SELECTOR;
 
     return (struct cpu_context*) context;
