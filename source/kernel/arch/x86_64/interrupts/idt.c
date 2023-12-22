@@ -33,7 +33,8 @@ u8 gen_interrupt_descriptor_flags(bool is_present, privilege_level dpl,
 }
 
 interrupt_descriptor gen_interrupt_descriptor(u16 segment_selector, u64 offset,
-                                              bool is_present, privilege_level dpl,
+                                              bool is_present,
+                                              privilege_level dpl,
                                               bool is_trap_gate) {
 
     interrupt_descriptor result = {
@@ -181,7 +182,7 @@ void idt_init(void) {
     SET_ISR(45)
     SET_ISR(46)
     SET_ISR(47)
-    SET_ISR(80)
+    SET_ISR(128) // syscall entry
     SET_ISR(250)
 
     __asm__ volatile("lidt %0" : : "m"(idt));

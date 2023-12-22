@@ -160,12 +160,20 @@ isr_hard 45
 isr_hard 46
 isr_hard 47
 
-global isr_80
-isr_80:
+; Syscall irq handler
+
+; For now syscalls are implemented using obsolete "int 0x80",
+; this is done to get them up and running quickly.
+; This interface may change in favor of modern "syscall" interface later.
+global isr_128
+isr_128:
     save_state
-    mov rsi, rsp   ; cpu context
+    push rsp ; cpu context, 7th argument of C handler
+    push rax ; syscall number, 6th argument of C handler
     call handle_syscall
     restore_state
     iretq
 
+; Schedule irq handler to call scheduler, this is dirty hack
+; to get easy interface to call scheduler
 isr_soft_no_error_code 250

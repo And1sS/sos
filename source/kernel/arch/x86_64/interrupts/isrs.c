@@ -63,9 +63,25 @@ struct cpu_context* handle_software_interrupt(u8 interrupt_number,
     return handle_interrupt(interrupt_number, error_code, context);
 }
 
-struct cpu_context* handle_syscall(u64 arg0, struct cpu_context* context) {
-    print("syscall! arg0: ");
-    print_u64_hex(arg0);
+struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
+                                   u64 arg4, u64 arg5, u64 syscall_number,
+                                   struct cpu_context* context) {
+
+    print("syscall num: ");
+    print_u64(syscall_number);
+    print(" arg0: ");
+    print_u64(arg0);
+    print(" arg1: ");
+    print_u64(arg1);
+    print(" arg2: ");
+    print_u64(arg2);
+    print(" arg3: ");
+    print_u64(arg3);
+    print(" arg4: ");
+    print_u64(arg4);
+    print(" arg5: ");
+    print_u64(arg5);
     println("");
+
     return context;
 }
