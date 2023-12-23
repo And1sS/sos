@@ -3,7 +3,6 @@
 
 #include "memory_map.h"
 
-void pmm_init();
 paddr allocate_frame();
 paddr allocate_zeroed_frame();
 void free_frame(paddr frame);

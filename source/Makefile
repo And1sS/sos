@@ -28,7 +28,7 @@ iso-kernel: kernel
 	cp $(KERNEL_OUTPUT_ELF_FILE) $(ISO_KERNEL_FILE)
 
 kernel: FORCE
-	$(MAKE) BUILD_FOLDER=$(BUILD_FOLDER)kernel -C kernel
+	$(MAKE) BUILD_FOLDER=$(BUILD_FOLDER)kernel/ -C kernel
 
 iso-user: user
 	mkdir -p $(ISO_USER_FOLDER)

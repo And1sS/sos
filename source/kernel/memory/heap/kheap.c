@@ -236,7 +236,7 @@ bool grow_heap(u64 size) {
                 return false;
             }
 
-            map_page(vframe, pframe, 1 | 2 | 4);
+            map_page(vframe, pframe, 1 | 2);
         }
     }
     memset((void*) start, 0, aligned_size);

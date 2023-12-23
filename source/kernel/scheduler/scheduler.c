@@ -1,8 +1,5 @@
 #include "scheduler.h"
 #include "../idle.h"
-#include "../lib/container/queue/queue.h"
-#include "../lib/kprint.h"
-#include "../synchronization/spin_lock.h"
 #include "../threading/kthread.h"
 
 static lock scheduler_lock = SPIN_LOCK_STATIC_INITIALIZER;

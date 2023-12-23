@@ -4,6 +4,7 @@
 #include "../../../lib/types.h"
 
 typedef struct __attribute__((__packed__)) {
+    u64 ds;
     u64 rax;
     u64 rbx;
     u64 rcx;

@@ -1,8 +1,6 @@
 ; Irq handlers entry-points.
 
 ; Hardware irqs are handled with interrupts disabled.
-; For now software irqs are also handled with interrupts disabled,
-; but that might be changed in the future.
 
 ; Each handler pushes current cpu context on the stack (each
 ; general purpose register) and restores provided cpu context
@@ -15,8 +13,28 @@ section .text
 ; C handlers defined in isrs.c
 extern handle_software_interrupt
 extern handle_hardware_interrupt
+extern handle_syscall
+extern update_tss
 
-%macro push_regs 0
+%macro update_tss 0
+    push rax
+    call update_tss
+    pop rax
+%endmacro
+
+%macro save_ds 0
+    mov bx, ds
+    push rbx
+    mov rbx, 0x10
+    mov ds, bx
+%endmacro
+
+%macro restore_ds 0
+    pop rbx
+    mov ds, bx
+%endmacro
+
+%macro save_state 0
     push r15
     push r14
     push r13
@@ -32,9 +50,13 @@ extern handle_hardware_interrupt
     push rcx
     push rbx
     push rax
+    save_ds
 %endmacro
 
-%macro pop_regs 0
+%macro restore_state 0
+   update_tss
+   mov rsp, rax
+   restore_ds
    pop rax
    pop rbx
    pop rcx
@@ -55,28 +77,24 @@ extern handle_hardware_interrupt
 %macro isr_soft_no_error_code 1
 global isr_%1
 isr_%1:
-    cli
-    push_regs
+    save_state
     mov rdi, %1  ; interrupt number
     mov rsi, 0   ; error code
     mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
-    mov rsp, rax
-    pop_regs
+    restore_state
     iretq
 %endmacro
 
 %macro isr_soft_error_code 1
 global isr_%1
 isr_%1:
-    cli
     pop rsi      ; error code
-    push_regs
+    save_state
     mov rdi, %1  ; interrupt number
     mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
-    mov rsp, rax
-    pop_regs
+    restore_state
     iretq
 %endmacro
 
@@ -84,12 +102,11 @@ isr_%1:
 global isr_%1
 isr_%1:
     cli
-    push_regs
+    save_state
     mov rdi, %1
     mov rsi, rsp
     call handle_hardware_interrupt
-    mov rsp, rax
-    pop_regs
+    restore_state
     iretq
 %endmacro
 
@@ -143,4 +160,20 @@ isr_hard 45
 isr_hard 46
 isr_hard 47
 
+; Syscall irq handler
+
+; For now syscalls are implemented using obsolete "int 0x80",
+; this is done to get them up and running quickly.
+; This interface may change in favor of modern "syscall" interface later.
+global isr_128
+isr_128:
+    save_state
+    push rsp ; cpu context, 7th argument of C handler
+    push rax ; syscall number, 6th argument of C handler
+    call handle_syscall
+    restore_state
+    iretq
+
+; Schedule irq handler to call scheduler, this is dirty hack
+; to get easy interface to call scheduler
 isr_soft_no_error_code 250

@@ -66,9 +66,7 @@ void thread_exit(u64 exit_code) {
 
 void thread_destroy(thread* thrd) {
     threading_free_tid(thrd->id);
-    if (thrd->kernel_thread) {
-        kfree(thrd->stack);
-    }
+    kfree(thrd->kernel_stack);
     kfree(thrd);
 }
 

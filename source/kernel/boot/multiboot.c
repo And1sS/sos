@@ -126,15 +126,15 @@ module get_module_info(const multiboot_info* multiboot_info_ptr,
     return result;
 }
 
-void print_multiboot_info(multiboot_info* multiboot_info_ptr) {
+void print_multiboot_info(const multiboot_info* multiboot_info_ptr) {
     multiboot_info mboot_info = *multiboot_info_ptr;
 
-    println("Multiboot structure: ");
+    println("Multiboot structure {");
     print("Size: ");
     print_u64(mboot_info.size);
     println("");
 
-    println("memory map: ");
+    println("Memory map: ");
     for (u8 i = 0; i < mboot_info.mmap.entries_count; i++) {
         print("t: ");
         print_u32(mboot_info.mmap.entries[i].type);
@@ -178,26 +178,32 @@ void print_multiboot_info(multiboot_info* multiboot_info_ptr) {
             kernel_end = section->addr + section->size;
     }
 
-    print("kernel s: ");
+    print("Kernel s: ");
     print_u64_hex(kernel_start);
     print(" e: ");
     print_u64_hex(kernel_end);
     println("");
 
-    print("multiboot s: ");
+    print("Multiboot s: ");
     print_u64_hex((u64) mboot_info.original_struct_addr);
     print(" e: ");
     print_u64_hex((u64) mboot_info.original_struct_addr + mboot_info.size);
     println("");
 
-    print("modules count: ");
+    print("Modules count: ");
     print_u32(mboot_info.modules_count);
     println("");
+
+    for (u64 i = 0; i < mboot_info.modules_count; ++i) {
+        module mod = get_module_info(&mboot_info, i);
+        print_module_info(&mod);
+    }
+    println("}");
 }
 
-void print_module_info(module* mod) {
+void print_module_info(const module* mod) {
     println("Module: ");
-    print("Size: ");
+    print("    Size: ");
     print_u32(mod->mod_end - mod->mod_start);
     print(" Start: ");
     print_u32_hex(mod->mod_start);

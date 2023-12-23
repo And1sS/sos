@@ -1,5 +1,6 @@
 #include "uthread.h"
 #include "../memory/heap/kheap.h"
+#include "../memory/memory_map.h"
 #include "../scheduler/scheduler.h"
 #include "threading.h"
 
@@ -14,6 +15,12 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
     memset(thrd, 0, sizeof(thread));
     thrd->id = threading_allocate_tid();
 
+    void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, FRAME_SIZE);
+    if (kernel_stack == NULL) {
+        threading_free_tid(thrd->id);
+        return false;
+    }
+    memset(kernel_stack, 0, THREAD_KERNEL_STACK_SIZE);
     memset(stack, 0, THREAD_KERNEL_STACK_SIZE);
 
     thrd->name = name;
@@ -27,7 +34,8 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
     thrd->kernel_thread = false;
     thrd->should_die = false;
 
-    thrd->stack = stack;
+    thrd->kernel_stack = kernel_stack;
+    thrd->user_stack = stack;
     thrd->context = arch_uthread_context_init(thrd, func);
     thrd->state = INITIALISED;
 

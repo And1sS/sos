@@ -12,12 +12,12 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
     thrd->id = threading_allocate_tid();
 
-    void* stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, FRAME_SIZE);
-    if (stack == NULL) {
+    void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, FRAME_SIZE);
+    if (kernel_stack == NULL) {
         threading_free_tid(thrd->id);
         return false;
     }
-    memset(stack, 0, THREAD_KERNEL_STACK_SIZE);
+    memset(kernel_stack, 0, THREAD_KERNEL_STACK_SIZE);
 
     // TODO: copy name string to kernel heap
     thrd->name = name;
@@ -30,7 +30,7 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->kernel_thread = true;
     thrd->should_die = false;
 
-    thrd->stack = stack;
+    thrd->kernel_stack = kernel_stack;
     thrd->context = arch_kthread_context_init(thrd, func);
     thrd->state = INITIALISED;
 
