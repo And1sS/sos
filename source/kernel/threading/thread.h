@@ -32,7 +32,7 @@ typedef struct _thread {
     thread_state state;
     struct cpu_context* context;
 
-    linked_list_node scheduler_node; // this is used in threading and thread
+    linked_list_node scheduler_node; // this is used in scheduler and thread
                                      // cleaner, never changes
 
     lock lock; // guards fields below and also guards thread against
@@ -41,6 +41,11 @@ typedef struct _thread {
     bool exiting;
     bool finished;
     u64 exit_code;
+
+    u64 pending_signals; // bitmap of pending signals
+    u64 signals_mask;    // bitmap of blocked signals, 0 - signal blocked,
+                         // 1 - signal unblocked
+    u64 signal_handler;
 
     ref_count refc;
 

@@ -4,19 +4,28 @@
 #include "../memory/pmm.h"
 #include "../memory/vmm.h"
 #include "../scheduler/scheduler.h"
+#include "../signal/signal.h"
 #include "../threading/kthread.h"
 #include "../threading/threading.h"
 #include "../threading/uthread.h"
 #include "arch_init.h"
 #include "multiboot.h"
 
-void kernel_thread() {
+thread* user_thread = NULL;
+
+_Noreturn void kernel_thread() {
     u64 i = 0;
     u64 print = 0;
-    while (print < 1000) {
+    bool signaled = false;
+    while (1) {
         if (i++ % 1000000 == 0) {
-            println("kernel thread!");
+            println("kernel threading!");
             print++;
+        }
+
+        if (print > 100 && !signaled) {
+            signal_thread(user_thread, SIGTEST);
+            signaled = true;
         }
     }
 }
@@ -58,8 +67,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     map_page(0xFFFF + 2 * FRAME_SIZE, allocate_zeroed_frame(), 1 | 2 | 4);
     void* stack = (void*) 0xFFFF;
 
-    uthread* t1 = uthread_create_orphan("test", stack, (uthread_func*) 0x1000);
-    thread_start(t1);
+    user_thread = uthread_create_orphan("test", stack, (uthread_func*) 0x1000);
+    thread_start(user_thread);
 
     kthread_run("kernel-test-thread", kernel_thread);
 

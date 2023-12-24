@@ -2,6 +2,7 @@
 #include "../memory/heap/kheap.h"
 #include "../memory/memory_map.h"
 #include "../scheduler/scheduler.h"
+#include "../signal/signal.h"
 #include "threading.h"
 
 #define UTHREAD_CHILDREN_INITIAL_CAPACITY 8
@@ -29,6 +30,9 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
     thrd->finished = false;
     thrd->exit_code = 0;
 
+    thrd->signals_mask = ALL_SIGNALS_UNBLOCKED;
+    thrd->pending_signals = PENDING_SIGNALS_CLEAR;
+
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
 
     thrd->kernel_thread = false;
@@ -38,6 +42,8 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
     thrd->user_stack = stack;
     thrd->context = arch_uthread_context_init(thrd, func);
     thrd->state = INITIALISED;
+
+    thrd->signal_handler = NULL;
 
     thrd->parent = NULL;
 

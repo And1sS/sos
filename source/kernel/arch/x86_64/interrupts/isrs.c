@@ -70,6 +70,13 @@ struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
     // no checks for now, because this is just for test
     if (syscall_number == 0) {
         println((string) arg0);
+    } else if (syscall_number == 3) {
+        println((string) arg0);
+    } else if (syscall_number == 1) {
+        thread* current = get_current_thread();
+        if (current) {
+            current->signal_handler = arg0;
+        }
     } else {
         print("syscall num: ");
         print_u64(syscall_number);
