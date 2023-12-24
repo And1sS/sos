@@ -5,6 +5,7 @@
 #include "../lib/container/linked_list/linked_list.h"
 #include "../lib/ref_count/ref_count.h"
 #include "../lib/types.h"
+#include "../signal/signal.h"
 #include "../synchronization/completion.h"
 #include "../synchronization/spin_lock.h"
 
@@ -45,7 +46,9 @@ typedef struct _thread {
     u64 pending_signals; // bitmap of pending signals
     u64 signals_mask;    // bitmap of blocked signals, 0 - signal blocked,
                          // 1 - signal unblocked
-    u64 signal_handler;
+    signal_handler* signal_handler;
+    struct cpu_context* signal_enter_context; // copy of context before
+                                              // executing signal handler
 
     ref_count refc;
 
@@ -68,5 +71,7 @@ void thread_exit(u64 exit_code);
 void thread_destroy(thread* thread);
 
 void thread_yield();
+
+bool thread_signal(thread* thread, signal sig);
 
 #endif // SOS_THREAD_H

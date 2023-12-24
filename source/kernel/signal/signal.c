@@ -1,4 +1,6 @@
 #include "signal.h"
+#include "../arch/common/context.h"
+#include "../arch/common/signal.h"
 #include "../scheduler/scheduler.h"
 
 bool signal_raised(u64 pending_signals, signal sig) {
@@ -26,22 +28,6 @@ void block_and_clear_all_signals(thread* thrd) {
     thrd->signals_mask = ALL_SIGNALS_BLOCKED;
 }
 
-bool signal_thread(thread* thrd, signal sig) {
-    bool signal_set = false;
-    bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
-    if (signal_allowed(thrd->signals_mask, sig)) {
-        signal_raise(&thrd->pending_signals, sig);
-        signal_set = true;
-    }
-    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
-
-    return signal_set;
-}
-
-extern bool arch_is_userspace_context(struct cpu_context* context);
-extern void arch_install_user_signal_handler(struct cpu_context* context,
-                                             u64 signal_handler);
-
 void check_pending_signals() {
     thread* current = get_current_thread();
     if (!current || !arch_is_userspace_context(current->context)) {
@@ -65,6 +51,8 @@ void check_pending_signals() {
                && signal_allowed(current->pending_signals, SIGTEST)) {
 
         signal_clear(&current->pending_signals, SIGTEST);
+
+        arch_copy_cpu_context(current->signal_enter_context, current->context);
         arch_install_user_signal_handler(current->context,
                                          current->signal_handler);
     }

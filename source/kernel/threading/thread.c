@@ -67,7 +67,23 @@ void thread_exit(u64 exit_code) {
 void thread_destroy(thread* thrd) {
     threading_free_tid(thrd->id);
     kfree(thrd->kernel_stack);
+    kfree(thrd->signal_enter_context);
+    // TODO: add arch cpu_context deinit function, because different
+    //       architectures might want to store context not on kernel stack, and
+    //       this memory won't be automatically freed with stack
     kfree(thrd);
 }
 
 void thread_yield() { schedule(); }
+
+bool thread_signal(thread* thrd, signal sig) {
+    bool signal_set = false;
+    bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
+    if (signal_allowed(thrd->signals_mask, sig)) {
+        signal_raise(&thrd->pending_signals, sig);
+        signal_set = true;
+    }
+    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
+
+    return signal_set;
+}

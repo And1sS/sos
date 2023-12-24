@@ -1,6 +1,5 @@
 #include "../../../lib/memory_util.h"
 #include "../../../threading/kthread.h"
-#include "../../../threading/thread.h"
 #include "../../../threading/uthread.h"
 #include "../cpu/cpu_context.h"
 #include "../cpu/gdt.h"

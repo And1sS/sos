@@ -1,14 +1,12 @@
 #include "uthread.h"
+#include "../arch/common/context.h"
+#include "../arch/common/thread.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/memory_map.h"
 #include "../scheduler/scheduler.h"
-#include "../signal/signal.h"
 #include "threading.h"
 
 #define UTHREAD_CHILDREN_INITIAL_CAPACITY 8
-
-extern struct cpu_context* arch_uthread_context_init(uthread* thrd,
-                                                     uthread_func* func);
 
 bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
                   uthread_func* func) {
@@ -32,6 +30,8 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
 
     thrd->signals_mask = ALL_SIGNALS_UNBLOCKED;
     thrd->pending_signals = PENDING_SIGNALS_CLEAR;
+    thrd->signal_handler = NULL;
+    thrd->signal_enter_context = arch_allocate_cpu_context();
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
 
@@ -42,8 +42,6 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
     thrd->user_stack = stack;
     thrd->context = arch_uthread_context_init(thrd, func);
     thrd->state = INITIALISED;
-
-    thrd->signal_handler = NULL;
 
     thrd->parent = NULL;
 

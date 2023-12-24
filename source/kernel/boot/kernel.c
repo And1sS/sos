@@ -24,7 +24,7 @@ _Noreturn void kernel_thread() {
         }
 
         if (print > 100 && !signaled) {
-            signal_thread(user_thread, SIGTEST);
+            thread_signal(user_thread, SIGTEST);
             signaled = true;
         }
     }

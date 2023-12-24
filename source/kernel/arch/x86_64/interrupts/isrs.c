@@ -1,6 +1,7 @@
 #include "../../../interrupts/irq.h"
 #include "../../../lib/kprint.h"
 #include "../../../scheduler/scheduler.h"
+#include "../../common/context.h"
 #include "../cpu/io.h"
 #include "../cpu/registers.h"
 #include "idt.h"
@@ -68,14 +69,18 @@ struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
                                    struct cpu_context* context) {
 
     // no checks for now, because this is just for test
-    if (syscall_number == 0) {
+    if (syscall_number == 0) { // print
         println((string) arg0);
-    } else if (syscall_number == 3) {
-        println((string) arg0);
-    } else if (syscall_number == 1) {
+    } else if (syscall_number == 1) { // signal handler installation
         thread* current = get_current_thread();
         if (current) {
-            current->signal_handler = arg0;
+            current->signal_handler = (signal_handler*) arg0;
+        }
+    } else if (syscall_number == 4) { // signal return
+        thread* current = get_current_thread();
+        if (current) {
+            // TODO: add check if signal context contains user cs, ds and ss
+            arch_copy_cpu_context(current->signal_enter_context, context);
         }
     } else {
         print("syscall num: ");

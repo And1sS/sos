@@ -1,12 +1,10 @@
 #include "kthread.h"
+#include "../arch/common/thread.h"
 #include "../lib/id_generator.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/pmm.h"
 #include "../scheduler/scheduler.h"
 #include "threading.h"
-
-extern struct cpu_context* arch_kthread_context_init(kthread* thrd,
-                                                     kthread_func* func);
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
@@ -25,6 +23,12 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->exiting = false;
     thrd->finished = false;
     thrd->exit_code = 0;
+
+    // kernel threads never receive signals
+    thrd->signals_mask = ALL_SIGNALS_BLOCKED;
+    thrd->pending_signals = PENDING_SIGNALS_CLEAR;
+    thrd->signal_handler = NULL;
+    thrd->signal_enter_context = NULL;
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     thrd->kernel_thread = true;
