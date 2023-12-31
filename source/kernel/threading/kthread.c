@@ -28,7 +28,6 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->signals_mask = ALL_SIGNALS_BLOCKED;
     thrd->pending_signals = PENDING_SIGNALS_CLEAR;
     thrd->signal_handler = NULL;
-    thrd->signal_enter_context = NULL;
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     thrd->kernel_thread = true;

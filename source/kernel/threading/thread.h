@@ -47,8 +47,6 @@ typedef struct _thread {
     u64 signals_mask;    // bitmap of blocked signals, 0 - signal blocked,
                          // 1 - signal unblocked
     signal_handler* signal_handler;
-    struct cpu_context* signal_enter_context; // copy of context before
-                                              // executing signal handler
 
     ref_count refc;
 

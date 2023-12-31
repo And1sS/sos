@@ -6,7 +6,9 @@
 
 struct cpu_context;
 
-void arch_install_user_signal_handler(struct cpu_context* context,
-                                      signal_handler* handler);
+void arch_enter_signal_handler(struct cpu_context* context,
+                               signal_handler* handler);
+
+void arch_return_from_signal_handler(struct cpu_context* context);
 
 #endif // SOS_ARCH_COMMON_SIGNAL_H

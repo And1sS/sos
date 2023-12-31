@@ -32,8 +32,6 @@ trigger_temp_syscall:
 signal_handler:
     mov rdi, HELLO_WORLD_2_STR
     make_syscall 0 ; print
-
-    make_syscall 4 ; sigreturn
     ret
 
 HELLO_WORLD_STR: db 'Hello world from user space!', 0

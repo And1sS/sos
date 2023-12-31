@@ -16,16 +16,14 @@ thread* user_thread = NULL;
 _Noreturn void kernel_thread() {
     u64 i = 0;
     u64 print = 0;
-    bool signaled = false;
     while (1) {
         if (i++ % 1000000 == 0) {
             println("kernel threading!");
             print++;
-        }
 
-        if (print > 100 && !signaled) {
-            thread_signal(user_thread, SIGTEST);
-            signaled = true;
+            if (print % 10 == 0) {
+                thread_signal(user_thread, SIGTEST);
+            }
         }
     }
 }

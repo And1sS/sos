@@ -51,10 +51,7 @@ void check_pending_signals() {
                && signal_allowed(current->pending_signals, SIGTEST)) {
 
         signal_clear(&current->pending_signals, SIGTEST);
-
-        arch_copy_cpu_context(current->signal_enter_context, current->context);
-        arch_install_user_signal_handler(current->context,
-                                         current->signal_handler);
+        arch_enter_signal_handler(current->context, current->signal_handler);
     }
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 }

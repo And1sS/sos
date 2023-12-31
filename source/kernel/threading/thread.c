@@ -67,7 +67,6 @@ void thread_exit(u64 exit_code) {
 void thread_destroy(thread* thrd) {
     threading_free_tid(thrd->id);
     kfree(thrd->kernel_stack);
-    kfree(thrd->signal_enter_context);
     // TODO: add arch cpu_context deinit function, because different
     //       architectures might want to store context not on kernel stack, and
     //       this memory won't be automatically freed with stack

@@ -64,6 +64,8 @@ struct cpu_context* handle_software_interrupt(u8 interrupt_number,
     return handle_interrupt(interrupt_number, error_code, context);
 }
 
+extern void arch_return_from_signal_handler(struct cpu_context* context);
+
 struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
                                    u64 arg4, u64 arg5, u64 syscall_number,
                                    struct cpu_context* context) {
@@ -77,11 +79,7 @@ struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
             current->signal_handler = (signal_handler*) arg0;
         }
     } else if (syscall_number == 4) { // signal return
-        thread* current = get_current_thread();
-        if (current) {
-            // TODO: add check if signal context contains user cs, ds and ss
-            arch_copy_cpu_context(current->signal_enter_context, context);
-        }
+        arch_return_from_signal_handler(context);
     } else {
         print("syscall num: ");
         print_u64(syscall_number);
