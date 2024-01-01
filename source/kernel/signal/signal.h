@@ -20,8 +20,6 @@ typedef enum {
 
 void check_pending_signals();
 
-struct thread;
-
 bool signal_raised(u64 pending_signals, signal sig);
 bool signal_allowed(u64 signals_mask, signal sig);
 void signal_raise(u64* pending_signals, signal sig);

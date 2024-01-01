@@ -14,8 +14,10 @@ section .text
 extern handle_software_interrupt
 extern handle_hardware_interrupt
 extern handle_syscall
-extern update_tss
-extern check_pending_signals
+
+
+extern update_tss ; defined in tss.c
+extern check_pending_signals ; defined in signal.c
 
 
 %macro save_ds 0

@@ -1,7 +1,7 @@
 #include "../../../interrupts/irq.h"
 #include "../../../lib/kprint.h"
 #include "../../../scheduler/scheduler.h"
-#include "../../common/context.h"
+#include "../../common/signal.h"
 #include "../cpu/io.h"
 #include "../cpu/registers.h"
 #include "idt.h"
@@ -20,14 +20,14 @@ struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
     } else if (interrupt_number == 13) {
         print("PROTECTION FAULT Error code: ");
         print_u64_hex(error_code);
-        println("");
+        panic("");
     } else if (interrupt_number == 14) {
         print("PAGE FAULT Error code: ");
         print_u64_hex(error_code);
         print(" CR2: ");
         u64 cr2 = get_cr2();
         print_u64_hex(cr2);
-        println("");
+        panic("");
     } else {
         print("isr #");
         print_u64(interrupt_number);
@@ -63,8 +63,6 @@ struct cpu_context* handle_software_interrupt(u8 interrupt_number,
 
     return handle_interrupt(interrupt_number, error_code, context);
 }
-
-extern void arch_return_from_signal_handler(struct cpu_context* context);
 
 struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
                                    u64 arg4, u64 arg5, u64 syscall_number,
