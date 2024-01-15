@@ -15,6 +15,10 @@ SECTIONS
     /* Early 32 bit boot code for long mode and paging enablement should live in first 2MiB of Ram */
     .boot32_text : { *(boot32_text) }
 
+    .boot32_data : { *(boot32_data) }
+
+    .boot32_rodata : { *(boot32_rodata) }
+
     . += KERNEL_OFFSET;
 
     /* Early 64 bit boot code and data should live in first GiB of ram */

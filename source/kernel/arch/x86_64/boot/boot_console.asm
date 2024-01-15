@@ -4,11 +4,6 @@ bits 32
 
 section .boot32_text
 
-ERROR_PREFIX_STR db 'Error: ', 0
-
-cursor_col dd 0
-cursor_row dd 0
-
 %define VGA_MEMORY_ADDR 0xB8000
 %define WHITE_ON_BLACK_ATTR 0x0F
 %define WHITE_ON_RED_ATTR 0x4F
@@ -113,3 +108,13 @@ boot_move_cursor_next_line:
     inc dword [cursor_row]
     mov dword [cursor_col], 0
     ret
+
+
+section .boot32_rodata
+
+ERROR_PREFIX_STR db 'Error: ', 0
+
+section .boot32_data
+
+cursor_col dd 0
+cursor_row dd 0

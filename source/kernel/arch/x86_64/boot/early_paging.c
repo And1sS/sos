@@ -9,7 +9,7 @@
  * In second megabyte of RAM lives boot code that is used for short time after
  * paging enablement. Code that jumps to higher half trampoline also lives here.
  * Page size used: 4KiB
- * Performed in bootstrap.asm
+ * Performed in entry.asm
  *
  *
  * 2) set up identity mapping of first 2MiB RAM to
@@ -17,7 +17,7 @@
  * In second megabyte of ram specifically lives trampoline to higher half, so
  * this mapping makes it usable.
  * Page size used: 4KiB
- * Performed in bootstrap.asm
+ * Performed in entry.asm
  *
  *
  * 3) set up identity mapping of first 1GiB RAM to
@@ -28,7 +28,7 @@
  * operate only with 4GiB addresses. Later, whole kernel space (512GiB) will be
  * remapped.
  * Page size used: 2MiB(Huge pages)
- * Performed in bootstrap.asm
+ * Performed in entry.asm
  *
  *
  * Then paging is enabled and jump to higher half code (0xFFFF800000000000) is
@@ -37,7 +37,7 @@
  * (0xFFFF800000000000 - 0xFFFF87FFFFFFFFFF) This mapping runs in 64 bit mode
  * and maps 512GiB of (potential) RAM to kernel space. This is used to be able
  * to run any kernel code without knowing kernel size in RAM. Page size used:
- * 1GiB(Huge pages) Performed in bootstrap.asm
+ * 1GiB(Huge pages) Performed in entry.asm
  *
  *
  * 5) set up identity mapping of all (potential) RAM to kernel space
@@ -73,7 +73,7 @@ static void pmm_maybe_free_frame(const multiboot_info* mboot_info, paddr frame);
  * ram should be removed.
  *
  * Note: pml3_pool address is virtual inside kernel bss section
- * (defined in bootstrap.asm), so when inserting into pml4 it has to be adjusted
+ * (defined in entry.asm), so when inserting into pml4 it has to be adjusted
  * by start address of kernel
  */
 void set_up_64tb_ram_identity_mapping(page_table* pml4,

@@ -14,6 +14,7 @@ ISO_USER_FOLDER = $(BUILD_FOLDER)iso/user/
 ISO_FOLDER = $(BUILD_FOLDER)iso/
 
 QEMU_FLAGS = -D ./log.txt -d int,cpu_reset -no-reboot
+export CROSS_COMPILE =
 
 all: iso
 
