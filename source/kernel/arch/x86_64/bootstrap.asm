@@ -120,7 +120,8 @@ PRESENT_ATTR                            equ 1 << 0
 WRITABLE_ATTR                           equ 1 << 1
 HUGE_PAGE_ATTR                          equ 1 << 7 ; creates a 1 GiB page in PML3, and 2 MiB page in PML2
 PAGE_SIZE                               equ 4096
-HUGE_PAGE_SIZE                          equ 512 * 4096
+HUGE_PAGE_SIZE_2MB                      equ 0x200000
+HUGE_PAGE_SIZE_1GB                      equ 0x40000000
 PT_ENTRIES                              equ 512
 PT_KERNEL_SPACE_START_IDX               equ 256 ; 0xFFFF800000000000
 PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX   equ 273 ; 0XFFFF888000000000
@@ -137,7 +138,7 @@ set_up_page_tables:
 .identity_map_kernel:
     mov [ebx], eax
     add ebx, 8
-    add eax, HUGE_PAGE_SIZE
+    add eax, HUGE_PAGE_SIZE_2MB
     loop .identity_map_kernel
 
     mov eax, V2P(kernel_p2_table)
@@ -390,9 +391,9 @@ long_mode_start:
     ; Remove identity mapping of first two megs of ram used to run lower memory code
     mov qword rax, 0
     mov [qword kernel_p4_table], rax
+    call reload_cr3
 
-    mov rax, cr3
-    mov cr3, rax
+    call remap_kernel
 
     ; here stack contains argument of multiboot structure, which should be passed wia rdi register
     ; following System V AMD64 ABI calling convention
@@ -400,3 +401,29 @@ long_mode_start:
     call kernel_main
 
     jmp $
+    ret ; unreachable
+
+
+; In low memory only 1GiB of kernel space were mapped, this can be expanded so that
+; kernel of any size will have fully mapped code.
+; So, this routine will map 512GiB address space (0xFFFF800000000000 - 0xFFFF87FFFFFFFFFF) for kernel code,
+; by using huge pages on PML3 level rather then PML2.
+remap_kernel:
+    mov rcx, PT_ENTRIES
+    mov rbx, kernel_p3_table
+    mov rax, HUGE_PAGE_ATTR | PRESENT_ATTR | WRITABLE_ATTR
+.identity_map_kernel:
+    mov [rbx], rax
+    add rbx, 8
+    add rax, HUGE_PAGE_SIZE_1GB
+    loop .identity_map_kernel
+
+    call reload_cr3
+    ret
+
+
+reload_cr3:
+   mov rax, cr3
+   mov cr3, rax
+
+   ret
