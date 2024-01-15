@@ -1,10 +1,10 @@
-#include "../../boot/arch_init.h"
-#include "../../memory/pmm.h"
-#include "cpu/gdt.h"
-#include "cpu/tss.h"
-#include "interrupts/idt.h"
-#include "memory/identity_map.h"
-#include "timer/pit.h"
+#include "../../../boot/arch_init.h"
+#include "../../../memory/pmm.h"
+#include "../cpu/gdt.h"
+#include "../cpu/tss.h"
+#include "../interrupts/idt.h"
+#include "../timer/pit.h"
+#include "identity_map.h"
 
 void arch_init(const multiboot_info* const mboot_info) {
     gdt_init();

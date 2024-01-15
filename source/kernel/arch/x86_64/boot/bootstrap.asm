@@ -30,7 +30,7 @@ KERNEL_START_ADDRESS                equ 0x100000
 
 %define V2P(addr) ((addr) - KERNEL_START_VADDR) ; virtual address to physical
 
-section .multiboot.text
+section .boot32.text
 
 extern kernel_main
 extern _start
@@ -126,6 +126,10 @@ PT_ENTRIES                              equ 512
 PT_KERNEL_SPACE_START_IDX               equ 256 ; 0xFFFF800000000000
 PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX   equ 273 ; 0XFFFF888000000000
 
+VMAPPED_RAM_P1_TABLE equ vmapped_ram_tables
+VMAPPED_RAM_P2_TABLE equ vmapped_ram_tables + 4096
+VMAPPED_RAM_P3_TABLE equ vmapped_ram_tables + 8192
+
 ; This routine:
 ; 1) sets up identity mapping of first 2MiB RAM to (0 - 0x200000) address space
 ; 2) sets up identity mapping of first 2MiB RAM to (0XFFFF888000000000 - 0XFFFF888000200000) address space
@@ -156,10 +160,10 @@ set_up_page_tables:
     ; while code still runs in low memory address space and will be
     ; unmapped before jumping to kernel
 
-    ; (0XFFFF888000000000 - 0XFFFF888000200000) is mapped to be able to print
-    ; to early console at address 0xB8000
+    ; (0XFFFF888000000000 - 0XFFFF888000200000) is mapped
+    ; to run early 64 bit code
     mov ecx, PT_ENTRIES
-    mov ebx, V2P(vmapped_ram_p1_table)
+    mov ebx, V2P(VMAPPED_RAM_P1_TABLE)
     mov eax, PRESENT_ATTR | WRITABLE_ATTR
 .identity_map_lowmem_ram:
     mov [ebx], eax
@@ -167,15 +171,15 @@ set_up_page_tables:
     add eax, PAGE_SIZE
     loop .identity_map_lowmem_ram
 
-    mov eax, V2P(vmapped_ram_p1_table)
+    mov eax, V2P(VMAPPED_RAM_P1_TABLE)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
-    mov [V2P(vmapped_ram_p2_table)], eax
+    mov [V2P(VMAPPED_RAM_P2_TABLE)], eax
 
-    mov eax, V2P(vmapped_ram_p2_table)
+    mov eax, V2P(VMAPPED_RAM_P2_TABLE)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
-    mov [V2P(vmapped_ram_p3_table)], eax
+    mov [V2P(VMAPPED_RAM_P3_TABLE)], eax
 
-    mov eax, V2P(vmapped_ram_p3_table)
+    mov eax, V2P(VMAPPED_RAM_P3_TABLE)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
     mov [V2P(kernel_p4_table)], eax
     mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX * 8], eax
@@ -312,46 +316,43 @@ move_cursor_next_line:
     ret
 
 
-section .data
+section .boot64.data
     cursor_col dd 0
     cursor_row dd 0
 
 ; Screen printing routines end
 
-
-section .bss
-
 KERNEL_STACK_SIZE equ 8192
+
+align 4096
+kernel_stack:
+    resb KERNEL_STACK_SIZE
 
 global kernel_p4_table
 ; kernel page tables
 align 4096
 kernel_p4_table: ; root pml4
-    resb 4096
+    times PT_ENTRIES dq 0
 
 ; page tables for kernel identity mapping of 1GiB or kernel
 ; address space
+align 4096
 kernel_p3_table:
-    resb 4096
+    times PT_ENTRIES dq 0
+align 4096
 kernel_p2_table:
-    resb 4096
+    times PT_ENTRIES dq 0
+align 4096
 kernel_p1_table:
-    resb 4096
+    times PT_ENTRIES dq 0
 
-; page tables for identity mapping of first 2MiB of RAM
-; to get early console at addr 0xB8000 to work
-vmapped_ram_p3_table:
-    resb 4096
-vmapped_ram_p2_table:
-    resb 4096
-vmapped_ram_p1_table:
-    resb 4096
+; 128 page tables, used to identity map 64TB of physical ram
+align 4096
+vmapped_ram_tables:
+    times 128 * PT_ENTRIES dq 0
 
-align 4
-kernel_stack:
-    resb KERNEL_STACK_SIZE
 
-section .rodata
+section .boot64.rodata
 
 CODE_ATTR                   equ 1 << 43
 CONFORMING_ATTR             equ 1 << 44
@@ -375,9 +376,10 @@ CPUID_ERROR_STR db 'Cpuid instruction is not supported.', 0
 LONG_MODE_ERROR_STR db 'Long mode is not supported.', 0
 
 bits 64
-section .text
+section .boot64.text
 
 extern kernel_main
+extern set_up_64tb_ram_identity_mapping
 
 long_mode_start:
     ; now rsp contains physical address, we need to adjust it to with virtual
@@ -394,6 +396,12 @@ long_mode_start:
     call reload_cr3
 
     call remap_kernel
+    ; now we can call any C kernel function
+
+    mov rdi, kernel_p4_table
+    mov rsi, vmapped_ram_tables
+    call set_up_64tb_ram_identity_mapping
+    call reload_cr3
 
     ; here stack contains argument of multiboot structure, which should be passed wia rdi register
     ; following System V AMD64 ABI calling convention

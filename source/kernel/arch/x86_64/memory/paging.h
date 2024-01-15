@@ -5,7 +5,8 @@
 
 #define PT_ENTRIES 512
 #define KERNEL_P4_ENTRY 256
-#define KERNEL_VMAPPED_RAM_P4_ENTRY 273
+#define KERNEL_VMAPPED_RAM_P4_START_ENTRY 273
+#define KERNEL_VMAPPED_RAM_P4_END_ENTRY 401 // exclusive
 
 #define P1_OFFSET(a) (((a) >> 12) & 0x1FF)
 #define P2_OFFSET(a) (((a) >> 21) & 0x1FF)
@@ -15,13 +16,14 @@
 #define PRESENT_ATTR 1 << 0
 #define RW_ATTR 1 << 1
 #define SUPERVISOR_ATTR 1 << 2
+#define HUGE_PAGE_ATTR 1 << 7
 
 #define MASK_FLAGS(addr) ((addr) & ~0xFFF)
 #define NEXT_PT(entry) ((page_table*) P2V(MASK_FLAGS(entry)))
 #define NEXT_PTE(entry, lvl, page)                                             \
     (NEXT_PT(entry)->entries[P##lvl##_OFFSET(page)])
 
-typedef struct {
+typedef struct __attribute__((__packed__)) {
     u64 entries[PT_ENTRIES];
 } page_table;
 

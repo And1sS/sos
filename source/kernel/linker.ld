@@ -9,12 +9,24 @@ SECTIONS
 
     kernel_start = .;
 
+    /* Multiboot headers */
     .multiboot.data : { *(.multiboot.data) }
 
-    .multiboot.text : { *(.multiboot.text) }
+    /* Early 32 bit boot code for long mode and paging enablement should live in first 2MiB of Ram */
+    .boot32.text : { *(.multiboot.text) }
+
 
     . += KERNEL_OFFSET;
 
+    /* Early 64 bit boot code and data should live in first GiB of ram */
+    .boot64.text ALIGN (4K) : AT (ADDR (.boot64.text) - KERNEL_OFFSET) { *(.boot64.text) }
+
+    .boot64.data ALIGN (4K) : AT (ADDR (.boot64.data) - KERNEL_OFFSET) { *(.boot64.data) }
+
+    .boot64.rodata ALIGN (4K) : AT (ADDR (.boot64.rodata) - KERNEL_OFFSET) { *(.boot64.rodata) }
+
+
+    /* Kernel itself */
     .text ALIGN (4K) : AT (ADDR (.text) - KERNEL_OFFSET) { *(.text) }
 
     .rodata ALIGN (4K) : AT (ADDR (.rodata) - KERNEL_OFFSET) { *(.rodata) }
