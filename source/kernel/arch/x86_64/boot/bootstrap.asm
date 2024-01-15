@@ -1,50 +1,39 @@
 bits 32
 
+section .boot32_text
 
-section .multiboot.data
-; Multiboot2 header
+%define KERNEL_STACK_SIZE 8192
 
-MAGIC_NUMBER equ 0xE85250D6
-ARCHITECTURE equ 0 ; i386 protected mode
-HEADER_LENGTH equ 16
-CHECKSUM equ -MAGIC_NUMBER - ARCHITECTURE - HEADER_LENGTH
-
-align 8
-
-dd MAGIC_NUMBER
-dd ARCHITECTURE
-dd HEADER_LENGTH
-dd CHECKSUM
-
-; empty tag
-
-dw 0
-dw 0
-dd 8
-
-; Multiboot2 header end
-
-KERNEL_START_VADDR                  equ 0xFFFF800000000000
-KERNEL_VMAPPED_RAM_START_VADDR      equ 0XFFFF888000000000
-KERNEL_START_ADDRESS                equ 0x100000
+%define KERNEL_START_VADDR 0xFFFF800000000000
+%define KERNEL_VMAPPED_RAM_START_VADDR 0XFFFF888000000000
+%define KERNEL_START_ADDRESS 0x100000
 
 %define V2P(addr) ((addr) - KERNEL_START_VADDR) ; virtual address to physical
 
-section .boot32.text
+%define CODE_SEGMENT_SELECTOR 1 << 3
+
+KERNEL_STARTUP_MESSAGE_STR db 'Booting sos kernel in long mode...', 0
+MULTIBOOT_ERROR_STR db 'Multiboot2 is not configured.', 0
+CPUID_ERROR_STR db 'Cpuid instruction is not supported.', 0
+LONG_MODE_ERROR_STR db 'Long mode is not supported.', 0
 
 extern kernel_main
-extern _start
+extern boot_print_string
+extern boot_panic
+extern boot_move_cursor_next_line
+extern boot_clear_screen
+
+global _start
 _start:
     mov esp, V2P(kernel_stack + KERNEL_STACK_SIZE)
 
     push ebx ; to preserve multiboot structure address loaded by grub
     push eax ; to preserve eax register which should hold multiboot magic
 
-    call clear_screen
-    mov esi, V2P(KERNEL_STARTUP_MESSAGE_STR)
-    call print_string
-    call move_cursor_next_line
-
+    call boot_clear_screen
+    mov esi, KERNEL_STARTUP_MESSAGE_STR
+    call boot_print_string
+    call boot_move_cursor_next_line
 
     pop eax
     call check_multiboot
@@ -59,18 +48,18 @@ _start:
     jmp CODE_SEGMENT_SELECTOR:V2P(long_mode_start)
 
 
-MULTIBOOT2_MAGIC equ 0x36D76289
-
+%define MULTIBOOT2_MAGIC 0x36D76289
 check_multiboot:
     cmp eax, MULTIBOOT2_MAGIC
     jne .no_multiboot
     ret
 .no_multiboot:
-    mov esi, V2P(MULTIBOOT_ERROR_STR)
-    call print_error
+    mov esi, MULTIBOOT_ERROR_STR
+    call boot_panic
 
 
-ID_ATTR equ 1 << 21
+
+%define ID_ATTR 1 << 21
 
 ; Check if CPUID is supported by attempting to flip the ID bit (bit 21)
 ; in the FLAGS register. If we can flip it, CPUID is available.
@@ -92,12 +81,13 @@ check_cpuid:
     je .no_cpuid
     ret
 .no_cpuid:
-    mov esi, V2P(CPUID_ERROR_STR)
-    call print_error
+    mov esi, CPUID_ERROR_STR
+    call boot_panic
 
-CPUID_LONG_MODE_ATTR                equ 1 << 29
-CPUID_MAXIMUM_ROUTINE               equ 0x80000000
-CPUID_VERSION_INFORMATION_ROUTINE   equ 0x80000001
+
+%define CPUID_LONG_MODE_ATTR 1 << 29
+%define CPUID_MAXIMUM_ROUTINE 0x80000000
+%define CPUID_VERSION_INFORMATION_ROUTINE 0x80000001
 
 check_long_mode:
     ; test if extended processor info in available
@@ -112,23 +102,23 @@ check_long_mode:
     jz .no_long_mode       
     ret
 .no_long_mode:
-    mov esi, V2P(LONG_MODE_ERROR_STR)
-    call print_error
+    mov esi, LONG_MODE_ERROR_STR
+    call boot_panic
 
 
-PRESENT_ATTR                            equ 1 << 0
-WRITABLE_ATTR                           equ 1 << 1
-HUGE_PAGE_ATTR                          equ 1 << 7 ; creates a 1 GiB page in PML3, and 2 MiB page in PML2
-PAGE_SIZE                               equ 4096
-HUGE_PAGE_SIZE_2MB                      equ 0x200000
-HUGE_PAGE_SIZE_1GB                      equ 0x40000000
-PT_ENTRIES                              equ 512
-PT_KERNEL_SPACE_START_IDX               equ 256 ; 0xFFFF800000000000
-PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX   equ 273 ; 0XFFFF888000000000
+%define PRESENT_ATTR 1 << 0
+%define WRITABLE_ATTR 1 << 1
+%define HUGE_PAGE_ATTR 1 << 7 ; creates a 1 GiB page in PML3, and 2 MiB page in PML2
+%define PAGE_SIZE 4096
+%define HUGE_PAGE_SIZE_2MB 0x200000
+%define HUGE_PAGE_SIZE_1GB 0x40000000
+%define PT_ENTRIES 512
+%define PT_KERNEL_SPACE_START_IDX 256 ; 0xFFFF800000000000
+%define PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX 273 ; 0XFFFF888000000000
 
-VMAPPED_RAM_P1_TABLE equ vmapped_ram_tables
-VMAPPED_RAM_P2_TABLE equ vmapped_ram_tables + 4096
-VMAPPED_RAM_P3_TABLE equ vmapped_ram_tables + 8192
+%define VMAPPED_RAM_P1_TABLE vmapped_ram_tables
+%define VMAPPED_RAM_P2_TABLE vmapped_ram_tables + 4096
+%define VMAPPED_RAM_P3_TABLE vmapped_ram_tables + 8192
 
 ; This routine:
 ; 1) sets up identity mapping of first 2MiB RAM to (0 - 0x200000) address space
@@ -187,9 +177,9 @@ set_up_page_tables:
     ret
 
 
-PAE_ATTR                equ 1 << 5
-EFER_LONG_MODE_ATTR     equ 1 << 8
-PAGING_ENABLED_ATTR     equ 1 << 31
+%define PAE_ATTR 1 << 5
+%define EFER_LONG_MODE_ATTR 1 << 8
+%define PAGING_ENABLED_ATTR 1 << 31
 
 enable_paging:
     mov eax, V2P(kernel_p4_table)
@@ -210,120 +200,7 @@ enable_paging:
 
     ret
 
-
-; Screen printing routines start
-
-VGA_MEMORY_ADDR         equ 0xB8000
-WHITE_ON_BLACK_ATTR     equ 0x0F
-WHITE_ON_RED_ATTR       equ 0x4F
-
-CONSOLE_WIDTH           equ 80
-CONSOLE_HEIGHT          equ 25
-
-
-print_error:
-    push esi
-
-    mov esi, V2P(ERROR_PREFIX_STR)
-    mov dh, WHITE_ON_RED_ATTR
-    call print_string_with_attr
-
-    pop esi
-    mov dh, WHITE_ON_RED_ATTR
-    call print_string_with_attr
-
-    hlt
-
-
-print_string:
-    mov dh, WHITE_ON_BLACK_ATTR
-    call print_string_with_attr
-    ret
-
-
-print_string_with_attr:
-    lodsb
-
-    cmp al, 0
-    je .done
-
-    mov ah, dh
-
-    mov dword ecx, [V2P(cursor_col)]
-    imul ecx, ecx, 2
-
-    mov dword ebx, [V2P(cursor_row)]
-    imul ebx, ebx, 2 * CONSOLE_WIDTH
-
-    mov word [VGA_MEMORY_ADDR + ebx + ecx], ax
-
-    mov eax, [V2P(cursor_col)]
-    inc eax
-    mov [V2P(cursor_col)], eax
-    cmp eax, CONSOLE_WIDTH
-    jne .print_next_char
-
-.proceed_on_new_line:
-    cmp dword [V2P(cursor_row)], CONSOLE_HEIGHT
-    je .done
-
-    call move_cursor_next_line
-
-.print_next_char:
-    jmp print_string_with_attr
-
-.done:
-    ret
-
-
-clear_screen:
-    mov dword [V2P(cursor_col)], 0
-    mov dword [V2P(cursor_row)], 0
-
-.clear_row:
-    mov ah, WHITE_ON_BLACK_ATTR
-    mov al, ' '
-
-    mov dword ecx, [V2P(cursor_col)]
-    imul ecx, ecx, 2
-
-    mov dword ebx, [V2P(cursor_row)]
-    imul ebx, ebx, 2 * CONSOLE_WIDTH
-
-    mov word [VGA_MEMORY_ADDR + ebx + ecx], ax
-
-    mov dword eax, [V2P(cursor_col)]
-    inc eax
-    mov dword [V2P(cursor_col)], eax
-    cmp eax, CONSOLE_WIDTH
-    jne .clear_row
-
-.done_clearing_row:
-    call move_cursor_next_line
-
-    cmp dword [V2P(cursor_row)], CONSOLE_HEIGHT
-    jne .clear_row
-
-.done:
-    mov dword [V2P(cursor_row)], 0
-    mov dword [V2P(cursor_col)], 0
-    ret
-
-
-move_cursor_next_line:
-    inc dword [V2P(cursor_row)]
-    mov dword [V2P(cursor_col)], 0
-    ret
-
-
-section .boot64.data
-    cursor_col dd 0
-    cursor_row dd 0
-
-; Screen printing routines end
-
-KERNEL_STACK_SIZE equ 8192
-
+section .boot64_data
 align 4096
 kernel_stack:
     resb KERNEL_STACK_SIZE
@@ -352,14 +229,16 @@ vmapped_ram_tables:
     times 128 * PT_ENTRIES dq 0
 
 
-section .boot64.rodata
+bits 64
 
-CODE_ATTR                   equ 1 << 43
-CONFORMING_ATTR             equ 1 << 44
-SEGMENT_PRESENT_ATTR        equ 1 << 47
-LONG_MODE_ATTR              equ 1 << 53
+section .boot64_rodata
 
-CODE_SEGMENT_SELECTOR       equ 1 << 3
+%define CODE_ATTR 1 << 43
+%define CONFORMING_ATTR 1 << 44
+%define SEGMENT_PRESENT_ATTR 1 << 47
+%define LONG_MODE_ATTR 1 << 53
+
+
 ; temporary gdt to get to long mode and resetup it later properly
 GDT64:
     dq 0 
@@ -369,14 +248,7 @@ GDT64:
     dw $ - GDT64 - 1
     dq GDT64
 
-KERNEL_STARTUP_MESSAGE_STR db 'Booting sos kernel in long mode...', 0
-ERROR_PREFIX_STR db 'Error: ', 0
-MULTIBOOT_ERROR_STR db 'Multiboot2 is not configured.', 0
-CPUID_ERROR_STR db 'Cpuid instruction is not supported.', 0
-LONG_MODE_ERROR_STR db 'Long mode is not supported.', 0
-
-bits 64
-section .boot64.text
+section .boot64_text
 
 extern kernel_main
 extern set_up_64tb_ram_identity_mapping
