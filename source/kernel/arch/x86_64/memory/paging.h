@@ -26,6 +26,6 @@ typedef struct {
 } page_table;
 
 extern page_table kernel_p4_table;
-page_table* current_p4_table = &kernel_p4_table;
+extern page_table* current_p4_table;
 
 #endif // SOS_PAGING_H

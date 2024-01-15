@@ -118,37 +118,66 @@ check_long_mode:
 
 PRESENT_ATTR                            equ 1 << 0
 WRITABLE_ATTR                           equ 1 << 1
+HUGE_PAGE_ATTR                          equ 1 << 7 ; creates a 1 GiB page in PML3, and 2 MiB page in PML2
 PAGE_SIZE                               equ 4096
+HUGE_PAGE_SIZE                          equ 512 * 4096
 PT_ENTRIES                              equ 512
 PT_KERNEL_SPACE_START_IDX               equ 256 ; 0xFFFF800000000000
 PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX   equ 273 ; 0XFFFF888000000000
 
+; This routine:
+; 1) sets up identity mapping of first 2MiB RAM to (0 - 0x200000) address space
+; 2) sets up identity mapping of first 2MiB RAM to (0XFFFF888000000000 - 0XFFFF888000200000) address space
+; 3) sets up identity mapping of first 1GiB RAM to kernel space (0xFFFF800000000000 - 0xFFFF800040000000)
 set_up_page_tables:
-    mov eax, V2P(p3_table)
+    ; mapping 1 GiB of kernel address space
+    mov ecx, PT_ENTRIES
+    mov ebx, V2P(kernel_p2_table)
+    mov eax, HUGE_PAGE_ATTR | PRESENT_ATTR | WRITABLE_ATTR
+.identity_map_kernel:
+    mov [ebx], eax
+    add ebx, 8
+    add eax, HUGE_PAGE_SIZE
+    loop .identity_map_kernel
+
+    mov eax, V2P(kernel_p2_table)
+    or eax, PRESENT_ATTR | WRITABLE_ATTR
+    mov [V2P(kernel_p3_table)], eax
+
+    mov eax, V2P(kernel_p3_table)
+    or eax, PRESENT_ATTR | WRITABLE_ATTR
+    mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_START_IDX * 8], eax
+
+    ; identity mapping of 2 MiB of ram to (0 - 0x200000)
+    ; and (0XFFFF888000000000 - 0XFFFF888000200000) address spaces
+
+    ; (0 - 2MiB) is needed to not triple fault after enabling paging
+    ; while code still runs in low memory address space and will be
+    ; unmapped before jumping to kernel
+
+    ; (0XFFFF888000000000 - 0XFFFF888000200000) is mapped to be able to print
+    ; to early console at address 0xB8000
+    mov ecx, PT_ENTRIES
+    mov ebx, V2P(vmapped_ram_p1_table)
+    mov eax, PRESENT_ATTR | WRITABLE_ATTR
+.identity_map_lowmem_ram:
+    mov [ebx], eax
+    add ebx, 8
+    add eax, PAGE_SIZE
+    loop .identity_map_lowmem_ram
+
+    mov eax, V2P(vmapped_ram_p1_table)
+    or eax, PRESENT_ATTR | WRITABLE_ATTR
+    mov [V2P(vmapped_ram_p2_table)], eax
+
+    mov eax, V2P(vmapped_ram_p2_table)
+    or eax, PRESENT_ATTR | WRITABLE_ATTR
+    mov [V2P(vmapped_ram_p3_table)], eax
+
+    mov eax, V2P(vmapped_ram_p3_table)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
     mov [V2P(kernel_p4_table)], eax
-
-    mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_START_IDX * 8], eax
     mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX * 8], eax
-
-    mov eax, V2P(p2_table)
-    or eax, PRESENT_ATTR | WRITABLE_ATTR
-    mov [V2P(p3_table)], eax
-
-    mov eax, V2P(p1_table)
-    or eax, PRESENT_ATTR | WRITABLE_ATTR
-    mov [V2P(p2_table)], eax
-
-    mov ebx, 0
-.identity_map_first_2mb:
-    mov eax, PAGE_SIZE
-    mul ebx
-    or eax, PRESENT_ATTR | WRITABLE_ATTR
-    mov [V2P(p1_table) + ebx * 8], eax
-
-    inc ebx
-    cmp ebx, PT_ENTRIES
-    jne .identity_map_first_2mb
 
     ret
 
@@ -294,15 +323,27 @@ section .bss
 KERNEL_STACK_SIZE equ 8192
 
 global kernel_p4_table
-; temporary page tables mappings to get to long mode and resetup it later properly
+; kernel page tables
 align 4096
-kernel_p4_table:
+kernel_p4_table: ; root pml4
     resb 4096
-p3_table:
+
+; page tables for kernel identity mapping of 1GiB or kernel
+; address space
+kernel_p3_table:
     resb 4096
-p2_table:
+kernel_p2_table:
     resb 4096
-p1_table:
+kernel_p1_table:
+    resb 4096
+
+; page tables for identity mapping of first 2MiB of RAM
+; to get early console at addr 0xB8000 to work
+vmapped_ram_p3_table:
+    resb 4096
+vmapped_ram_p2_table:
+    resb 4096
+vmapped_ram_p1_table:
     resb 4096
 
 align 4
@@ -346,6 +387,7 @@ long_mode_start:
     jmp rax
 
 .upper_memory:
+    ; Remove identity mapping of first two megs of ram used to run lower memory code
     mov qword rax, 0
     mov [qword kernel_p4_table], rax
 

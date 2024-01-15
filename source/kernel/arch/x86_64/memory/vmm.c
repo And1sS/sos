@@ -2,6 +2,8 @@
 #include "../../../memory/pmm.h"
 #include "paging.h"
 
+page_table* current_p4_table = &kernel_p4_table;
+
 u64 get_page(vaddr virtual_page) {
     if (!IS_CANONICAL(virtual_page)) {
         return NULL;
