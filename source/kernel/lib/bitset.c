@@ -7,7 +7,7 @@ bitset* bitset_create() {
     }
 
     array_list* chunks =
-        array_list_create(BITSET_INITIAL_CHUNKS * sizeof(chunk));
+        array_list_create(BITSET_INITIAL_CHUNKS);
     if (!chunks) {
         return NULL;
     }

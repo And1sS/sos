@@ -14,11 +14,13 @@
 #define P4_OFFSET(a) (((a) >> 39) & 0x1FF)
 
 #define PRESENT_ATTR 1 << 0
-#define RW_ATTR 1 << 1
+#define WRITABLE_ATTR 1 << 1
 #define SUPERVISOR_ATTR 1 << 2
 #define HUGE_PAGE_ATTR 1 << 7
 
-#define MASK_FLAGS(addr) ((addr) & ~0xFFF)
+#define FLAGS_MASK 0xFFF
+#define MASK_FLAGS(addr) ((addr) & ~FLAGS_MASK)
+#define GET_FLAGS(entry) (entry & FLAGS_MASK)
 #define NEXT_PT(entry) ((page_table*) P2V(MASK_FLAGS(entry)))
 #define NEXT_PTE(entry, lvl, page)                                             \
     (NEXT_PT(entry)->entries[P##lvl##_OFFSET(page)])
@@ -28,6 +30,5 @@ typedef struct __attribute__((__packed__)) {
 } page_table;
 
 extern page_table kernel_p4_table;
-extern page_table* current_p4_table;
 
 #endif // SOS_PAGING_H

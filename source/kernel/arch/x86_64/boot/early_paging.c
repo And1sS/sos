@@ -1,4 +1,4 @@
-#include "../../../memory/pmm.h"
+#include "../../../memory/physical/pmm.h"
 #include "../memory/paging.h"
 
 /*
@@ -64,17 +64,16 @@
  */
 void __attribute__((section(".boot64_text")))
 set_up_64tb_ram_identity_mapping(page_table* pml4, page_table pml3_pool[128]) {
-
     paddr frame = 0;
     for (int i = 0; i < 128; i++) {
         for (int j = 0; j < PT_ENTRIES; j++) {
             pml3_pool[i].entries[j] =
-                frame | PRESENT_ATTR | RW_ATTR | HUGE_PAGE_ATTR;
+                frame | PRESENT_ATTR | WRITABLE_ATTR | HUGE_PAGE_ATTR;
             frame += HUGE_PAGE_SIZE_1GB;
         }
 
         pml4->entries[KERNEL_VMAPPED_RAM_P4_START_ENTRY + i] =
             (((u64) &pml3_pool[i]) - KERNEL_START_VADDR) | PRESENT_ATTR
-            | RW_ATTR;
+            | WRITABLE_ATTR;
     }
 }

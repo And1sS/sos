@@ -5,6 +5,8 @@
 
 void panic(string message) {
     local_irq_disable();
+    println("");
+    print("PANIC: ");
     println(message);
     halt();
 }
