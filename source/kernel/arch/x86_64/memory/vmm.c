@@ -1,6 +1,7 @@
 #include "../../../memory/virtual/vmm.h"
 #include "../../../memory/heap/kheap.h"
 #include "../../../memory/physical/pmm.h"
+#include "../cpu/features.h"
 #include "paging.h"
 
 #define TABLE(entry) ((page_table*) P2V(MASK_FLAGS(entry)))
@@ -113,7 +114,9 @@ static u64 vm_area_flags_to_x86_64_flags(vm_area_flags flags) {
     result |= flags.present ? PRESENT_ATTR : 0;
     result |= flags.writable ? WRITABLE_ATTR : 0;
     result |= flags.user_access_allowed ? SUPERVISOR_ATTR : 0;
-
+    result |= !flags.executable && features_execute_disable_supported()
+                  ? EXECUTE_DISABLE_ATTR
+                  : 0;
     return result;
 }
 
@@ -123,7 +126,7 @@ void* arch_get_page_view(struct page_table* table, vaddr page) {
         return NULL;
 
     page_table* arch_table = (page_table*) table;
-    page = MASK_FLAGS(page);
+    page = PAGE_ALIGN(page);
     u64 pml3 = arch_table->entries[P4_OFFSET(page)];
     if (!(pml3 & PRESENT_ATTR))
         return NULL;
@@ -143,8 +146,8 @@ static bool map_page(page_table* table, vaddr page, paddr frame, u64 flags) {
     if (!IS_CANONICAL(page))
         return false;
 
-    flags &= 0xFFF;
-    page = MASK_FLAGS(page);
+    flags &= FLAGS_MASK;
+    page = PAGE_ALIGN(page);
     frame = MASK_FLAGS(frame);
 
     u64 pml4_entry = table->entries[P4_OFFSET(page)];
@@ -236,7 +239,7 @@ bool arch_map_page_to_frame(struct page_table* table, vaddr page, paddr frame,
 
     page_table* arch_table = (page_table*) table;
     u64 arch_flags = vm_area_flags_to_x86_64_flags(flags);
-    page = MASK_FLAGS(page);
+    page = PAGE_ALIGN(page);
 
     return map_page(arch_table, page, frame, arch_flags);
 }

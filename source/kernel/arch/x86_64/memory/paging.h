@@ -17,9 +17,12 @@
 #define WRITABLE_ATTR 1 << 1
 #define SUPERVISOR_ATTR 1 << 2
 #define HUGE_PAGE_ATTR 1 << 7
+#define EXECUTE_DISABLE_ATTR ((u64) 1 << 63)
 
-#define FLAGS_MASK 0xFFF
-#define MASK_FLAGS(addr) ((addr) & ~FLAGS_MASK)
+#define PAGE_ALIGN(addr) ((addr) & ~0xFFF)
+
+#define FLAGS_MASK 0x8000000000000FFF
+#define MASK_FLAGS(entry) ((entry) & ~FLAGS_MASK)
 #define GET_FLAGS(entry) (entry & FLAGS_MASK)
 #define NEXT_PT(entry) ((page_table*) P2V(MASK_FLAGS(entry)))
 #define NEXT_PTE(entry, lvl, page)                                             \
