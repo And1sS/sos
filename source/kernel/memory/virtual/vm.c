@@ -97,7 +97,7 @@ static vm_area* vm_space_surrounding_area_unsafe(vm_space* space,
     return NULL;
 }
 
-void vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
+bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
     vm_area_validate(to_insert);
 
     vm_area* prev = NULL;
@@ -130,8 +130,11 @@ void vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
         kfree(to_insert);
     }
 
-    if (!merge_prev && !merge_both)
-        array_list_insert(&space->areas, next_idx, to_insert);
+    if (!merge_prev && !merge_both) {
+        return array_list_insert(&space->areas, next_idx, to_insert);
+    }
+
+    return true;
 }
 
 bool vm_space_cut_area_unsafe(vm_space* space, vm_area* to_cut) {
@@ -208,7 +211,8 @@ vm_space* vm_space_fork(vm_space* space) {
             if (!cloned)
                 goto area_clone_failed;
 
-            array_list_add_last(&forked->areas, cloned);
+            if (!array_list_add_last(&forked->areas, cloned))
+                goto area_clone_failed;
         }
     }
 

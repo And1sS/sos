@@ -11,7 +11,9 @@ extern struct cpu_context* arch_kthread_context_init(kthread* thrd,
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
-    thrd->id = threading_allocate_tid();
+    bool allocated_tid = threading_allocate_tid(&thrd->id);
+    if (!allocated_tid)
+        return false;
 
     void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
 

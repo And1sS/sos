@@ -61,6 +61,9 @@ typedef struct {
     lock lock;
     bin bins[BINS_COUNT];
     u64 capacity;
+
+    u64 allocs;
+    u64 deallocs;
 } heap;
 
 typedef struct {
@@ -142,6 +145,7 @@ void* kmalloc(u64 size) {
     block* result_block = result.orphan;
     result_block->used = true;
 
+    kheap.allocs++;
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 
     return free_space(result_block);
@@ -170,6 +174,7 @@ void* kmalloc_aligned(u64 size, u64 alignment) {
     if (alignment_gap == 0) {
         block* result_block = shrink_block(blk_bin, blk, block_size).orphan;
         result_block->used = true;
+        kheap.allocs++;
         spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 
         return free_space(result_block);
@@ -186,6 +191,7 @@ void* kmalloc_aligned(u64 size, u64 alignment) {
     block* result_block = result.orphan;
     result_block->used = true;
 
+    kheap.allocs++;
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 
     return free_space(result_block);
@@ -197,6 +203,9 @@ void* krealloc(void* addr, u64 size) {
 
     u64 to_copy = MIN(old_data_size, size);
     void* new_data = kmalloc(size);
+    if (!new_data)
+        return NULL;
+
     memcpy(new_data, addr, to_copy);
     kfree(addr);
 
@@ -206,6 +215,7 @@ void* krealloc(void* addr, u64 size) {
 void kfree(void* addr) {
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
     kfree_unsafe(addr);
+    kheap.deallocs++;
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 }
 

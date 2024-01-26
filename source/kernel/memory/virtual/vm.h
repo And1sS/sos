@@ -51,7 +51,7 @@ typedef struct {
  * Panics in case something goes wrong. Public because arch needs way to insert
  * areas it created in kernel space during boot process.
  */
-void vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert);
+bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert);
 
 vm_space* vm_space_fork(vm_space* space);
 void vm_space_destroy(vm_space* space);

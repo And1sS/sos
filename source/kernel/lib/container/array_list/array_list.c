@@ -3,7 +3,7 @@
 #include "../../memory_util.h"
 #include "../../panic.h"
 
-void array_list_grow(array_list* list);
+bool array_list_grow(array_list* list);
 
 array_list* array_list_create(u64 capacity) {
     array_list* list = (array_list*) kmalloc(sizeof(array_list));
@@ -11,7 +11,11 @@ array_list* array_list_create(u64 capacity) {
         return NULL;
     }
 
-    array_list_init(list, capacity);
+    if (!array_list_init(list, capacity)) {
+        kfree(list);
+        return NULL;
+    }
+
     return list;
 }
 
@@ -53,8 +57,8 @@ bool array_list_set(array_list* list, u64 index, void* value) {
 }
 
 bool array_list_insert(array_list* list, u64 index, void* value) {
-    if (list->size + 1 > list->capacity) {
-        array_list_grow(list);
+    if (list->size + 1 > list->capacity && !array_list_grow(list)) {
+        return false;
     }
 
     for (u64 i = list->size; i > index; i--) {
@@ -65,9 +69,9 @@ bool array_list_insert(array_list* list, u64 index, void* value) {
     return true;
 }
 
-void array_list_add_first(array_list* list, void* value) {
-    if (list->size + 1 > list->capacity) {
-        array_list_grow(list);
+bool array_list_add_first(array_list* list, void* value) {
+    if (list->size + 1 > list->capacity && !array_list_grow(list)) {
+        return false;
     }
 
     for (u64 i = list->size; i > 0; i--) {
@@ -75,14 +79,16 @@ void array_list_add_first(array_list* list, void* value) {
     }
     list->size++;
     list->array[0] = value;
+    return true;
 }
 
-void array_list_add_last(array_list* list, void* value) {
-    if (list->size + 1 > list->capacity) {
-        array_list_grow(list);
+bool array_list_add_last(array_list* list, void* value) {
+    if (list->size + 1 > list->capacity && !array_list_grow(list)) {
+        return false;
     }
 
     list->array[list->size++] = value;
+    return true;
 }
 
 void* array_list_remove_first(array_list* list) {
@@ -130,13 +136,13 @@ bool array_list_remove(array_list* list, void* value) {
     return false;
 }
 
-void array_list_grow(array_list* list) {
+bool array_list_grow(array_list* list) {
     u64 new_capacity = list->capacity + list->capacity / 2 + 1;
 
     list->array = krealloc(list->array, sizeof(void*) * new_capacity);
-    // TODO: handle it gracefully
     if (!list->array)
-        panic("could not grow kernel array list");
+        return false;
 
     list->capacity = new_capacity;
+    return true;
 }

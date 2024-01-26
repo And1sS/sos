@@ -26,8 +26,8 @@ void* array_list_get(array_list* list, u64 index);
 bool array_list_set(array_list* list, u64 index, void* value);
 bool array_list_insert(array_list* list, u64 index, void* value);
 
-void array_list_add_first(array_list* list, void* value);
-void array_list_add_last(array_list* list, void* value);
+bool array_list_add_first(array_list* list, void* value);
+bool array_list_add_last(array_list* list, void* value);
 
 void* array_list_remove_first(array_list* list);
 void* array_list_remove_last(array_list* list);
