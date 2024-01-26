@@ -12,15 +12,7 @@
  * Performed in entry.asm
  *
  *
- * 2) set up identity mapping of first 2MiB RAM to
- * (0XFFFF888000000000 - 0XFFFF888000200000) address space
- * In second megabyte of ram specifically lives trampoline to higher half, so
- * this mapping makes it usable.
- * Page size used: 4KiB
- * Performed in entry.asm
- *
- *
- * 3) set up identity mapping of first 1GiB RAM to
+ * 2) set up identity mapping of first 1GiB RAM to
  * kernel space (0xFFFF800000000000 - 0xFFFF800040000000)
  * This mapping is temporary and is used to be able to run early boot kernel
  * space code and use kernel space data without knowing kernel size in RAM. It
@@ -33,14 +25,14 @@
  *
  * Then paging is enabled and jump to higher half code (0xFFFF800000000000) is
  * performed, after that:
- * 4) set up whole kernel space identity mapping
+ * 3) set up whole kernel space identity mapping
  * (0xFFFF800000000000 - 0xFFFF87FFFFFFFFFF) This mapping runs in 64 bit mode
  * and maps 512GiB of (potential) RAM to kernel space. This is used to be able
  * to run any kernel code without knowing kernel size in RAM. Page size used:
  * 1GiB(Huge pages) Performed in entry.asm
  *
  *
- * 5) set up identity mapping of all (potential) RAM to kernel space
+ * 4) set up identity mapping of all (potential) RAM to kernel space
  * (0xFFFF888000000000 - 0xFFFFC87FFFFFFFFF).
  * This mapping runs in 64 bit mode and maps 64TB of (potential) RAM to kernel
  * space. This is used to be able to write to/read from any physical ram page.
