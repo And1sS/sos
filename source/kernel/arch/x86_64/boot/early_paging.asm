@@ -21,8 +21,7 @@ section .boot32_text
 
 ; This routine:
 ; 1) sets up identity mapping of first 2MiB RAM to (0 - 0x200000) address space
-; 2) sets up identity mapping of first 2MiB RAM to (0XFFFF888000000000 - 0XFFFF888000200000) address space
-; 3) sets up identity mapping of first 1GiB RAM to kernel space (0xFFFF800000000000 - 0xFFFF800040000000)
+; 2) sets up identity mapping of first 1GiB RAM to kernel space (0xFFFF800000000000 - 0xFFFF800040000000)
 global set_up_page_tables
 set_up_page_tables:
     ; mapping 1 GiB of kernel address space
@@ -44,13 +43,13 @@ set_up_page_tables:
     mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_START_IDX * 8], eax
 
     ; identity mapping of 2 MiB of ram to (0 - 0x200000)
-    ; and (0XFFFF888000000000 - 0XFFFF888000200000) address spaces
+    ; and (0XFFFF800000000000 - 0XFFFF800000200000) address spaces
 
     ; (0 - 2MiB) is needed to not triple fault after enabling paging
     ; while code still runs in low memory address space and will be
     ; unmapped before jumping to kernel
 
-    ; (0XFFFF888000000000 - 0XFFFF888000200000) is mapped
+    ; (0XFFFF800000000000 - 0XFFFF800000200000) is mapped
     ; to run early 64 bit code
     mov ecx, PT_ENTRIES
     mov ebx, V2P(VMAPPED_RAM_P1_TABLE)
@@ -72,7 +71,6 @@ set_up_page_tables:
     mov eax, V2P(VMAPPED_RAM_P3_TABLE)
     or eax, PRESENT_ATTR | WRITABLE_ATTR
     mov [V2P(kernel_p4_table)], eax
-    mov [V2P(kernel_p4_table) + PT_KERNEL_SPACE_VMAPPED_RAM_START_IDX * 8], eax
 
     ret
 
