@@ -45,7 +45,6 @@ static vm_area* create_kernel_binary_vm_area() {
     kernel_binary_area->base = KERNEL_START_VADDR;
     kernel_binary_area->length = (u64) 512 * 1024 * 1024 * 1024; // 512GiB
     kernel_binary_area->flags = (vm_area_flags){.writable = true,
-                                                .present = true,
                                                 .executable = true,
                                                 .shared = true,
                                                 .user_access_allowed = false};
@@ -63,7 +62,6 @@ static vm_area* create_kernel_vmapped_ram_vm_area() {
         (u64) 64 * 1024 * 1024 * 1024 * 1024; // 64 TiB
     kernel_vmapped_ram_area->flags =
         (vm_area_flags){.writable = true,
-                        .present = true,
                         .executable = true,
                         .shared = true,
                         .user_access_allowed = false};
@@ -79,7 +77,6 @@ static vm_area* create_kernel_heap_vm_area() {
     kernel_heap_vm_area->base = KHEAP_START_VADDR;
     kernel_heap_vm_area->length = kheap_size();
     kernel_heap_vm_area->flags = (vm_area_flags){.writable = true,
-                                                 .present = true,
                                                  .executable = true,
                                                  .shared = true,
                                                  .user_access_allowed = false};
@@ -110,13 +107,13 @@ void arch_init_kernel_vm(vm_space* kernel_space) {
     bool kheap_area_inserted =
         vm_space_insert_area_unsafe(kernel_space, create_kernel_heap_vm_area());
 
-    if (!kernel_area_inserted || !vmapped_ram_area_inserted || !kheap_area_inserted)
+    if (!kernel_area_inserted || !vmapped_ram_area_inserted
+        || !kheap_area_inserted)
         panic("Could not kreate initial kernel space areas");
 }
 
 static u64 vm_area_flags_to_x86_64_flags(vm_area_flags flags) {
     u64 result = 0;
-    result |= flags.present ? PRESENT_ATTR : 0;
     result |= flags.writable ? WRITABLE_ATTR : 0;
     result |= flags.user_access_allowed ? SUPERVISOR_ATTR : 0;
     result |= !flags.executable && features_execute_disable_supported()
@@ -243,7 +240,7 @@ bool arch_map_page_to_frame(struct page_table* table, vaddr page, paddr frame,
         return false;
 
     page_table* arch_table = (page_table*) table;
-    u64 arch_flags = vm_area_flags_to_x86_64_flags(flags);
+    u64 arch_flags = vm_area_flags_to_x86_64_flags(flags) | PRESENT_ATTR;
     page = PAGE_ALIGN(page);
 
     return map_page(arch_table, page, frame, arch_flags);

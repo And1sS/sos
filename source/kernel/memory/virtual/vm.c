@@ -27,8 +27,7 @@ static bool vm_area_flags_equal(vm_area* left, vm_area* right) {
     vm_area_flags lflags = left->flags;
     vm_area_flags rflags = right->flags;
 
-    return lflags.present == rflags.present
-           && lflags.writable == rflags.writable
+    return lflags.writable == rflags.writable
            && lflags.executable == rflags.executable
            && lflags.shared == rflags.shared
            && lflags.user_access_allowed == rflags.user_access_allowed;
@@ -404,10 +403,22 @@ void vm_space_print(vm_space* space) {
         print(", len: ");
         print_u64(area->length);
         print("(");
+
+        if (area->length >= (u64) 1024 * 1024 * 1024 * 1024) {
+            print_u64(area->length / 1024 / 1024 / 1024 / 1024);
+            print("tb, ");
+        } else if (area->length >= 1024 * 1024 * 1024) {
+            print_u64(area->length / 1024 / 1024 / 1024);
+            print("gb, ");
+        } else if (area->length >= 1024 * 1024) {
+            print_u64(area->length / 1024 / 1024);
+            print("mb, ");
+        } else if (area->length >= 1024) {
+            print_u64(area->length / 1024);
+            print("kb, ");
+        }
         print_u64(area->length / PAGE_SIZE);
         print(" pgs), f: ");
-        if (area->flags.present)
-            print("P");
         if (area->flags.writable)
             print("W");
         if (area->flags.user_access_allowed)

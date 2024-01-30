@@ -252,7 +252,7 @@ bool grow_heap(u64 size) {
     u64 end = start + aligned_size;
 
     for (u64 vframe = start; vframe < end; vframe += PAGE_SIZE) {
-        vm_area_flags flags = {.present = true, .writable = true};
+        vm_area_flags flags = {.writable = true};
         arch_map_kernel_page(vframe, flags);
     }
 

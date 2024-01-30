@@ -10,7 +10,6 @@
 struct page_table;
 
 typedef struct {
-    bool present : 1;
     bool writable : 1;
     bool user_access_allowed : 1;
     bool executable : 1;

@@ -57,10 +57,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Forked vm:");
     vm_space_print(forked_space);
 
-    vm_area_flags flags = {.present = true,
-                           .writable = true,
-                           .user_access_allowed = true,
-                           .executable = true};
+    vm_area_flags flags = {
+        .writable = true, .user_access_allowed = true, .executable = true};
 
     vm_space_map_page(forked_space, 0x1000, flags);
     vm_space_map_pages(forked_space, 0xF000, 2, flags);
