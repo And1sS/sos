@@ -103,10 +103,15 @@ void arch_init_kernel_vm(vm_space* kernel_space) {
         panic(PREALLOCATION_ERROR_MSG);
     }
 
-    vm_space_insert_area_unsafe(kernel_space, create_kernel_binary_vm_area());
-    vm_space_insert_area_unsafe(kernel_space,
-                                create_kernel_vmapped_ram_vm_area());
-    vm_space_insert_area_unsafe(kernel_space, create_kernel_heap_vm_area());
+    bool kernel_area_inserted = vm_space_insert_area_unsafe(
+        kernel_space, create_kernel_binary_vm_area());
+    bool vmapped_ram_area_inserted = vm_space_insert_area_unsafe(
+        kernel_space, create_kernel_vmapped_ram_vm_area());
+    bool kheap_area_inserted =
+        vm_space_insert_area_unsafe(kernel_space, create_kernel_heap_vm_area());
+
+    if (!kernel_area_inserted || !vmapped_ram_area_inserted || !kheap_area_inserted)
+        panic("Could not kreate initial kernel space areas");
 }
 
 static u64 vm_area_flags_to_x86_64_flags(vm_area_flags flags) {

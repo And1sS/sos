@@ -100,6 +100,7 @@ static vm_area* vm_space_surrounding_area_unsafe(vm_space* space,
 bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
     vm_area_validate(to_insert);
 
+    bool merged = false;
     vm_area* prev = NULL;
     u64 next_idx = 0;
 
@@ -114,6 +115,7 @@ bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
     if (merge_prev) {
         vm_areas_merge(prev, to_insert); // prev holds merged area
         kfree(to_insert);
+        merged = true;
     }
 
     bool merge_both = next && merge_prev && vm_areas_can_merge(prev, next);
@@ -121,6 +123,7 @@ bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
         vm_areas_merge(prev, next); // prev holds merged area
         kfree(next);
         array_list_remove_idx(&space->areas, next_idx);
+        merged = true;
     }
 
     bool merge_next =
@@ -128,13 +131,14 @@ bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
     if (merge_next) {
         vm_areas_merge(next, to_insert); // next holds merged area
         kfree(to_insert);
+        merged = true;
     }
 
     if (!merge_prev && !merge_both) {
-        return array_list_insert(&space->areas, next_idx, to_insert);
+        merged = array_list_insert(&space->areas, next_idx, to_insert);
     }
 
-    return true;
+    return merged;
 }
 
 bool vm_space_cut_area_unsafe(vm_space* space, vm_area* to_cut) {
@@ -264,21 +268,22 @@ static vm_page_mapping_result vm_space_map_page_unsafe(vm_space* space,
 
     base = PAGE(base);
     vm_area* new = (vm_area*) kmalloc(sizeof(vm_area*));
-    if (!new) {
+    if (!new)
         return OUT_OF_MEMORY;
-    } else {
-        if (!arch_map_page(space->table, base, flags)) {
-            kfree(new);
-            return OUT_OF_MEMORY;
-        }
 
-        new->base = base;
-        new->length = PAGE_SIZE;
-        new->flags = flags;
-
-        vm_space_insert_area_unsafe(space, new);
-        return SUCCESS;
+    if (!arch_map_page(space->table, base, flags)) {
+        kfree(new);
+        return OUT_OF_MEMORY;
     }
+
+    new->base = base;
+    new->length = PAGE_SIZE;
+    new->flags = flags;
+
+    if (!vm_space_insert_area_unsafe(space, new))
+        return OUT_OF_MEMORY;
+
+    return SUCCESS;
 }
 
 static vm_pages_mapping_result vm_space_map_pages_unsafe(vm_space* space,
