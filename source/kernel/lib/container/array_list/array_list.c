@@ -139,10 +139,11 @@ bool array_list_remove(array_list* list, void* value) {
 bool array_list_grow(array_list* list) {
     u64 new_capacity = list->capacity + list->capacity / 2 + 1;
 
-    list->array = krealloc(list->array, sizeof(void*) * new_capacity);
-    if (!list->array)
+    void* new_array = krealloc(list->array, sizeof(void*) * new_capacity);
+    if (!new_array)
         return false;
 
+    list->array = new_array;
     list->capacity = new_capacity;
     return true;
 }
