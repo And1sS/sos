@@ -3,6 +3,7 @@
 #include "../../common/vmm.h"
 
 #define FRAME(frame) ((frame) & ~(PAGE_SIZE - 1))
+#define RESERVED_LOWER_PMEM_SIZE 0x100000 // 1MB
 
 static paddr kernel_start = NULL;
 static paddr kernel_end = NULL;
