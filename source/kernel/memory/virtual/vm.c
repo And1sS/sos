@@ -147,7 +147,7 @@ bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
     return merged;
 }
 
-bool vm_space_cut_area_unsafe(vm_space* space, vm_area* to_cut) {
+static bool vm_space_cut_area_unsafe(vm_space* space, vm_area* to_cut) {
     vm_area_validate(to_cut);
 
     u64 idx = 0;
@@ -292,19 +292,32 @@ static vm_page_mapping_result vm_space_map_page_unsafe(vm_space* space,
     return SUCCESS;
 }
 
-static vm_pages_mapping_result vm_space_map_area_unsafe(vm_space* space,
-                                                        vm_area* area) {
+vm_pages_mapping_result vm_space_map_pages(vm_space* space, vaddr base,
+                                           u64 count, vm_area_flags flags) {
+
+    base = PAGE(base);
+    vm_area to_map = {
+        .base = PAGE(base), .length = PAGE_SIZE * count, .flags = flags};
+
+    if (vm_areas_intersect(&to_map, &non_canonical_area))
+        return (vm_pages_mapping_result){.mapped_pages_count = 0,
+                                         .status = INVALID_RANGE};
+
+    if (vm_areas_intersect(&to_map, &kernel_space_area)
+        && !space->is_kernel_space)
+        return (vm_pages_mapping_result){.mapped_pages_count = 0,
+                                         .status = UNAUTHORIZED};
+
+    if (vm_space_intersecting_area_unsafe(space, &to_map))
+        return (vm_pages_mapping_result){.mapped_pages_count = 0,
+                                         .status = ALREADY_MAPPED};
 
     u64 mapped = 0;
     vm_page_mapping_result page_status;
 
-    if (vm_space_intersecting_area_unsafe(space, area))
-        return (vm_pages_mapping_result){.mapped_pages_count = 0,
-                                         .status = ALREADY_MAPPED};
-
-    for (; mapped < area->length / PAGE_SIZE; mapped++) {
-        u64 page = area->base + PAGE_SIZE * mapped;
-        page_status = vm_space_map_page_unsafe(space, page, area->flags);
+    for (; mapped < count; mapped++) {
+        u64 page = base + PAGE_SIZE * mapped;
+        page_status = vm_space_map_page_unsafe(space, page, flags);
         if (page_status != SUCCESS)
             break;
     }
@@ -319,42 +332,6 @@ vm_page_mapping_result vm_space_map_page(vm_space* space, vaddr base,
     return vm_space_map_pages(space, base, 1, flags).status;
 }
 
-vm_pages_mapping_result vm_space_map_pages(vm_space* space, vaddr base,
-                                           u64 count, vm_area_flags flags) {
-
-    vm_area to_map = {
-        .base = PAGE(base), .length = PAGE_SIZE * count, .flags = flags};
-
-    if (vm_areas_intersect(&to_map, &non_canonical_area))
-        return (vm_pages_mapping_result){.mapped_pages_count = 0,
-                                         .status = INVALID_RANGE};
-
-    if (vm_areas_intersect(&to_map, &kernel_space_area)
-        && !space->is_kernel_space)
-        return (vm_pages_mapping_result){.mapped_pages_count = 0,
-                                         .status = UNAUTHORIZED};
-
-    rw_spin_lock_write_irq(&space->lock);
-    vm_pages_mapping_result result = vm_space_map_area_unsafe(space, &to_map);
-    rw_spin_unlock_write_irq(&space->lock);
-
-    return result;
-}
-
-void* vm_space_get_page_view(vm_space* space, vaddr base) {
-    base = PAGE(base);
-    vm_area temp = {.base = base, .length = PAGE_SIZE};
-
-    void* view = NULL;
-    rw_spin_lock_read_irq(&space->lock);
-    if (vm_space_surrounding_area_unsafe(space, &temp)) {
-        view = arch_get_page_view(space->table, base);
-    }
-    rw_spin_unlock_read_irq(&space->lock);
-
-    return view;
-}
-
 static bool vm_space_unmap_page_unsafe(vm_space* space, vaddr base) {
     vm_area temp = {.base = PAGE(base), .length = PAGE_SIZE};
     if (vm_space_cut_area_unsafe(space, &temp)) {
@@ -364,8 +341,7 @@ static bool vm_space_unmap_page_unsafe(vm_space* space, vaddr base) {
     return false;
 }
 
-static bool vm_space_unmap_pages_unsafe(vm_space* space, vaddr base,
-                                        u64 count) {
+bool vm_space_unmap_pages(vm_space* space, vaddr base, u64 count) {
     base = PAGE(base);
     vm_area to_unmap = {.base = base, .length = PAGE_SIZE * count};
 
@@ -386,12 +362,15 @@ bool vm_space_unmap_page(vm_space* space, vaddr base) {
     return vm_space_unmap_pages(space, base, 1);
 }
 
-bool vm_space_unmap_pages(vm_space* space, vaddr base, u64 count) {
-    rw_spin_lock_write_irq(&space->lock);
-    bool result = vm_space_unmap_pages_unsafe(space, base, count);
-    rw_spin_unlock_write_irq(&space->lock);
+void* vm_space_get_page_view(vm_space* space, vaddr base) {
+    base = PAGE(base);
+    vm_area temp = {.base = base, .length = PAGE_SIZE};
 
-    return result;
+    if (vm_space_surrounding_area_unsafe(space, &temp)) {
+        return arch_get_page_view(space->table, base);
+    }
+
+    return NULL;
 }
 
 void vm_space_print(vm_space* space) {

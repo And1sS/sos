@@ -46,15 +46,6 @@ typedef struct {
     rw_spin_lock lock;
 } vm_space;
 
-/*
- * Panics in case something goes wrong. Public because arch needs way to insert
- * areas it created in kernel space during boot process.
- */
-bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert);
-
-vm_space* vm_space_fork(vm_space* space);
-void vm_space_destroy(vm_space* space);
-
 typedef enum {
     SUCCESS = 0,
     ALREADY_MAPPED = 1,
@@ -68,16 +59,27 @@ typedef struct {
     vm_page_mapping_result status;
 } vm_pages_mapping_result;
 
+/*
+ * Panics in case something goes wrong. Public because arch needs way to insert
+ * areas it created in kernel space during boot process.
+ */
+bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert);
+
+// these functions take write lock of provided vm_space
+vm_space* vm_space_fork(vm_space* space);
+void vm_space_destroy(vm_space* space);
+
+// these functions should be called with vm_space lock held for write
 vm_page_mapping_result vm_space_map_page(vm_space* space, vaddr base,
                                          vm_area_flags flags);
 vm_pages_mapping_result vm_space_map_pages(vm_space* space, vaddr base,
                                            u64 count, vm_area_flags flags);
 
-void* vm_space_get_page_view(vm_space* space, vaddr base);
-
 bool vm_space_unmap_page(vm_space* space, vaddr base);
 bool vm_space_unmap_pages(vm_space* space, vaddr base, u64 count);
 
+// these functions should be called with vm_space lock held for read
+void* vm_space_get_page_view(vm_space* space, vaddr base);
 void vm_space_print(vm_space* space);
 
 #endif // SOS_VM_SPACE_H
