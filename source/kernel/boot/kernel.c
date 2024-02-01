@@ -60,6 +60,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
 
+    // temporary hardcoded loading of first-userspace-program.bin for test
+    // which contains only code which start is mapped to 0x1000
     vm_space_map_page(forked_space, 0x1000, flags);
     vm_space_map_pages(forked_space, 0xF000, 2, flags);
     println("Forked vm after mapping: ");
