@@ -14,7 +14,4 @@ void vmm_notify_vm_space_changed();
 
 bool vmm_invalidate_range(vaddr base, u64 len);
 
-bool vmm_map_kernel_range(vaddr base, u64 len, vm_area_flags flags);
-bool vmm_unmap_kernel_range(vaddr base, u64 len);
-
 #endif // SOS_VIRTUAL_MEMORY_MANAGER_H

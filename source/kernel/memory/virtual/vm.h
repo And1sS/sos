@@ -58,11 +58,13 @@ void vm_space_destroy(vm_space* space);
 typedef enum {
     SUCCESS = 0,
     ALREADY_MAPPED = 1,
-    OUT_OF_MEMORY = 2
+    INVALID_RANGE = 2,
+    UNAUTHORIZED = 3,
+    OUT_OF_MEMORY = 4
 } vm_page_mapping_result;
 
 typedef struct {
-    u64 mapped;
+    u64 mapped_pages_count;
     vm_page_mapping_result status;
 } vm_pages_mapping_result;
 
