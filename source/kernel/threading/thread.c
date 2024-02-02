@@ -66,7 +66,6 @@ void thread_exit(u64 exit_code) {
 
 void thread_destroy(thread* thrd) {
     threading_free_tid(thrd->id);
-    // TODO: free thread children list
     array_list_deinit(&thrd->children);
     kfree(thrd->kernel_stack);
     kfree(thrd);
