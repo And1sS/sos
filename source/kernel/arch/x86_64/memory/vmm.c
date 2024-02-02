@@ -275,6 +275,7 @@ bool arch_unmap_page(struct page_table* table, vaddr page) {
     if (!(pml1 & PRESENT_ATTR))
         return false;
 
+    pmm_free_frame(MASK_FLAGS(NEXT_PTE(pml1, 1, page)));
     return NEXT_PTE(pml1, 1, page) = 0;
 }
 

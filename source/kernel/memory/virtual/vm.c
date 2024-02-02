@@ -140,14 +140,14 @@ bool vm_space_insert_area_unsafe(vm_space* space, vm_area* to_insert) {
         merged = true;
     }
 
-    if (!merge_prev && !merge_both) {
-        merged = array_list_insert(&space->areas, next_idx, to_insert);
+    if (!merged) {
+        return array_list_insert(&space->areas, next_idx, to_insert);
     }
 
-    return merged;
+    return true;
 }
 
-static bool vm_space_cut_area_unsafe(vm_space* space, vm_area* to_cut) {
+static bool vm_space_cut_area_unsafe(vm_space* space, const vm_area* to_cut) {
     vm_area_validate(to_cut);
 
     u64 idx = 0;
@@ -286,8 +286,10 @@ static vm_page_mapping_result vm_space_map_page_unsafe(vm_space* space,
     new->length = PAGE_SIZE;
     new->flags = flags;
 
-    if (!vm_space_insert_area_unsafe(space, new))
+    if (!vm_space_insert_area_unsafe(space, new)) {
+        arch_unmap_page(space->table, base);
         return OUT_OF_MEMORY;
+    }
 
     return SUCCESS;
 }
@@ -303,8 +305,8 @@ vm_pages_mapping_result vm_space_map_pages(vm_space* space, vaddr base,
         return (vm_pages_mapping_result){.mapped_pages_count = 0,
                                          .status = INVALID_RANGE};
 
-    if (vm_areas_intersect(&to_map, &kernel_space_area)
-        && !space->is_kernel_space)
+    if (!space->is_kernel_space
+        && vm_areas_intersect(&to_map, &kernel_space_area))
         return (vm_pages_mapping_result){.mapped_pages_count = 0,
                                          .status = UNAUTHORIZED};
 
@@ -333,12 +335,9 @@ vm_page_mapping_result vm_space_map_page(vm_space* space, vaddr base,
 }
 
 static bool vm_space_unmap_page_unsafe(vm_space* space, vaddr base) {
-    vm_area temp = {.base = PAGE(base), .length = PAGE_SIZE};
-    if (vm_space_cut_area_unsafe(space, &temp)) {
-        arch_unmap_page(space->table, base);
-        return true;
-    }
-    return false;
+    vm_area to_cut = {.base = PAGE(base), .length = PAGE_SIZE};
+    return vm_space_cut_area_unsafe(space, &to_cut)
+           && arch_unmap_page(space->table, base);
 }
 
 bool vm_space_unmap_pages(vm_space* space, vaddr base, u64 count) {
