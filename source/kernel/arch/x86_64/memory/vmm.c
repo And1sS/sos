@@ -254,7 +254,12 @@ bool arch_map_page(struct page_table* table, vaddr page, vm_area_flags flags) {
     if (!frame)
         return false;
 
-    return arch_map_page_to_frame(table, page, frame, flags);
+    if (!arch_map_page_to_frame(table, page, frame, flags)) {
+        pmm_free_frame(frame);
+        return false;
+    }
+
+    return true;
 }
 
 bool arch_unmap_page(struct page_table* table, vaddr page) {
