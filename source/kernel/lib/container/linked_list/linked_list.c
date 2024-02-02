@@ -31,7 +31,7 @@ bool linked_list_add_last(linked_list* list, void* value) {
         return false;
     }
 
-    linked_list_add_last_node(list, linked_list_node_create(value));
+    linked_list_add_last_node(list, node);
     return true;
 }
 

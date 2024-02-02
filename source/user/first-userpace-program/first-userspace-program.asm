@@ -39,7 +39,7 @@ trigger_temp_syscall:
     make_syscall 0
     ret
 
-HELLO_WORLD_STR: db 'Hello world from user space!', 0
+HELLO_WORLD_STR: db 'Hello world from user space! VMM revision', 0
 
 US_MAPPED equ 0x1300
 US_UNMAPPED equ 0x7cccfffffff
