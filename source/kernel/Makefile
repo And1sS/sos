@@ -5,9 +5,8 @@ OBJ_FILES := $(patsubst ./%.c, $(BUILD_FOLDER)%.o, $(С_FILES))
 ASM_FILES := $(shell find ./ -name '*.asm')
 ELF_FILES := $(patsubst ./%.asm, $(BUILD_FOLDER)%.elf, $(ASM_FILES))
 
-KERNEL_ELF = $(BUILD_FOLDER)/sos-kernel.elf
+KERNEL_ELF = $(BUILD_FOLDER)sos-kernel.elf
 
-CROSS_COMPILE =
 ASM = nasm
 CC = gcc
 CC_FLAGS = -c -g -O3 -m64 -mcmodel=large -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \

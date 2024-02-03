@@ -46,16 +46,19 @@ What is implemented:
 - basic atomic operations, spin lock support
 - kernel heap (kmalloc, kmalloc_aligned, krealloc, kfree)
 - vga text console
+- synchronization primitives: spinlocks, mutexes, semaphores, conditional variables
+- preemptive multithreading
+- userspace (ring 3) threads
+- initial support for syscalls (via "int 0x80" for x86-64)
 
 TBD:
-- preemptive multhreading, ring 0 <- right now working on this part
-- group threads to form processes, ring 0
-- processes, threads, ring 3
-- more synchronization primitives apart from basic spinlocks - mutex, semaphores, conditional variables
+- Implement subset of POSIX signals <- currently working on this part
+- group threads to form processes, ring 0/3 
+- parse elf files to run processes
 - syscall interface and basic unix syscalls implementation
 - modern graphics interface support to get rid of CSM
 - interface for drivers
-- simple hdd driver, file system
+- simple hdd driver, virtual file system
 - SMP(simultaneous multi-processing) support
 - compile portable std lib for C for kernel
 
