@@ -48,7 +48,8 @@ void check_pending_signals() {
         spin_unlock_irq_restore(&current->lock, interrupts_enabled);
         thread_exit(-1);
     } else if (signal_raised(current->pending_signals, SIGTEST)
-               && signal_allowed(current->pending_signals, SIGTEST)) {
+               && signal_allowed(current->pending_signals, SIGTEST)
+               && current->signal_handler) {
 
         signal_clear(&current->pending_signals, SIGTEST);
         arch_enter_signal_handler(current->context, current->signal_handler);

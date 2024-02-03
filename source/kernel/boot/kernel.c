@@ -15,13 +15,20 @@ thread* user_thread = NULL;
 _Noreturn void kernel_thread() {
     u64 i = 0;
     u64 print = 0;
+    bool signaled = false;
+    ref_acquire(&user_thread->refc);
     while (1) {
-        if (i++ % 1000000 == 0) {
+        if (i++ % 100000000 == 0) {
             println("kernel threading!");
             print++;
 
-            if (print % 10 == 0) {
+            if (!signaled)
                 thread_signal(user_thread, SIGTEST);
+
+            if (print % 20 == 0 && !signaled) {
+                thread_signal(user_thread, SIGKILL);
+                ref_release(&user_thread->refc);
+                signaled = true;
             }
         }
     }
@@ -53,7 +60,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
         parse_multiboot_info((void*) P2V(multiboot_structure));
     set_up(&multiboot_info);
 
-    module first = get_module_info(&multiboot_info, 0);
+    module first = get_module_info(&multiboot_info, 1);
 
     vm_space* kernel_space = vmm_kernel_vm_space();
     println("Kernel vm:");

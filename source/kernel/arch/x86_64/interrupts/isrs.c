@@ -76,6 +76,8 @@ struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
         if (current) {
             current->signal_handler = (signal_handler*) arg0;
         }
+    } else if (syscall_number == 2) {
+        thread_exit(arg0);
     } else if (syscall_number == 4) { // signal return
         arch_return_from_signal_handler(context);
     } else {

@@ -9,7 +9,7 @@ section .text
     int 0x80
 %endmacro
 
-_start:
+start:
     mov rdi, signal_handler
     make_syscall 1
 
