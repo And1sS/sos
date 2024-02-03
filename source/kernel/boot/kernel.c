@@ -1,14 +1,13 @@
+#include "../arch/common/init.h"
+#include "../arch/common/vmm.h"
 #include "../interrupts/irq.h"
-#include "../lib/kprint.h"
 #include "../memory/heap/kheap.h"
-#include "../memory/pmm.h"
-#include "../memory/vmm.h"
+#include "../memory/virtual/vmm.h"
 #include "../scheduler/scheduler.h"
 #include "../signal/signal.h"
 #include "../threading/kthread.h"
 #include "../threading/threading.h"
 #include "../threading/uthread.h"
-#include "arch_init.h"
 #include "multiboot.h"
 
 thread* user_thread = NULL;
@@ -34,7 +33,9 @@ void set_up(const multiboot_info* mboot_info) {
 
     arch_init(mboot_info);
 
-    kmalloc_init();
+    kheap_init();
+    vmm_init();
+
     print("Finished kernel heap initialization! Heap initial size: ");
     print_u64(KHEAP_INITIAL_SIZE);
     println("");
@@ -54,20 +55,34 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
 
     module first = get_module_info(&multiboot_info, 0);
 
+    vm_space* kernel_space = vmm_kernel_vm_space();
+    println("Kernel vm:");
+    vm_space_print(kernel_space);
+
+    vm_space* forked_space = vm_space_fork(kernel_space);
+
+    println("Forked vm:");
+    vm_space_print(forked_space);
+
+    vm_area_flags flags = {
+        .writable = true, .user_access_allowed = true, .executable = true};
+
     // temporary hardcoded loading of first-userspace-program.bin for test
     // which contains only code which start is mapped to 0x1000
-    map_page(0x1000, allocate_zeroed_frame(), 1 | 2 | 4);
-    memcpy((void*) 0x1000, (void*) P2V(first.mod_start),
+    vm_space_map_page(forked_space, 0x1000, flags);
+    vm_space_map_pages(forked_space, 0xF000, 2, flags);
+    println("Forked vm after mapping: ");
+    vm_space_print(forked_space);
+
+    void* forked_text_page = vm_space_get_page_view(forked_space, 0x1000);
+    memcpy(forked_text_page, (void*) P2V(first.mod_start),
            first.mod_end - first.mod_start);
 
-    map_page(0xFFFF, allocate_zeroed_frame(), 1 | 2 | 4);
-    map_page(0xFFFF + FRAME_SIZE, allocate_zeroed_frame(), 1 | 2 | 4);
-    map_page(0xFFFF + 2 * FRAME_SIZE, allocate_zeroed_frame(), 1 | 2 | 4);
-    void* stack = (void*) 0xFFFF;
+    vmm_set_vm_space(forked_space);
+    user_thread =
+        uthread_create_orphan("test", (void*) 0xF000, (uthread_func*) 0x1000);
 
-    user_thread = uthread_create_orphan("test", stack, (uthread_func*) 0x1000);
     thread_start(user_thread);
-
     kthread_run("kernel-test-thread", kernel_thread);
 
     local_irq_enable();

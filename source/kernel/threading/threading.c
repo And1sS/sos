@@ -9,6 +9,8 @@ void threading_init() {
     thread_cleaner_init();
 }
 
-u64 threading_allocate_tid() { return id_generator_get_id(&id_gen); }
+bool threading_allocate_tid(u64* result) {
+    return id_generator_get_id(&id_gen, result);
+}
 
 bool threading_free_tid(u64 tid) { return id_generator_free_id(&id_gen, tid); }

@@ -1,12 +1,14 @@
 #include "kheap.h"
 
+#include "../../arch/common/vmm.h"
 #include "../../lib/alignment.h"
+#include "../../lib/kprint.h"
 #include "../../lib/math.h"
 #include "../../lib/memory_util.h"
 #include "../../synchronization/spin_lock.h"
 #include "../memory_map.h"
-#include "../pmm.h"
-#include "../vmm.h"
+#include "../physical/pmm.h"
+#include "../virtual/vmm.h"
 
 // This is simplified version of Doug Lea`s malloc
 
@@ -59,6 +61,9 @@ typedef struct {
     lock lock;
     bin bins[BINS_COUNT];
     u64 capacity;
+
+    u64 allocs;
+    u64 deallocs;
 } heap;
 
 typedef struct {
@@ -115,17 +120,17 @@ block* coalesce_blocks(block* left, block* right);
 
 void* free_space(block* blk);
 
-void kmalloc_init() {
+void kheap_init() {
     memset(&kheap, 0, sizeof(kheap));
-    init_lock(&kheap.lock);
-
-    bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
-    grow_heap(KHEAP_INITIAL_SIZE); // TODO: add panic in case we cant grow heap
-    spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+    grow_heap(KHEAP_INITIAL_SIZE);
+    kheap.lock = SPIN_LOCK_STATIC_INITIALIZER;
+    kheap.capacity = align_to_upper(KHEAP_INITIAL_SIZE, PAGE_SIZE);
 }
 
 void* kmalloc(u64 size) {
-    u64 block_size = align_to_upper(size + sizeof(header) + sizeof(footer), 8);
+    u64 block_size = align_to_upper(
+        MAX(size + sizeof(header) + sizeof(footer), MIN_BLOCK_SIZE), 8);
+
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
 
     best_fit_result best_fit = find_best_fit_or_grow(block_size);
@@ -140,6 +145,7 @@ void* kmalloc(u64 size) {
     block* result_block = result.orphan;
     result_block->used = true;
 
+    kheap.allocs++;
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 
     return free_space(result_block);
@@ -147,7 +153,9 @@ void* kmalloc(u64 size) {
 
 // alignment must be multiple of 8
 void* kmalloc_aligned(u64 size, u64 alignment) {
-    u64 block_size = align_to_upper(size + sizeof(header) + sizeof(footer), 8);
+    u64 block_size = align_to_upper(
+        MAX(size + sizeof(header) + sizeof(footer), MIN_BLOCK_SIZE), 8);
+
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
 
     aligned_best_fit_result best_fit =
@@ -166,6 +174,7 @@ void* kmalloc_aligned(u64 size, u64 alignment) {
     if (alignment_gap == 0) {
         block* result_block = shrink_block(blk_bin, blk, block_size).orphan;
         result_block->used = true;
+        kheap.allocs++;
         spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 
         return free_space(result_block);
@@ -182,6 +191,7 @@ void* kmalloc_aligned(u64 size, u64 alignment) {
     block* result_block = result.orphan;
     result_block->used = true;
 
+    kheap.allocs++;
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
 
     return free_space(result_block);
@@ -193,6 +203,9 @@ void* krealloc(void* addr, u64 size) {
 
     u64 to_copy = MIN(old_data_size, size);
     void* new_data = kmalloc(size);
+    if (!new_data)
+        return NULL;
+
     memcpy(new_data, addr, to_copy);
     kfree(addr);
 
@@ -202,11 +215,21 @@ void* krealloc(void* addr, u64 size) {
 void kfree(void* addr) {
     bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
     kfree_unsafe(addr);
+    kheap.deallocs++;
     spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+}
+
+u64 kheap_size() {
+    bool interrupts_enabled = spin_lock_irq_save(&kheap.lock);
+    u64 size = kheap.capacity;
+    spin_unlock_irq_restore(&kheap.lock, interrupts_enabled);
+    return size;
 }
 
 void kfree_unsafe(void* addr) {
     block* coalesced = (block*) ((vaddr) addr - sizeof(header));
+    if (block_size(coalesced) < MIN_BLOCK_SIZE || !coalesced->used)
+        panic("Invalid block passed to free");
 
     block* preceding = preceding_block(coalesced);
     block* succeeding = succeeding_block(coalesced);
@@ -224,24 +247,19 @@ void kfree_unsafe(void* addr) {
 }
 
 bool grow_heap(u64 size) {
-    u64 aligned_size = align_to_upper(size, FRAME_SIZE);
+    u64 aligned_size = align_to_upper(size, PAGE_SIZE);
     u64 start = KHEAP_START_VADDR + kheap.capacity;
     u64 end = start + aligned_size;
 
-    for (u64 vframe = start; vframe < end; vframe += FRAME_SIZE) {
-        u64 page = get_page(vframe);
-        if (!(page & 1)) {
-            paddr pframe = allocate_frame();
-            if (!pframe) {
-                return false;
-            }
-
-            map_page(vframe, pframe, 1 | 2);
-        }
+    for (u64 vframe = start; vframe < end; vframe += PAGE_SIZE) {
+        vm_area_flags flags = {.writable = true};
+        arch_map_kernel_page(vframe, flags);
     }
+
     memset((void*) start, 0, aligned_size);
 
     block* blk = init_orphan_block(start, aligned_size);
+    blk->used = true;
     kfree_unsafe(free_space(blk));
 
     kheap.capacity += aligned_size;
@@ -565,3 +583,39 @@ block* coalesce_blocks(block* left, block* right) {
 }
 
 void* free_space(block* blk) { return (void*) ((vaddr) blk + sizeof(header)); }
+
+void kheap_print() {
+    println("----------------------");
+    println("BINS:");
+    for (int i = 7; i < 24; ++i) {
+        bin* b = &kheap.bins[i];
+        print("bin #");
+        print_u32(i);
+        print(" -> ");
+        block* blk = b->first;
+        while (blk) {
+            print("(");
+            print_u64_hex((u64) blk);
+            print(", ");
+            print_u32(block_size(blk));
+            print(") -> ");
+            blk = blk->next;
+        }
+        println("NULL");
+    }
+
+    println("BLOCKS:");
+    block* blk = (block*) KHEAP_START_VADDR;
+    while (blk && (u64) blk < KHEAP_START_VADDR + kheap.capacity) {
+        print("(");
+        print_u64_hex((u64) blk);
+        print(", ");
+        print_u32(block_size(blk));
+        print(", ");
+        print(blk->used ? "used" : "unused");
+        print(");");
+        blk = (block*) ((u64) blk + block_size(blk));
+    }
+    println("");
+    println("----------------------");
+}

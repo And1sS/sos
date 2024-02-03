@@ -4,7 +4,7 @@
 
 void threading_init();
 
-u64 threading_allocate_tid();
+bool threading_allocate_tid(u64* result);
 bool threading_free_tid(u64 tid);
 
 #endif // SOS_THREADING_H

@@ -1,16 +1,20 @@
 #include "kthread.h"
+#include "../arch/common/vmm.h"
 #include "../arch/common/thread.h"
 #include "../lib/id_generator.h"
 #include "../memory/heap/kheap.h"
-#include "../memory/pmm.h"
+#include "../memory/physical/pmm.h"
 #include "../scheduler/scheduler.h"
 #include "threading.h"
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
-    thrd->id = threading_allocate_tid();
+    bool allocated_tid = threading_allocate_tid(&thrd->id);
+    if (!allocated_tid)
+        return false;
 
-    void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, FRAME_SIZE);
+    void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
+
     if (kernel_stack == NULL) {
         threading_free_tid(thrd->id);
         return false;

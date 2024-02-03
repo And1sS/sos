@@ -1,4 +1,5 @@
 #include "uthread.h"
+#include "../arch/common/vmm.h"
 #include "../arch/common/context.h"
 #include "../arch/common/thread.h"
 #include "../memory/heap/kheap.h"
@@ -12,10 +13,13 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
                   uthread_func* func) {
 
     memset(thrd, 0, sizeof(thread));
-    thrd->id = threading_allocate_tid();
+    bool allocated_tid = threading_allocate_tid(&thrd->id);
+    if (!allocated_tid)
+        return false;
 
-    void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, FRAME_SIZE);
-    if (kernel_stack == NULL) {
+    void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
+
+    if (!kernel_stack) {
         threading_free_tid(thrd->id);
         return false;
     }

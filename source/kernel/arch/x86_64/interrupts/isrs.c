@@ -24,7 +24,7 @@ struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
     } else if (interrupt_number == 14) {
         print("PAGE FAULT Error code: ");
         print_u64_hex(error_code);
-        print(" CR2: ");
+        print(" Faulty addr(CR2): ");
         u64 cr2 = get_cr2();
         print_u64_hex(cr2);
         panic("");

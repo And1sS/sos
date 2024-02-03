@@ -6,8 +6,7 @@ bitset* bitset_create() {
         return NULL;
     }
 
-    array_list* chunks =
-        array_list_create(BITSET_INITIAL_CHUNKS * sizeof(chunk));
+    array_list* chunks = array_list_create(BITSET_INITIAL_CHUNKS);
     if (!chunks) {
         return NULL;
     }
@@ -18,7 +17,7 @@ bitset* bitset_create() {
     return result;
 }
 
-u64 bitset_allocate_index(bitset* set) {
+bool bitset_allocate_index(bitset* set, u64* result) {
     for (u64 i = 0; i < set->chunks->size; ++i) {
         chunk ch = (chunk) array_list_get(set->chunks, i);
         chunk inverted = ~ch;
@@ -29,14 +28,19 @@ u64 bitset_allocate_index(bitset* set) {
             if (empty_idx >= 0) {
                 chunk updated = ch | ((u64) 1 << empty_idx);
                 array_list_set(set->chunks, i, (void*) updated);
-                return i * BITS_IN_CHUNK + empty_idx;
+                *result = i * BITS_IN_CHUNK + empty_idx;
+                return true;
             }
         }
     }
 
     u64 bits = set->chunks->size * BITS_IN_CHUNK;
-    array_list_add_last(set->chunks, (void*) 1);
-    return bits;
+    if (!array_list_add_last(set->chunks, (void*) 1)) {
+        return false;
+    }
+
+    *result = bits;
+    return true;
 }
 
 bool bitset_free_index(bitset* set, u64 index) {
