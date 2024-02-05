@@ -27,7 +27,16 @@ struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
         print(" Faulty addr(CR2): ");
         u64 cr2 = get_cr2();
         print_u64_hex(cr2);
-        panic("");
+        println("");
+
+        // Just for test
+        // TODO: Refactor this
+        thread* current = get_current_thread();
+        if (current && current->kernel_thread) {
+            panic("");
+        } else {
+            thread_signal(get_current_thread(), SIGSEGV);
+        }
     } else {
         print("isr #");
         print_u64(interrupt_number);
@@ -70,16 +79,19 @@ struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
 
     // no checks for now, because this is just for test
     if (syscall_number == 0) { // print
-        println((string) arg0);
+        print((string) arg0);
     } else if (syscall_number == 1) { // signal handler installation
         thread* current = get_current_thread();
         if (current) {
-            current->signal_handler = (signal_handler*) arg0;
+            current->signal_info.signal_configs[SIGINT].handler =
+                (signal_handler*) arg0;
         }
     } else if (syscall_number == 2) {
         thread_exit(arg0);
     } else if (syscall_number == 4) { // signal return
         arch_return_from_signal_handler(context);
+    } else if (syscall_number == 5) {
+        print_u64(arg0);
     } else {
         print("syscall num: ");
         print_u64(syscall_number);

@@ -1,6 +1,6 @@
 #include "kthread.h"
-#include "../arch/common/vmm.h"
 #include "../arch/common/thread.h"
+#include "../arch/common/vmm.h"
 #include "../lib/id_generator.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/physical/pmm.h"
@@ -29,9 +29,10 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->exit_code = 0;
 
     // kernel threads never receive signals
-    thrd->signals_mask = ALL_SIGNALS_BLOCKED;
-    thrd->pending_signals = PENDING_SIGNALS_CLEAR;
-    thrd->signal_handler = NULL;
+    thrd->signal_info.signals_mask = ALL_SIGNALS_BLOCKED;
+    thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
+    memset(thrd->signal_info.signal_configs, 0,
+           sizeof(signal_config) * (SIGNALS_COUNT + 1));
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     thrd->kernel_thread = true;

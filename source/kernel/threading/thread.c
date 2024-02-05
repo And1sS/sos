@@ -79,8 +79,8 @@ void thread_yield() { schedule(); }
 bool thread_signal(thread* thrd, signal sig) {
     bool signal_set = false;
     bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
-    if (signal_allowed(thrd->signals_mask, sig)) {
-        signal_raise(&thrd->pending_signals, sig);
+    if (signal_allowed(thrd->signal_info.signals_mask, sig)) {
+        signal_raise(&thrd->signal_info.pending_signals, sig);
         signal_set = true;
     }
     spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);

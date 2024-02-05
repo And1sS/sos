@@ -5,6 +5,7 @@
 #define SYS_SIGINSTALL 1
 #define SYS_EXIT 2
 #define SYS_SIGRET 4
+#define SYS_PRINT_U64 5
 
 long long syscall0(int syscall_number);
 long long syscall1(int syscall_number, long long arg0);

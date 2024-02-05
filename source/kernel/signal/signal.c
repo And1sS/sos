@@ -1,31 +1,59 @@
 #include "signal.h"
 #include "../arch/common/context.h"
 #include "../arch/common/signal.h"
+#include "../lib/kprint.h"
+#include "../lib/math.h"
 #include "../scheduler/scheduler.h"
 
-bool signal_raised(u64 pending_signals, signal sig) {
+signal_disposition default_dispositions[SIGNALS_COUNT + 1] = {
+    CORE_DUMP,
+    [SIGHUP] = TERMINATE,
+    [SIGINT] = TERMINATE,
+    [SIGQUIT] = CORE_DUMP,
+    [SIGILL] = CORE_DUMP,
+    CORE_DUMP, // Signal not supported for now
+    [SIGABRT] = CORE_DUMP,
+    CORE_DUMP, // Signal not supported for now
+    CORE_DUMP, // Signal not supported for now
+    [SIGKILL] = TERMINATE,
+    CORE_DUMP, // Signal not supported for now
+    [SIGSEGV] = CORE_DUMP,
+    CORE_DUMP, // Signal not supported for now
+    CORE_DUMP, // Signal not supported for now
+    [SIGTERM] = TERMINATE,
+    [SIGTERM + 1 ... SIGNALS_COUNT] = FALLBACK_TO_DEFAULT};
+
+bool signal_raised(sigpending pending_signals, signal sig) {
     return (pending_signals >> sig) & 1;
 }
 
-bool signal_allowed(u64 signals_mask, signal sig) {
+bool signal_any_raised(sigpending pending_signals) {
+    return pending_signals != PENDING_SIGNALS_CLEAR;
+}
+
+bool signal_allowed(sigmask signals_mask, signal sig) {
     return (signals_mask >> sig) & 1;
 }
 
-void signal_raise(u64* pending_signals, signal sig) {
+signal signal_first_raised(sigpending pending_signals) {
+    return msb_u64(pending_signals) - 1;
+}
+
+void signal_raise(sigpending* pending_signals, signal sig) {
     *pending_signals |= 1 << sig;
 }
 
-void signal_clear(u64* pending_signals, signal sig) {
+void signal_clear(sigpending* pending_signals, signal sig) {
     *pending_signals &= ~(1 << sig);
 }
 
-void signal_block(u64* signals_mask, signal sig) {
+void signal_block(sigmask* signals_mask, signal sig) {
     *signals_mask &= ~(1 << sig);
 }
 
-void block_and_clear_all_signals(thread* thrd) {
-    thrd->pending_signals = PENDING_SIGNALS_CLEAR;
-    thrd->signals_mask = ALL_SIGNALS_BLOCKED;
+static void block_and_clear_all_signals(thread* thrd) {
+    thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
+    thrd->signal_info.signals_mask = ALL_SIGNALS_BLOCKED;
 }
 
 void check_pending_signals() {
@@ -35,24 +63,44 @@ void check_pending_signals() {
     }
 
     bool interrupts_enabled = spin_lock_irq_save(&current->lock);
-    if (current->pending_signals == PENDING_SIGNALS_CLEAR) {
+    siginfo* signal_info = &current->signal_info;
+    if (!signal_any_raised(signal_info->pending_signals)) {
         spin_unlock_irq_restore(&current->lock, interrupts_enabled);
         return;
     }
 
-    if (signal_raised(current->pending_signals, SIGKILL)
-        && signal_allowed(current->signals_mask, SIGKILL)) {
+    signal raised = signal_first_raised(signal_info->pending_signals);
+    signal_config config = signal_info->signal_configs[raised];
+    signal_handler* handler = config.handler;
 
-        block_and_clear_all_signals(current);
+    if (handler) {
+        signal_clear(&signal_info->pending_signals, raised);
+        arch_enter_signal_handler(current->context, handler);
+    } else {
+        signal_disposition disposition =
+            config.disposition != FALLBACK_TO_DEFAULT
+                ? config.disposition
+                : default_dispositions[raised];
 
-        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-        thread_exit(-1);
-    } else if (signal_raised(current->pending_signals, SIGTEST)
-               && signal_allowed(current->pending_signals, SIGTEST)
-               && current->signal_handler) {
+        switch (disposition) {
+        case FALLBACK_TO_DEFAULT:
+            panic("Signal handling error, resolved disposition is fallback");
+            return;
 
-        signal_clear(&current->pending_signals, SIGTEST);
-        arch_enter_signal_handler(current->context, current->signal_handler);
+        case TERMINATE:
+        case CORE_DUMP:
+            println("Core dumped: ");
+            arch_print_cpu_context(current->context);
+            block_and_clear_all_signals(current);
+            spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+            thread_exit(-1);
+            return;
+
+        case STOP:
+        case IGNORE:
+        case CONTINUE:
+            break;
+        }
     }
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 }

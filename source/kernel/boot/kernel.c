@@ -14,22 +14,37 @@ thread* user_thread = NULL;
 
 _Noreturn void kernel_thread() {
     u64 i = 0;
-    u64 print = 0;
-    bool signaled = false;
+    u64 printed = 0;
+    u64 exit_code;
+    bool dead = false;
     ref_acquire(&user_thread->refc);
     while (1) {
-        if (i++ % 100000000 == 0) {
-            println("kernel threading!");
-            print++;
+        if (i++ % 10000000 == 0) {
+            print("kernel!");
+            printed++;
 
-            if (!signaled)
-                thread_signal(user_thread, SIGTEST);
+            if (printed >= 100 && printed % 10 == 0 && !dead)
+                thread_signal(user_thread, SIGINT);
 
-            if (print % 20 == 0 && !signaled) {
-                thread_signal(user_thread, SIGKILL);
+            if (!dead && user_thread->finished) {
+                dead = true;
+                exit_code = user_thread->exit_code;
                 ref_release(&user_thread->refc);
-                signaled = true;
+                user_thread = NULL;
             }
+
+            if (dead) {
+                print(", user exit code: ");
+                print_u64_hex(exit_code);
+                while (true){}
+            }
+            println("");
+
+            //            if (print % 2000 == 0 && !signaled) {
+            //                thread_signal(user_thread, SIGKILL);
+            //                ref_release(&user_thread->refc);
+            //                signaled = true;
+            //            }
         }
     }
 }
@@ -89,8 +104,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     user_thread =
         uthread_create_orphan("test", (void*) 0xF000, (uthread_func*) 0x1000);
 
-    thread_start(user_thread);
     kthread_run("kernel-test-thread", kernel_thread);
+    thread_start(user_thread);
 
     local_irq_enable();
     while (true) {

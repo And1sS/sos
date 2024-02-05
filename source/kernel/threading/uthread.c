@@ -1,7 +1,7 @@
 #include "uthread.h"
-#include "../arch/common/vmm.h"
 #include "../arch/common/context.h"
 #include "../arch/common/thread.h"
+#include "../arch/common/vmm.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/memory_map.h"
 #include "../scheduler/scheduler.h"
@@ -32,9 +32,10 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
     thrd->finished = false;
     thrd->exit_code = 0;
 
-    thrd->signals_mask = ALL_SIGNALS_UNBLOCKED;
-    thrd->pending_signals = PENDING_SIGNALS_CLEAR;
-    thrd->signal_handler = NULL;
+    thrd->signal_info.signals_mask = ALL_SIGNALS_UNBLOCKED;
+    thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
+    memset(thrd->signal_info.signal_configs, 0,
+           sizeof(signal_config) * (SIGNALS_COUNT + 1));
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
 

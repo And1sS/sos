@@ -21,6 +21,12 @@ typedef enum {
 
 struct cpu_context;
 
+typedef struct {
+    sigpending pending_signals;
+    sigmask signals_mask;
+    signal_config signal_configs[SIGNALS_COUNT + 1];
+} siginfo;
+
 typedef struct _thread {
     u64 id;
     string name;
@@ -43,10 +49,7 @@ typedef struct _thread {
     bool finished;
     u64 exit_code;
 
-    u64 pending_signals; // bitmap of pending signals
-    u64 signals_mask;    // bitmap of blocked signals, 0 - signal blocked,
-                         // 1 - signal unblocked
-    signal_handler* signal_handler;
+    siginfo signal_info;
 
     ref_count refc;
 
