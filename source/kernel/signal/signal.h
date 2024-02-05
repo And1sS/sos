@@ -91,7 +91,13 @@ typedef enum {
 typedef struct {
     signal_disposition disposition;
     signal_handler* handler;
-} signal_config;
+} sigaction;
+
+typedef struct {
+    sigpending pending_signals;
+    sigmask signals_mask;
+    sigaction signal_actions[SIGNALS_COUNT + 1];
+} siginfo;
 
 void check_pending_signals();
 
@@ -102,5 +108,6 @@ signal signal_first_raised(sigpending pending_signals);
 void signal_raise(sigpending* pending_signals, signal sig);
 void signal_clear(sigpending* pending_signals, signal sig);
 void signal_block(sigmask* signals_mask, signal sig);
+bool signal_set_action(siginfo* signal_info, signal sig, sigaction action);
 
 #endif // SOS_SIGNAL_H

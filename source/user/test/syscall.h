@@ -2,7 +2,7 @@
 #define SOS_SYSCALL_H
 
 #define SYS_PRINT 0
-#define SYS_SIGINSTALL 1
+#define SYS_SIGACTION 1
 #define SYS_EXIT 2
 #define SYS_SIGRET 4
 #define SYS_PRINT_U64 5

@@ -20,7 +20,7 @@ _Noreturn void kernel_thread() {
     ref_acquire(&user_thread->refc);
     while (1) {
         if (i++ % 10000000 == 0) {
-            print("kernel!");
+            println("kernel!");
             printed++;
 
             if (printed >= 100 && printed % 10 == 0 && !dead)
@@ -34,11 +34,10 @@ _Noreturn void kernel_thread() {
             }
 
             if (dead) {
-                print(", user exit code: ");
+                print("user exit code: ");
                 print_u64_hex(exit_code);
-                while (true){}
+                println("");
             }
-            println("");
 
             //            if (print % 2000 == 0 && !signaled) {
             //                thread_signal(user_thread, SIGKILL);
@@ -89,8 +88,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
 
-    // temporary hardcoded loading of first-userspace-program.bin for test
-    // which contains only code which start is mapped to 0x1000
+    // temporary hardcoded loading of test.bin for test, which code and data are
+    // within single page, start is mapped to 0x1000, entrypoint is 0x1000
     vm_space_map_page(forked_space, 0x1000, flags);
     vm_space_map_pages(forked_space, 0xF000, 2, flags);
     println("Forked vm after mapping: ");

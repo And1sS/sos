@@ -2,6 +2,7 @@
 #include "../../../lib/kprint.h"
 #include "../../../scheduler/scheduler.h"
 #include "../../common/signal.h"
+#include "../cpu/cpu_context.h"
 #include "../cpu/io.h"
 #include "../cpu/registers.h"
 #include "idt.h"
@@ -80,11 +81,12 @@ struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
     // no checks for now, because this is just for test
     if (syscall_number == 0) { // print
         print((string) arg0);
+        ((cpu_context*) context)->rax = 0;
     } else if (syscall_number == 1) { // signal handler installation
         thread* current = get_current_thread();
         if (current) {
-            current->signal_info.signal_configs[SIGINT].handler =
-                (signal_handler*) arg0;
+            bool set = thread_set_sigaction(current, arg0, *(sigaction*) arg1);
+            ((cpu_context*) context)->rax = set ? 0 : -1;
         }
     } else if (syscall_number == 2) {
         thread_exit(arg0);

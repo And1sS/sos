@@ -31,8 +31,8 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     // kernel threads never receive signals
     thrd->signal_info.signals_mask = ALL_SIGNALS_BLOCKED;
     thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
-    memset(thrd->signal_info.signal_configs, 0,
-           sizeof(signal_config) * (SIGNALS_COUNT + 1));
+    memset(thrd->signal_info.signal_actions, 0,
+           sizeof(sigaction) * (SIGNALS_COUNT + 1));
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     thrd->kernel_thread = true;

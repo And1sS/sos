@@ -51,6 +51,14 @@ void signal_block(sigmask* signals_mask, signal sig) {
     *signals_mask &= ~(1 << sig);
 }
 
+bool signal_set_action(siginfo* signal_info, signal sig, sigaction action) {
+    if (sig == SIGKILL)
+        return false;
+
+    signal_info->signal_actions[sig] = action;
+    return true;
+}
+
 static void block_and_clear_all_signals(thread* thrd) {
     thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
     thrd->signal_info.signals_mask = ALL_SIGNALS_BLOCKED;
@@ -70,16 +78,16 @@ void check_pending_signals() {
     }
 
     signal raised = signal_first_raised(signal_info->pending_signals);
-    signal_config config = signal_info->signal_configs[raised];
-    signal_handler* handler = config.handler;
+    sigaction action = signal_info->signal_actions[raised];
+    signal_handler* handler = action.handler;
 
     if (handler) {
         signal_clear(&signal_info->pending_signals, raised);
         arch_enter_signal_handler(current->context, handler);
     } else {
         signal_disposition disposition =
-            config.disposition != FALLBACK_TO_DEFAULT
-                ? config.disposition
+            action.disposition != FALLBACK_TO_DEFAULT
+                ? action.disposition
                 : default_dispositions[raised];
 
         switch (disposition) {

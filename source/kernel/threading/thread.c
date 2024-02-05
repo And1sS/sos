@@ -87,3 +87,11 @@ bool thread_signal(thread* thrd, signal sig) {
 
     return signal_set;
 }
+
+bool thread_set_sigaction(thread* thrd, signal sig, sigaction action) {
+    bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
+    bool action_set = signal_set_action(&thrd->signal_info, sig, action);
+    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
+
+    return action_set;
+}

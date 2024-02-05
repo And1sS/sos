@@ -21,12 +21,6 @@ typedef enum {
 
 struct cpu_context;
 
-typedef struct {
-    sigpending pending_signals;
-    sigmask signals_mask;
-    signal_config signal_configs[SIGNALS_COUNT + 1];
-} siginfo;
-
 typedef struct _thread {
     u64 id;
     string name;
@@ -74,5 +68,6 @@ void thread_destroy(thread* thread);
 void thread_yield();
 
 bool thread_signal(thread* thread, signal sig);
+bool thread_set_sigaction(thread* thread, signal sig, sigaction action);
 
 #endif // SOS_THREAD_H
