@@ -14,9 +14,6 @@ void trigger_segfault() { *(volatile long*) 0 = 1; }
 void sigint_handler() {
     print("Hello from signal handler!\n");
     signals++;
-
-    if (signals == 12)
-        trigger_segfault();
 }
 
 const sigaction sigint_action = {.handler = (signal_handler*) sigint_handler};

@@ -36,7 +36,7 @@ bool signal_allowed(sigmask signals_mask, signal sig) {
 }
 
 signal signal_first_raised(sigpending pending_signals) {
-    return msb_u64(pending_signals) - 1;
+    return lsb_u64(pending_signals);
 }
 
 void signal_raise(sigpending* pending_signals, signal sig) {
@@ -78,6 +78,10 @@ void check_pending_signals() {
     }
 
     signal raised = signal_first_raised(signal_info->pending_signals);
+    print("signal raised: ");
+    print_u64(raised);
+    println("");
+
     sigaction action = signal_info->signal_actions[raised];
     signal_handler* handler = action.handler;
 

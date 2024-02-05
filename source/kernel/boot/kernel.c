@@ -17,6 +17,8 @@ _Noreturn void kernel_thread() {
     u64 printed = 0;
     u64 exit_code;
     bool dead = false;
+    bool killed = false;
+
     ref_acquire(&user_thread->refc);
     while (1) {
         if (i++ % 10000000 == 0) {
@@ -39,11 +41,10 @@ _Noreturn void kernel_thread() {
                 println("");
             }
 
-            //            if (print % 2000 == 0 && !signaled) {
-            //                thread_signal(user_thread, SIGKILL);
-            //                ref_release(&user_thread->refc);
-            //                signaled = true;
-            //            }
+            if (printed % 700 == 0 && !killed && !dead) {
+                thread_signal(user_thread, SIGKILL);
+                killed = true;
+            }
         }
     }
 }
