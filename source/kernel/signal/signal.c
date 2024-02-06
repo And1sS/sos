@@ -78,15 +78,12 @@ void check_pending_signals() {
     }
 
     signal raised = signal_first_raised(signal_info->pending_signals);
-    print("signal raised: ");
-    print_u64(raised);
-    println("");
-
     sigaction action = signal_info->signal_actions[raised];
     signal_handler* handler = action.handler;
 
     if (handler) {
         signal_clear(&signal_info->pending_signals, raised);
+        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
         arch_enter_signal_handler(current->context, handler);
     } else {
         signal_disposition disposition =

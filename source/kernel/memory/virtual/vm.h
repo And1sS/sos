@@ -78,6 +78,8 @@ vm_pages_mapping_result vm_space_map_pages(vm_space* space, vaddr base,
 bool vm_space_unmap_page(vm_space* space, vaddr base);
 bool vm_space_unmap_pages(vm_space* space, vaddr base, u64 count);
 
+vm_area* vm_space_get_surrounding_area(vm_space* space, vaddr base, u64 length);
+
 // these functions should be called with vm_space lock held for read
 void* vm_space_get_page_view(vm_space* space, vaddr base);
 void vm_space_print(vm_space* space);

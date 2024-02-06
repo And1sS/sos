@@ -84,7 +84,7 @@ static vm_area* vm_space_intersecting_area_unsafe(vm_space* space,
 
     ARRAY_LIST_FOR_EACH(&space->areas, vm_area * iter) {
         if (vm_areas_intersect(iter, area)) {
-            return area;
+            return iter;
         }
     }
 
@@ -96,7 +96,7 @@ static vm_area* vm_space_surrounding_area_unsafe(vm_space* space,
 
     ARRAY_LIST_FOR_EACH(&space->areas, vm_area * iter) {
         if (vm_area_contains_area(iter, area)) {
-            return area;
+            return iter;
         }
     }
 
@@ -359,6 +359,13 @@ bool vm_space_unmap_pages(vm_space* space, vaddr base, u64 count) {
 
 bool vm_space_unmap_page(vm_space* space, vaddr base) {
     return vm_space_unmap_pages(space, base, 1);
+}
+
+vm_area* vm_space_get_surrounding_area(vm_space* space, vaddr base,
+                                       u64 length) {
+
+    vm_area temp = {.base = base, .length = length};
+    return vm_space_surrounding_area_unsafe(space, &temp);
 }
 
 void* vm_space_get_page_view(vm_space* space, vaddr base) {
