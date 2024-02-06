@@ -1,23 +1,23 @@
-#include "../../../lib/kprint.h"
-#include "../../../lib/memory_util.h"
-#include "../../common/context.h"
 #include "../../common/signal.h"
+#include "../../../memory/virtual/umem.h"
+#include "../../../threading/thread.h"
 #include "../cpu/cpu_context.h"
 #include "../cpu/gdt.h"
 #include "../cpu/rflags.h"
 
-// TODO: Add checks for rsp that it is present and mapped
 #define STACK_PUSH(rsp, type, val)                                             \
     do {                                                                       \
         type __val = val;                                                      \
         rsp -= sizeof(type);                                                   \
-        *(type*) rsp = __val;                                                  \
+        if (!copy_to_user((void*) (rsp), &__val, sizeof(type)))                \
+            thread_exit(-1);                                                   \
     } while (0)
 
 #define STACK_PUSH_RAW(rsp, size, src)                                         \
     do {                                                                       \
         rsp -= size;                                                           \
-        memcpy((void*) rsp, (void*) src, size);                                \
+        if (!copy_to_user((void*) (rsp), (void*) (src), size))                 \
+            thread_exit(-1);                                                   \
     } while (0)
 
 extern void signal_trampoline_code_start();
@@ -77,8 +77,9 @@ void arch_enter_signal_handler(struct cpu_context* context,
 void arch_return_from_signal_handler(struct cpu_context* context) {
     cpu_context* arch_context = (cpu_context*) context;
 
-    memcpy((void*) context, (void*) arch_context->rsp + TRAMPOLINE_CODE_SIZE,
-           sizeof(cpu_context));
+    void* src = (void*) arch_context->rsp + TRAMPOLINE_CODE_SIZE;
+    if (!copy_from_user((void*) context, src, sizeof(cpu_context)))
+        thread_exit(-1);
 
     // make sure user space did not modify cs, ss and flags to mess kernel state
     arch_context->ss = USER_DATA_SEGMENT_SELECTOR;

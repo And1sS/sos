@@ -33,8 +33,8 @@ struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
         // Just for test
         // TODO: Refactor this
         thread* current = get_current_thread();
-        if (current && current->kernel_thread) {
-            panic("");
+        if (!current || current->kernel_thread) {
+            panic("Unhandled page fault");
         } else {
             thread_signal(get_current_thread(), SIGSEGV);
         }
