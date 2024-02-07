@@ -6,6 +6,22 @@
 
 void thread_start(thread* thrd) { schedule_thread(thrd); }
 
+bool thread_add_child(thread* parent, thread* child) {
+    bool interrupts_enabled = spin_lock_irq_save(&parent->lock);
+
+    if (!array_list_add_last(&parent->children, child)) {
+        spin_unlock_irq_restore(&parent->lock, interrupts_enabled);
+        return false;
+    }
+
+    child->parent = parent;
+    ref_acquire(&child->refc);
+    ref_acquire(&parent->refc);
+    spin_unlock_irq_restore(&parent->lock, interrupts_enabled);
+
+    return true;
+}
+
 u64 thread_join(thread* child) {
     bool interrupts_enabled = spin_lock_irq_save(&child->lock);
     WAIT_FOR_IRQ(&child->finish_cvar, &child->lock, interrupts_enabled,
@@ -49,6 +65,8 @@ void thread_exit(u64 exit_code) {
         }
     }
 
+    process_exit_thread(current->proc, (struct thread*) current);
+
     current->finished = true;
     con_var_broadcast(&current->finish_cvar);
 
@@ -57,6 +75,7 @@ void thread_exit(u64 exit_code) {
                  refc->count == 0);
 
     current->state = DEAD;
+
     schedule_thread_exit();
     thread_cleaner_mark(current);
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);

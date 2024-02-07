@@ -4,8 +4,11 @@
 
 static id_generator id_gen;
 
+extern process kernel_process;
+
 void threading_init() {
     id_generator_init(&id_gen);
+    process_init(&kernel_process, true);
     thread_cleaner_init();
 }
 

@@ -7,6 +7,8 @@
 #include "../scheduler/scheduler.h"
 #include "threading.h"
 
+process kernel_process;
+
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
     bool allocated_tid = threading_allocate_tid(&thrd->id);
@@ -33,6 +35,9 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
     memset(thrd->signal_info.signal_actions, 0,
            sizeof(sigaction) * (SIGNALS_COUNT + 1));
+
+    // Each kernel thread runs as separate thread group inside kernel process
+    process_add_thread_group(&kernel_process, (struct thread*) thrd);
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     thrd->kernel_thread = true;

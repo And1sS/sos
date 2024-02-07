@@ -1,6 +1,7 @@
 #include "../../../interrupts/irq.h"
 #include "../../../lib/kprint.h"
 #include "../../../scheduler/scheduler.h"
+#include "../../../threading/uthread.h"
 #include "../../common/signal.h"
 #include "../cpu/cpu_context.h"
 #include "../cpu/io.h"
@@ -78,10 +79,11 @@ struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
                                    u64 arg4, u64 arg5, u64 syscall_number,
                                    struct cpu_context* context) {
 
+    cpu_context* arch_context = (cpu_context*) context;
     // no checks for now, because this is just for test
     if (syscall_number == 0) { // print
         print((string) arg0);
-        ((cpu_context*) context)->rax = 0;
+        arch_context->rax = 0;
     } else if (syscall_number == 1) { // signal handler installation
         thread* current = get_current_thread();
         if (current) {
@@ -94,6 +96,17 @@ struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
         arch_return_from_signal_handler(context);
     } else if (syscall_number == 5) {
         print_u64(arg0);
+    } else if (syscall_number == 6) {
+        uthread* thread = uthread_create((string) arg0, (void*) 0xF0000,
+                                         (uthread_func*) arg1);
+        thread_start(thread);
+        arch_context->rax = (u64) thread;
+    } else if (syscall_number == 7) {
+        thread_join((thread*) arg0);
+        arch_context->rax = 0;
+    } else if (syscall_number == 8) {
+        thread_detach((thread*) arg0);
+        arch_context->rax = 0;
     } else {
         print("syscall num: ");
         print_u64(syscall_number);
