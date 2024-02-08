@@ -83,7 +83,6 @@ void check_pending_signals() {
 
     if (handler) {
         signal_clear(&signal_info->pending_signals, raised);
-        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
         arch_enter_signal_handler(current->context, handler);
     } else {
         signal_disposition disposition =
