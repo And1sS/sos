@@ -6,7 +6,7 @@
 void panic(string message) {
     local_irq_disable();
     println("");
-    print("PANIC: ");
+    print("[Kernel panic]: ");
     println(message);
     halt();
 }

@@ -10,8 +10,12 @@ section .text
 %endmacro
 
 start:
+    mov rdi, signal_handler
+    make_syscall 1
+
+loop:
     call trigger_temp_syscall
-    jmp start
+    jmp loop
 
 ;trigger_page_fault_missing:
 ;    mov rax, US_UNMAPPED
@@ -39,7 +43,13 @@ trigger_temp_syscall:
     make_syscall 0
     ret
 
-HELLO_WORLD_STR: db 'Hello world from user space! VMM revision', 0
+signal_handler:
+    mov rdi, HELLO_WORLD_2_STR
+    make_syscall 0 ; print
+    ret
+
+HELLO_WORLD_STR: db 'Hello world from user space!', 0
+HELLO_WORLD_2_STR: db 'Hello world from signal handler!', 0
 
 US_MAPPED equ 0x1300
 US_UNMAPPED equ 0x7cccfffffff

@@ -14,13 +14,11 @@ section .text
 extern handle_software_interrupt
 extern handle_hardware_interrupt
 extern handle_syscall
-extern update_tss
 
-%macro update_tss 0
-    push rax
-    call update_tss
-    pop rax
-%endmacro
+
+extern update_tss ; defined in tss.c
+extern check_pending_signals ; defined in signal.c
+
 
 %macro save_ds 0
     mov bx, ds
@@ -54,34 +52,40 @@ extern update_tss
 %endmacro
 
 %macro restore_state 0
-   update_tss
-   mov rsp, rax
-   restore_ds
-   pop rax
-   pop rbx
-   pop rcx
-   pop rdx
-   pop rsi
-   pop rdi
-   pop rbp
-   pop r8
-   pop r9
-   pop r10
-   pop r11
-   pop r12
-   pop r13
-   pop r14
-   pop r15
+    call update_tss
+    call check_pending_signals
+
+    restore_ds
+    pop rax
+    pop rbx
+    pop rcx
+    pop rdx
+    pop rsi
+    pop rdi
+    pop rbp
+    pop r8
+    pop r9
+    pop r10
+    pop r11
+    pop r12
+    pop r13
+    pop r14
+    pop r15
 %endmacro
 
 %macro isr_soft_no_error_code 1
 global isr_%1
 isr_%1:
     save_state
+
     mov rdi, %1  ; interrupt number
     mov rsi, 0   ; error code
     mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
+
+    ; Now we run in probably new context
+    mov rsp, rax
+
     restore_state
     iretq
 %endmacro
@@ -91,9 +95,14 @@ global isr_%1
 isr_%1:
     pop rsi      ; error code
     save_state
+
     mov rdi, %1  ; interrupt number
     mov rdx, rsp ; cpu_context pointer
     call handle_software_interrupt
+
+    ; Now we run in probably new context
+    mov rsp, rax
+
     restore_state
     iretq
 %endmacro
@@ -103,9 +112,14 @@ global isr_%1
 isr_%1:
     cli
     save_state
+
     mov rdi, %1
     mov rsi, rsp
     call handle_hardware_interrupt
+
+    ; Now we run in probably new context
+    mov rsp, rax
+
     restore_state
     iretq
 %endmacro
@@ -168,9 +182,14 @@ isr_hard 47
 global isr_128
 isr_128:
     save_state
+
     push rsp ; cpu context, 7th argument of C handler
     push rax ; syscall number, 6th argument of C handler
     call handle_syscall
+
+    ; Now we run in probably new context
+    mov rsp, rax
+
     restore_state
     iretq
 

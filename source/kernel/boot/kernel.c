@@ -4,18 +4,47 @@
 #include "../memory/heap/kheap.h"
 #include "../memory/virtual/vmm.h"
 #include "../scheduler/scheduler.h"
+#include "../signal/signal.h"
 #include "../threading/kthread.h"
 #include "../threading/threading.h"
 #include "../threading/uthread.h"
 #include "multiboot.h"
 
-void kernel_thread() {
+thread* user_thread = NULL;
+
+_Noreturn void kernel_thread() {
     u64 i = 0;
-    u64 print = 0;
-    while (print < 1000) {
-        if (i++ % 1000000 == 0) {
-            println("kernel thread!");
-            print++;
+    u64 printed = 0;
+    u64 exit_code;
+    bool dead = false;
+    bool killed = false;
+
+    ref_acquire(&user_thread->refc);
+    while (1) {
+        if (i++ % 10000000 == 0) {
+            println("kernel!");
+            printed++;
+
+            if (printed >= 100 && printed % 10 == 0 && !dead)
+                thread_signal(user_thread, SIGINT);
+
+            if (!dead && user_thread->finished) {
+                dead = true;
+                exit_code = user_thread->exit_code;
+                ref_release(&user_thread->refc);
+                user_thread = NULL;
+            }
+
+            if (dead) {
+                print("user exit code: ");
+                print_u64_hex(exit_code);
+                println("");
+            }
+
+            if (printed % 700 == 0 && !killed && !dead) {
+                thread_signal(user_thread, SIGKILL);
+                killed = true;
+            }
         }
     }
 }
@@ -46,7 +75,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
         parse_multiboot_info((void*) P2V(multiboot_structure));
     set_up(&multiboot_info);
 
-    module first = get_module_info(&multiboot_info, 0);
+    module first = get_module_info(&multiboot_info, 1);
 
     vm_space* kernel_space = vmm_kernel_vm_space();
     println("Kernel vm:");
@@ -60,8 +89,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
 
-    // temporary hardcoded loading of first-userspace-program.bin for test
-    // which contains only code which start is mapped to 0x1000
+    // temporary hardcoded loading of test.bin for test, which code and data are
+    // within single page, start is mapped to 0x1000, entrypoint is 0x1000
     vm_space_map_page(forked_space, 0x1000, flags);
     vm_space_map_pages(forked_space, 0xF000, 2, flags);
     println("Forked vm after mapping: ");
@@ -72,10 +101,11 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
            first.mod_end - first.mod_start);
 
     vmm_set_vm_space(forked_space);
-    thread_start(
-        uthread_create_orphan("test", (void*) 0xF000, (uthread_func*) 0x1000));
+    user_thread =
+        uthread_create_orphan("test", (void*) 0xF000, (uthread_func*) 0x1000);
 
-    kthread_run("kernel_space-test-thread", kernel_thread);
+    kthread_run("kernel-test-thread", kernel_thread);
+    thread_start(user_thread);
 
     local_irq_enable();
     while (true) {

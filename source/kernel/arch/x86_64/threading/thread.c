@@ -1,6 +1,5 @@
 #include "../../../lib/memory_util.h"
 #include "../../../threading/kthread.h"
-#include "../../../threading/thread.h"
 #include "../../../threading/uthread.h"
 #include "../cpu/cpu_context.h"
 #include "../cpu/gdt.h"
@@ -13,6 +12,7 @@ void kernel_thread_wrapper(kthread_func* func) {
 
 struct cpu_context* arch_kthread_context_init(kthread* thrd,
                                               kthread_func* func) {
+
     u64 start_rsp = (u64) thrd->kernel_stack + THREAD_KERNEL_STACK_SIZE;
 
     cpu_context* context = (cpu_context*) (start_rsp - sizeof(cpu_context));
@@ -34,7 +34,9 @@ struct cpu_context* arch_uthread_context_init(uthread* thrd,
 
     u64 start_rsp = (u64) thrd->user_stack + THREAD_KERNEL_STACK_SIZE;
 
-    cpu_context* context = (cpu_context*) (start_rsp - sizeof(cpu_context));
+    u64 kernel_rsp = (u64) thrd->kernel_thread + THREAD_KERNEL_STACK_SIZE;
+    // On x86-64 cpu context always lives on kernel stack
+    cpu_context* context = (cpu_context*) (kernel_rsp - sizeof(cpu_context));
     memset(context, 0, sizeof(cpu_context));
 
     context->rip = (u64) func;

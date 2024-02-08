@@ -5,6 +5,7 @@
 #include "../lib/container/linked_list/linked_list.h"
 #include "../lib/ref_count/ref_count.h"
 #include "../lib/types.h"
+#include "../signal/signal.h"
 #include "../synchronization/completion.h"
 #include "../synchronization/spin_lock.h"
 
@@ -32,7 +33,7 @@ typedef struct _thread {
     thread_state state;
     struct cpu_context* context;
 
-    linked_list_node scheduler_node; // this is used in threading and thread
+    linked_list_node scheduler_node; // this is used in scheduler and thread
                                      // cleaner, never changes
 
     lock lock; // guards fields below and also guards thread against
@@ -41,6 +42,8 @@ typedef struct _thread {
     bool exiting;
     bool finished;
     u64 exit_code;
+
+    siginfo signal_info;
 
     ref_count refc;
 
@@ -63,5 +66,8 @@ void thread_exit(u64 exit_code);
 void thread_destroy(thread* thread);
 
 void thread_yield();
+
+bool thread_signal(thread* thread, signal sig);
+bool thread_set_sigaction(thread* thread, signal sig, sigaction action);
 
 #endif // SOS_THREAD_H
