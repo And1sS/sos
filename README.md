@@ -50,10 +50,10 @@ What is implemented:
 - preemptive multithreading
 - userspace (ring 3) threads
 - initial support for syscalls (via "int 0x80" for x86-64)
+- subset of posix signals
 
 TBD:
-- Implement subset of POSIX signals <- currently working on this part
-- group threads to form processes, ring 0/3 
+- group threads to form processes, ring 0/3 <- currently working on this part
 - parse elf files to run processes
 - syscall interface and basic unix syscalls implementation
 - modern graphics interface support to get rid of CSM
@@ -61,6 +61,7 @@ TBD:
 - simple hdd driver, virtual file system
 - SMP(simultaneous multi-processing) support
 - compile portable std lib for C for kernel
+- port Doom :D
 
 <h2>Building and running</h2>
 
