@@ -1,6 +1,6 @@
-#ifndef SOS_TIMER_H
-#define SOS_TIMER_H
+#ifndef SOS_PIT_H
+#define SOS_PIT_H
 
 void pit_init();
 
-#endif // SOS_TIMER_H
+#endif // SOS_PIT_H

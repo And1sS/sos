@@ -1,116 +1,81 @@
-#include "../../../interrupts/irq.h"
+#include "isrs.h"
 #include "../../../lib/kprint.h"
-#include "../../../scheduler/scheduler.h"
-#include "../../common/signal.h"
-#include "../cpu/cpu_context.h"
-#include "../cpu/io.h"
-#include "../cpu/registers.h"
-#include "idt.h"
+#include "../../../synchronization/rw_spin_lock.h"
+#include "pic.h"
 
-const u8 OCW2_EOI_OFFSET = 5;
-volatile u64 ticks = 0;
+static rw_spin_lock irq_handlers_lock = RW_LOCK_STATIC_INITIALIZER;
+static irq_handler* irq_handlers[256] = {0};
 
-struct cpu_context* handle_interrupt(u8 interrupt_number, u64 error_code,
-                                     struct cpu_context* context) {
+static rw_spin_lock exception_handlers_lock = RW_LOCK_STATIC_INITIALIZER;
+static exception_handler* exception_handlers[32] = {0};
 
-    if (interrupt_number == 32) {
-        ticks++;
-        return context_switch(context);
-    } else if (interrupt_number == 250) {
-        return context_switch(context);
-    } else if (interrupt_number == 13) {
-        print("PROTECTION FAULT Error code: ");
-        print_u64_hex(error_code);
-        panic("");
-    } else if (interrupt_number == 14) {
-        print("PAGE FAULT Error code: ");
-        print_u64_hex(error_code);
-        print(" Faulty addr(CR2): ");
-        u64 cr2 = get_cr2();
-        print_u64_hex(cr2);
-        println("");
+struct cpu_context* handle_unknown_irq(u8 irq_num,
+                                       struct cpu_context* context) {
 
-        // Just for test
-        // TODO: Refactor this
-        thread* current = get_current_thread();
-        if (!current || current->kernel_thread) {
-            panic("Unhandled page fault");
-        } else {
-            thread_signal(get_current_thread(), SIGSEGV);
-        }
-    } else {
-        print("isr #");
-        print_u64(interrupt_number);
-        print(", error code: ");
-        print_u64_hex(error_code);
-        println("");
-    }
-
+    print("Irq #");
+    print_u64(irq_num);
+    println("");
     return context;
 }
 
-struct cpu_context* handle_hardware_interrupt(u8 interrupt_number,
-                                              struct cpu_context* context) {
+struct cpu_context* handle_irq(u8 irq_num, struct cpu_context* context) {
+    rw_spin_lock_read_irq(&irq_handlers_lock);
+    irq_handler* handler = irq_handlers[irq_num];
+    rw_spin_unlock_read_irq(&irq_handlers_lock);
 
     struct cpu_context* new_context =
-        handle_interrupt(interrupt_number, 0, context);
+        handler != NULL ? handler(context)
+                        : handle_unknown_irq(irq_num, context);
 
-    outb(MASTER_PIC_COMMAND_ADDR, 1 << OCW2_EOI_OFFSET);
-    io_wait();
-
-    // slave PIC interrupt
-    if (interrupt_number >= 40 && interrupt_number < 48) {
-        outb(SLAVE_PIC_COMMAND_ADDR, 1 << OCW2_EOI_OFFSET);
-        io_wait();
+    if (irq_num >= 32 && irq_num < 47) {
+        pic_ack(irq_num);
     }
 
     return new_context;
 }
 
-struct cpu_context* handle_software_interrupt(u8 interrupt_number,
-                                              u64 error_code,
-                                              struct cpu_context* context) {
-
-    return handle_interrupt(interrupt_number, error_code, context);
+struct cpu_context* handle_soft_irq(u8 irq_num, struct cpu_context* context) {
+    return handle_irq(irq_num, context);
 }
 
-struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
-                                   u64 arg4, u64 arg5, u64 syscall_number,
-                                   struct cpu_context* context) {
+struct cpu_context* handle_hard_irq(u8 irq_num, struct cpu_context* context) {
+    return handle_irq(irq_num, context);
+}
 
-    // no checks for now, because this is just for test
-    if (syscall_number == 0) { // print
-        print((string) arg0);
-        ((cpu_context*) context)->rax = 0;
-    } else if (syscall_number == 1) { // signal handler installation
-        thread* current = get_current_thread();
-        if (current) {
-            bool set = thread_set_sigaction(current, arg0, *(sigaction*) arg1);
-            ((cpu_context*) context)->rax = set ? 0 : -1;
-        }
-    } else if (syscall_number == 2) {
-        thread_exit(arg0);
-    } else if (syscall_number == 4) { // signal return
-        arch_return_from_signal_handler(context);
-    } else if (syscall_number == 5) {
-        print_u64(arg0);
-    } else {
-        print("syscall num: ");
-        print_u64(syscall_number);
-        print(" arg0: ");
-        print_u64(arg0);
-        print(" arg1: ");
-        print_u64(arg1);
-        print(" arg2: ");
-        print_u64(arg2);
-        print(" arg3: ");
-        print_u64(arg3);
-        print(" arg4: ");
-        print_u64(arg4);
-        print(" arg5: ");
-        print_u64(arg5);
-        println("");
-    }
+struct cpu_context* handle_unknown_exception(u8 exception_num, u64 error_code,
+                                             struct cpu_context* context) {
 
+    print("Exception #");
+    print_u64(exception_num);
+    print(", error code: ");
+    print_u64_hex(error_code);
+    println("");
     return context;
+}
+
+struct cpu_context* handle_exception(u8 exception_num, u64 error_code,
+                                     struct cpu_context* context) {
+
+    rw_spin_lock_read_irq(&exception_handlers_lock);
+    exception_handler* handler = exception_handlers[exception_num];
+    rw_spin_unlock_read_irq(&exception_handlers_lock);
+
+    struct cpu_context* new_context =
+        handler != NULL
+            ? handler(error_code, context)
+            : handle_unknown_exception(exception_num, error_code, context);
+
+    return new_context;
+}
+
+void mount_irq_handler(u8 irq_num, irq_handler* handler) {
+    rw_spin_lock_write_irq(&irq_handlers_lock);
+    irq_handlers[irq_num] = handler;
+    rw_spin_unlock_write_irq(&irq_handlers_lock);
+}
+
+void mount_exception_handler(u8 exception_num, exception_handler* handler) {
+    rw_spin_lock_write_irq(&exception_handlers_lock);
+    exception_handlers[exception_num] = handler;
+    rw_spin_unlock_write_irq(&exception_handlers_lock);
 }
