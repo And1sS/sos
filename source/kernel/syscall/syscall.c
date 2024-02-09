@@ -1,71 +1,53 @@
 #include "syscall.h"
-#include "../lib/kprint.h"
 #include "../scheduler/scheduler.h"
 
-typedef struct cpu_context* syscall0_handler(struct cpu_context* context);
+typedef u64 syscall0_handler(struct cpu_context* context);
 
-typedef struct cpu_context* syscall1_handler(u64 arg0,
-                                             struct cpu_context* context);
+typedef u64 syscall1_handler(u64 arg0, struct cpu_context* context);
 
-typedef struct cpu_context* syscall2_handler(u64 arg0, u64 arg1,
-                                             struct cpu_context* context);
+typedef u64 syscall2_handler(u64 arg0, u64 arg1, struct cpu_context* context);
 
-typedef struct cpu_context* syscall3_handler(u64 arg0, u64 arg1, u64 arg2,
-                                             struct cpu_context* context);
+typedef u64 syscall3_handler(u64 arg0, u64 arg1, u64 arg2,
+                             struct cpu_context* context);
 
-typedef struct cpu_context* syscall4_handler(u64 arg0, u64 arg1, u64 arg2,
-                                             u64 arg3,
-                                             struct cpu_context* context);
+typedef u64 syscall4_handler(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
+                             struct cpu_context* context);
 
-typedef struct cpu_context* syscall5_handler(u64 arg0, u64 arg1, u64 arg2,
-                                             u64 arg3, u64 arg4,
-                                             struct cpu_context* context);
+typedef u64 syscall5_handler(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4,
+                             struct cpu_context* context);
 
-typedef struct cpu_context* syscall6_handler(u64 arg0, u64 arg1, u64 arg2,
-                                             u64 arg3, u64 arg4, u64 arg5,
-                                             struct cpu_context* context);
+typedef u64 syscall6_handler(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4,
+                             u64 arg5, struct cpu_context* context);
 
 typedef struct {
     void* handler;
     u8 arguments_count;
 } syscall_descriptor;
 
-static syscall_descriptor syscall_handlers[1024] = {[0 ... 1023] = {0}};
+#define SYSCALLN(impl, n)                                                      \
+    { .handler = impl, .arguments_count = n }
 
-#define PRINT_ARG(argnum)                                                      \
-    do {                                                                       \
-        print_u64(argnum);                                                     \
-        print(":");                                                            \
-        print_u64_hex(arg##argnum);                                            \
-        print(", ");                                                           \
-    } while (0)
+#define SYSCALL0(handler) SYSCALLN(handler, 0)
+#define SYSCALL1(handler) SYSCALLN(handler, 1)
+#define SYSCALL2(handler) SYSCALLN(handler, 2)
+#define SYSCALL3(handler) SYSCALLN(handler, 3)
+#define SYSCALL4(handler) SYSCALLN(handler, 4)
+#define SYSCALL5(handler) SYSCALLN(handler, 5)
+#define SYSCALL6(handler) SYSCALLN(handler, 6)
 
-struct cpu_context* fallback_syscall_handler(u64 arg0, u64 arg1, u64 arg2,
-                                             u64 arg3, u64 arg4, u64 arg5,
-                                             u64 syscall_number,
-                                             struct cpu_context* context) {
+static syscall_descriptor syscall_handlers[1024] = {
+    [SYS_PRINT] = SYSCALL1(sys_print),
+    [SYS_PRINT_U64] = SYSCALL2(sys_print_u64),
+    [SYS_SIGACTION] = SYSCALL2(sys_set_sigaction),
+    [SYS_SIGRET] = SYSCALL0(sys_sigret),
+    [SYS_EXIT] = SYSCALL1(sys_exit),
 
-    print("Invalid syscall: ");
-    print_u64(syscall_number);
-    print(" ");
+    [SYSCALLS_IMPLEMENTED_COUNT + 1 ... SYSCALLS_MAX_COUNT - 1] = {0}};
 
-    PRINT_ARG(0);
-    PRINT_ARG(1);
-    PRINT_ARG(2);
-    PRINT_ARG(3);
-    PRINT_ARG(4);
-    PRINT_ARG(5);
+u64 handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5,
+                   u64 syscall_number, struct cpu_context* context) {
 
-    println("");
-
-    return context;
-}
-
-struct cpu_context* handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3,
-                                   u64 arg4, u64 arg5, u64 syscall_number,
-                                   struct cpu_context* context) {
-
-    if (syscall_number > 1024)
+    if (syscall_number >= SYSCALLS_MAX_COUNT)
         return fallback_syscall_handler(arg0, arg0, arg2, arg3, arg4, arg5,
                                         syscall_number, context);
 

@@ -3,8 +3,7 @@
 
 #include "../../../lib/types.h"
 
-typedef struct cpu_context* exception_handler(u64 error_code,
-                                              struct cpu_context* context);
+typedef struct cpu_context* exception_handler(struct cpu_context* context);
 typedef struct cpu_context* irq_handler(struct cpu_context* context);
 
 void mount_irq_handler(u8 irq_num, irq_handler* handler);
