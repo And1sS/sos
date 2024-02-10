@@ -1,5 +1,6 @@
 #include "interrupts.h"
-#include "../../../memory/virtual/paging.h"
+#include "../../../memory/virtual/page_fault.h"
+#include "../../../scheduler/scheduler.h"
 #include "../../../syscall/syscall.h"
 #include "../../../time/timer.h"
 #include "../cpu/cpu_context.h"

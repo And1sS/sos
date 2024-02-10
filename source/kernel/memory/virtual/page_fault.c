@@ -1,9 +1,5 @@
-#ifndef SOS_PAGING_H
-#define SOS_PAGING_H
-
-#include "../../lib/kprint.h"
+#include "page_fault.h"
 #include "../../scheduler/scheduler.h"
-#include "../../threading/thread.h"
 
 struct cpu_context* handle_page_fault(struct cpu_context* context) {
     thread* current = get_current_thread();
@@ -15,5 +11,3 @@ struct cpu_context* handle_page_fault(struct cpu_context* context) {
 
     return context;
 }
-
-#endif // SOS_PAGING_H
