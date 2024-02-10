@@ -4,7 +4,6 @@
 #include "../memory/heap/kheap.h"
 #include "../memory/virtual/vmm.h"
 #include "../scheduler/scheduler.h"
-#include "../signal/signal.h"
 #include "../threading/kthread.h"
 #include "../threading/threading.h"
 #include "../threading/uthread.h"
@@ -22,7 +21,7 @@ _Noreturn void kernel_thread() {
     ref_acquire(&user_thread->refc);
     while (1) {
         if (i++ % 10000000 == 0) {
-            println("kernel!");
+            println("kernel! Irq refactoring revision!");
             printed++;
 
             if (printed >= 100 && printed % 10 == 0 && !dead)

@@ -11,10 +11,9 @@ bits 64
 section .text
 
 ; C handlers defined in isrs.c
-extern handle_software_interrupt
-extern handle_hardware_interrupt
-extern handle_syscall
-
+extern handle_exception
+extern handle_soft_irq
+extern handle_hard_irq
 
 extern update_tss ; defined in tss.c
 extern check_pending_signals ; defined in signal.c
@@ -73,15 +72,40 @@ extern check_pending_signals ; defined in signal.c
     pop r15
 %endmacro
 
-%macro isr_soft_no_error_code 1
-global isr_%1
-isr_%1:
+; x86-64 exception with error code handler stub
+%macro esr_error_code 1
+global esr_%1
+esr_%1:
+    save_state
+
+    mov rdi, %1  ; interrupt number
+    mov rsi, [rsp + 16 * 8] ; stack top initially holds error code,
+                            ; we move it here so that we don't scratch
+                            ; rsi value before saving state
+
+    mov rdx, rsp ; cpu_context pointer
+    call handle_exception
+
+    ; Now we run in probably new context
+    mov rsp, rax
+
+    restore_state
+    add rsp, 8 ; remove error code from stack
+
+    iretq
+%endmacro
+
+
+; x86-64 exception without error code handler stub
+%macro esr_no_error_code 1
+global esr_%1
+esr_%1:
     save_state
 
     mov rdi, %1  ; interrupt number
     mov rsi, 0   ; error code
     mov rdx, rsp ; cpu_context pointer
-    call handle_software_interrupt
+    call handle_exception
 
     ; Now we run in probably new context
     mov rsp, rax
@@ -90,15 +114,16 @@ isr_%1:
     iretq
 %endmacro
 
-%macro isr_soft_error_code 1
+
+; Software interrupts handler stub
+%macro isr_soft 1
 global isr_%1
 isr_%1:
-    pop rsi      ; error code
     save_state
 
     mov rdi, %1  ; interrupt number
-    mov rdx, rsp ; cpu_context pointer
-    call handle_software_interrupt
+    mov rsi, rsp ; cpu_context pointer
+    call handle_soft_irq
 
     ; Now we run in probably new context
     mov rsp, rax
@@ -107,6 +132,8 @@ isr_%1:
     iretq
 %endmacro
 
+
+; Hardware interrupts handler stub
 %macro isr_hard 1
 global isr_%1
 isr_%1:
@@ -115,7 +142,7 @@ isr_%1:
 
     mov rdi, %1
     mov rsi, rsp
-    call handle_hardware_interrupt
+    call handle_hard_irq
 
     ; Now we run in probably new context
     mov rsp, rax
@@ -124,75 +151,48 @@ isr_%1:
     iretq
 %endmacro
 
-isr_soft_no_error_code 0
-isr_soft_no_error_code 1
-isr_soft_no_error_code 2
-isr_soft_no_error_code 3
-isr_soft_no_error_code 4
-isr_soft_no_error_code 5
-isr_soft_no_error_code 6
-isr_soft_no_error_code 7
-isr_soft_error_code 8
-isr_soft_no_error_code 9
-isr_soft_error_code 10
-isr_soft_error_code 11
-isr_soft_error_code 12
-isr_soft_error_code 13
-isr_soft_error_code 14
-isr_soft_no_error_code 15
-isr_soft_no_error_code 16
-isr_soft_error_code 17
-isr_soft_no_error_code 18
-isr_soft_no_error_code 19
-isr_soft_no_error_code 20
-isr_soft_error_code 21
-isr_soft_no_error_code 22
-isr_soft_no_error_code 23
-isr_soft_no_error_code 24
-isr_soft_no_error_code 25
-isr_soft_no_error_code 26
-isr_soft_no_error_code 27
-isr_soft_no_error_code 28
-isr_soft_error_code 29
-isr_soft_error_code 30
-isr_soft_no_error_code 31
 
-isr_hard 32
-isr_hard 33
-isr_hard 34
-isr_hard 35
-isr_hard 36
-isr_hard 37
-isr_hard 38
-isr_hard 39
-isr_hard 40
-isr_hard 41
-isr_hard 42
-isr_hard 43
-isr_hard 44
-isr_hard 45
-isr_hard 46
-isr_hard 47
+esr_no_error_code 0
+esr_no_error_code 1
+esr_no_error_code 2
+esr_no_error_code 3
+esr_no_error_code 4
+esr_no_error_code 5
+esr_no_error_code 6
+esr_no_error_code 7
+esr_error_code 8
+esr_no_error_code 9
+esr_error_code 10
+esr_error_code 11
+esr_error_code 12
+esr_error_code 13
+esr_error_code 14
+esr_no_error_code 15
+esr_no_error_code 16
+esr_error_code 17
+esr_no_error_code 18
+esr_no_error_code 19
+esr_no_error_code 20
+esr_error_code 21
+esr_no_error_code 22
+esr_no_error_code 23
+esr_no_error_code 24
+esr_no_error_code 25
+esr_no_error_code 26
+esr_no_error_code 27
+esr_no_error_code 28
+esr_error_code 29
+esr_error_code 30
+esr_no_error_code 31
 
-; Syscall irq handler
+%assign i 32
+%rep   48 - 32
+       isr_hard i
+%assign i i+1
+%endrep
 
-; For now syscalls are implemented using obsolete "int 0x80",
-; this is done to get them up and running quickly.
-; This interface may change in favor of modern "syscall" interface later.
-global isr_128
-isr_128:
-    save_state
-
-    push rsp ; cpu context, 7th argument of C handler
-    push rax ; syscall number, 6th argument of C handler
-    call handle_syscall
-
-    ; Now we run in probably new context
-    mov rsp, rax
-
-    restore_state
-    iretq
-
-; Schedule irq handler to call scheduler, this is dirty hack
-; to get easy interface to call scheduler
-isr_soft_no_error_code 250
+%assign i 48
+%rep    256 - 48
+        isr_soft i
+%assign i i+1
+%endrep
