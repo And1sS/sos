@@ -2,23 +2,22 @@
 #include "../arch/common/thread.h"
 #include "../arch/common/vmm.h"
 #include "../lib/id_generator.h"
-#include "../memory/heap/kheap.h"
-#include "../memory/physical/pmm.h"
 #include "../scheduler/scheduler.h"
+#include "process.h"
 #include "threading.h"
+
+process kernel_process;
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
     bool allocated_tid = threading_allocate_tid(&thrd->id);
     if (!allocated_tid)
-        return false;
+        goto failed_to_allocate_tid;
 
     void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
+    if (!kernel_stack)
+        goto failed_to_allocate_kernel_stack;
 
-    if (kernel_stack == NULL) {
-        threading_free_tid(thrd->id);
-        return false;
-    }
     memset(kernel_stack, 0, THREAD_KERNEL_STACK_SIZE);
 
     // TODO: copy name string to kernel heap
@@ -43,15 +42,32 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->state = INITIALISED;
 
     thrd->parent = NULL;
-    array_list_init(&thrd->children, 0);
+    thrd->proc = &kernel_process;
+
+    if (!array_list_init(&thrd->children, 0))
+        goto failed_to_init_child_list;
 
     thrd->finish_cvar = (con_var) CON_VAR_STATIC_INITIALIZER;
-
     thrd->lock = SPIN_LOCK_STATIC_INITIALIZER;
-
     thrd->scheduler_node = (linked_list_node) LINKED_LIST_NODE_OF(thrd);
 
+    // Each kernel thread runs as separate thread group inside kernel process
+    if (!process_add_thread_group(&kernel_process, (struct thread*) thrd))
+        goto failed_to_add_thread_to_parent;
+
     return true;
+
+failed_to_add_thread_to_parent:
+    array_list_deinit(&thrd->children);
+
+failed_to_init_child_list:
+    kfree(kernel_stack);
+
+failed_to_allocate_kernel_stack:
+    threading_free_tid(thrd->id);
+
+failed_to_allocate_tid:
+    return false;
 }
 
 kthread* kthread_create(string name, kthread_func* func) {

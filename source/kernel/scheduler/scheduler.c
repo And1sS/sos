@@ -1,5 +1,7 @@
 #include "scheduler.h"
 #include "../idle.h"
+#include "../interrupts/irq.h"
+#include "../memory/virtual/vmm.h"
 #include "../threading/kthread.h"
 
 static lock scheduler_lock = SPIN_LOCK_STATIC_INITIALIZER;
@@ -71,7 +73,10 @@ struct cpu_context* context_switch(struct cpu_context* context) {
     }
 
     struct cpu_context* new_context = new_thread->context;
-    spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
+    spin_unlock(&scheduler_lock);
+
+    vmm_set_vm_space(new_thread->proc->vm);
+    local_irq_restore(interrupts_enabled);
 
     return new_context;
 }

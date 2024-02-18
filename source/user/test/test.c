@@ -1,3 +1,4 @@
+#include "pthread.h"
 #include "signal.h"
 #include "syscall.h"
 
@@ -16,6 +17,23 @@ void sigint_handler() {
     signals++;
 }
 
+void second_thread_func() {
+    long long i = 1;
+    while (1) {
+
+        print("Hello from second thread!  ");
+        printll(i);
+        print("\n");
+
+        if (i == 16000)
+            break;
+
+        i++;
+    }
+
+    exit(0xCAFE);
+}
+
 const sigaction sigint_action = {.handler = (signal_handler*) sigint_handler};
 const sigaction sigkill_action = {.disposition = IGNORE};
 
@@ -24,6 +42,10 @@ void __attribute__((section(".entrypoint"))) main() {
     long sigint_act_set = set_sigaction(SIGINT, &sigint_action);
     // This one should fail (e.g. return value < 0)
     long sigkill_act_set = set_sigaction(SIGKILL, &sigkill_action);
+
+    pthread thread;
+    pthread_run("second-test-thread", second_thread_func, &thread);
+    pthread_detach(thread);
 
     for (volatile long long i = 0;; i++) {
         if (i % 100000 == 0) {

@@ -6,31 +6,79 @@
 
 void thread_start(thread* thrd) { schedule_thread(thrd); }
 
-u64 thread_join(thread* child) {
-    bool interrupts_enabled = spin_lock_irq_save(&child->lock);
-    WAIT_FOR_IRQ(&child->finish_cvar, &child->lock, interrupts_enabled,
-                 child->finished);
+bool thread_add_child(thread* child) {
+    thread* current = get_current_thread();
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
 
-    u64 exit_code = child->exit_code;
-    spin_unlock_irq_restore(&child->lock, interrupts_enabled);
+    if (!array_list_add_last(&current->children, child)) {
+        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+        return false;
+    }
 
-    thread_detach(child);
+    child->parent = current;
+    ref_acquire(&child->refc);
+    ref_acquire(&current->refc);
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 
-    return exit_code;
+    return true;
 }
 
-void thread_detach(thread* child) {
+void thread_remove_child(thread* child) {
+    thread* current = get_current_thread();
+
     bool interrupts_enabled = spin_lock_irq_save(&child->lock);
     child->parent = NULL;
     ref_release(&child->refc);
     spin_unlock_irq_restore(&child->lock, interrupts_enabled);
 
-    thread* current = get_current_thread();
     interrupts_enabled = spin_lock_irq_save(&current->lock);
 
     array_list_remove(&current->children, child);
     ref_release(&current->refc);
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+}
+
+bool thread_detach(thread* child) {
+    bool interrupts_enabled = spin_lock_irq_save(&child->lock);
+
+    // If thread has not been detached, then it is at least referenced by
+    // parent(current) thread and waiting on ref count, so we can just add it as
+    // a new process thread group, and it will safely exit from process
+    if (child->parent != get_current_thread()
+        || !process_add_thread_group(child->proc, (struct thread*) child)) {
+        spin_unlock_irq_restore(&child->lock, interrupts_enabled);
+        return false;
+    }
+
+    // It is safe to break atomicity in this case, since only parent thread
+    // can detach/join/remove child
+    spin_unlock_irq_restore(&child->lock, interrupts_enabled);
+
+    thread_remove_child(child);
+    return true;
+}
+
+bool thread_join(thread* child, u64* exit_code) {
+    bool interrupts_enabled = spin_lock_irq_save(&child->lock);
+    if (child->parent != get_current_thread()) {
+        spin_unlock_irq_restore(&child->lock, interrupts_enabled);
+        return false;
+    }
+
+    WAIT_FOR_IRQ(&child->finish_cvar, &child->lock, interrupts_enabled,
+                 child->finished);
+
+    if (exit_code) {
+        *exit_code = child->exit_code;
+    }
+
+    spin_unlock_irq_restore(&child->lock, interrupts_enabled);
+
+    // It is safe to break atomicity in this case, since only parent thread
+    // can detach/join/remove child
+    thread_remove_child(child);
+
+    return true;
 }
 
 void thread_exit(u64 exit_code) {
@@ -44,7 +92,7 @@ void thread_exit(u64 exit_code) {
 
         if (child) {
             spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-            thread_join(child);
+            thread_join(child, NULL);
             interrupts_enabled = spin_lock_irq_save(&current->lock);
         }
     }
@@ -72,6 +120,7 @@ void thread_destroy(thread* thrd) {
     //       architectures might want to store context not on kernel stack, and
     //       this memory won't be automatically freed with stack
     kfree(thrd);
+    process_exit_thread(thrd->proc, (struct thread*) thrd);
 }
 
 void thread_yield() { schedule(); }

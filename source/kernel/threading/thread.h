@@ -8,6 +8,7 @@
 #include "../signal/signal.h"
 #include "../synchronization/completion.h"
 #include "../synchronization/spin_lock.h"
+#include "process.h"
 
 #define THREAD_KERNEL_STACK_SIZE 8192
 
@@ -27,6 +28,7 @@ typedef struct _thread {
     bool kernel_thread;
     void* kernel_stack;
     void* user_stack;
+    process* proc;
 
     // state and context should be modified only within the thread, so no
     // locking required on accesses, visibility is carried by scheduler
@@ -49,8 +51,6 @@ typedef struct _thread {
 
     bool should_die; // used in kernel threads
 
-    // here should be pointer to process
-
     struct _thread* parent;
     array_list children; // children threads
 
@@ -59,13 +59,16 @@ typedef struct _thread {
 
 void thread_start(thread* thread);
 
-void thread_detach(thread* thread);
-u64 thread_join(thread* thread);
+// These functions should be called within thread
+bool thread_add_child(thread* child);
+bool thread_detach(thread* child);
+bool thread_join(thread* child, u64* exit_code);
 
 void thread_exit(u64 exit_code);
-void thread_destroy(thread* thread);
-
 void thread_yield();
+
+// This function should be called from thread cleaner
+void thread_destroy(thread* thread);
 
 bool thread_signal(thread* thread, signal sig);
 bool thread_set_sigaction(thread* thread, signal sig, sigaction action);
