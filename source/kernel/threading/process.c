@@ -2,6 +2,8 @@
 #include "../interrupts/irq.h"
 #include "../lib/kprint.h"
 #include "../memory/virtual/vmm.h"
+#include "../scheduler/scheduler.h"
+#include "thread.h"
 
 bool process_init(process* proc, bool kernel_process) {
     if (!array_list_init(&proc->thread_groups, 8)) {
@@ -65,3 +67,12 @@ void process_exit_thread(process* proc, struct thread* thrd) {
 
     spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 }
+
+//void process_exit(u64 exit_code) {
+//    thread* current = get_current_thread();
+//    process* proc = current->proc;
+//
+//    bool interrupts_enabled = spin_lock_irq_save(&current->proc->lock);
+//
+//    // TODO: Pass child processes to init
+//}

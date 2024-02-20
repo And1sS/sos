@@ -30,9 +30,7 @@ typedef struct _thread {
     void* user_stack;
     process* proc;
 
-    // state and context should be modified only within the thread, so no
-    // locking required on accesses, visibility is carried by scheduler
-    thread_state state;
+    // context should be accessed only within the thread, so no locking required
     struct cpu_context* context;
 
     linked_list_node scheduler_node; // this is used in scheduler and thread
@@ -41,6 +39,10 @@ typedef struct _thread {
     lock lock; // guards fields below and also guards thread against
                // de-allocation
 
+    // state should be modified only within the thread
+    thread_state state;
+
+    bool on_scheduler_queue;
     bool exiting;
     bool finished;
     u64 exit_code;

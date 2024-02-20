@@ -25,7 +25,7 @@ void second_thread_func() {
         printll(i);
         print("\n");
 
-        if (i == 16000)
+        if (i == 4000)
             break;
 
         i++;
@@ -45,6 +45,8 @@ void __attribute__((section(".entrypoint"))) main() {
 
     pthread thread;
     pthread_run("second-test-thread", second_thread_func, &thread);
+
+    long long exit_code;
     pthread_detach(thread);
 
     for (volatile long long i = 0;; i++) {
@@ -55,10 +57,12 @@ void __attribute__((section(".entrypoint"))) main() {
             printll(sigkill_act_set);
             print(", cnt: ");
             printll(signals);
+            print(", exit code:");
+            printll(exit_code);
             print("\n");
         }
 
-        if (signals == 50)
+        if (signals == 10)
             break;
     }
 

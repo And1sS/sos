@@ -1,4 +1,5 @@
 #include "thread.h"
+#include "../interrupts/irq.h"
 #include "../lib/id_generator.h"
 #include "../scheduler/scheduler.h"
 #include "thread_cleaner.h"
@@ -106,13 +107,28 @@ void thread_exit(u64 exit_code) {
 
     current->state = DEAD;
     schedule_thread_exit();
+    spin_unlock(&current->lock);
+
     thread_cleaner_mark(current);
-    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+    local_irq_restore(interrupts_enabled);
 
     schedule();
 }
 
+void thread_group_signal(thread* thread_group, signal sig) {
+    bool interrupts_enabled = spin_lock_irq_save(&thread_group->lock);
+    thread_signal(thread_group, sig);
+    ARRAY_LIST_FOR_EACH(&thread_group->children, thread * iter) {
+        spin_unlock_irq_restore(&thread_group->lock, interrupts_enabled);
+        thread_group_signal(iter, sig);
+
+        interrupts_enabled = spin_lock_irq_save(&thread_group->lock);
+    }
+}
+
 void thread_destroy(thread* thrd) {
+    process_exit_thread(thrd->proc, (struct thread*) thrd);
+
     threading_free_tid(thrd->id);
     array_list_deinit(&thrd->children);
     kfree(thrd->kernel_stack);
@@ -120,7 +136,6 @@ void thread_destroy(thread* thrd) {
     //       architectures might want to store context not on kernel stack, and
     //       this memory won't be automatically freed with stack
     kfree(thrd);
-    process_exit_thread(thrd->proc, (struct thread*) thrd);
 }
 
 void thread_yield() { schedule(); }
@@ -128,7 +143,7 @@ void thread_yield() { schedule(); }
 bool thread_signal(thread* thrd, signal sig) {
     bool signal_set = false;
     bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
-    if (signal_allowed(thrd->signal_info.signals_mask, sig)) {
+    if (!thrd->exiting && signal_allowed(thrd->signal_info.signals_mask, sig)) {
         signal_raise(&thrd->signal_info.pending_signals, sig);
         signal_set = true;
     }

@@ -14,6 +14,7 @@ typedef struct {
 
     lock lock;
     bool finishing;
+    u64 exit_code;
 
     array_list thread_groups;
 

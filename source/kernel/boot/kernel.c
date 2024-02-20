@@ -11,7 +11,7 @@
 
 thread* user_thread = NULL;
 
-_Noreturn void kernel_thread() {
+void kernel_thread() {
     u64 i = 0;
     u64 printed = 0;
     u64 exit_code;
@@ -21,7 +21,9 @@ _Noreturn void kernel_thread() {
     ref_acquire(&user_thread->refc);
     while (1) {
         if (i++ % 10000000 == 0) {
-            println("kernel! Irq refactoring revision!");
+            print("kernel! Irq refactoring revision!");
+            print_u64(printed);
+            println("");
             printed++;
 
             if (printed >= 100 && printed % 10 == 0 && !dead)
@@ -45,6 +47,9 @@ _Noreturn void kernel_thread() {
                 killed = true;
             }
         }
+
+        if (printed > 300)
+            break;
     }
 }
 
