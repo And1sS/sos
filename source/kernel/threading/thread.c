@@ -164,6 +164,9 @@ bool thread_signal(thread* thrd, signal sig) {
     }
     spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
 
+    if (signal_set)
+        schedule_thread(thrd);
+
     return signal_set;
 }
 

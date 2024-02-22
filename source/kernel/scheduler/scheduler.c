@@ -37,9 +37,9 @@ void schedule_thread(thread* thrd) {
     }
 
     thrd->on_scheduler_queue = true;
-    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
+    spin_unlock(&thrd->lock);
 
-    interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
+    spin_lock(&scheduler_lock);
     queue_push(&run_queue, &thrd->scheduler_node);
     spin_unlock_irq_restore(&scheduler_lock, interrupts_enabled);
 }
