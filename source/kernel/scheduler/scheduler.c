@@ -1,7 +1,6 @@
 #include "scheduler.h"
 #include "../idle.h"
 #include "../interrupts/irq.h"
-#include "../lib/kprint.h"
 #include "../memory/virtual/vmm.h"
 #include "../threading/kthread.h"
 
@@ -14,7 +13,6 @@ static kthread* kernel_wait_thread; // shouldn't enter run queue
 
 _Noreturn void kernel_wait_thread_func() {
     while (true) {
-        println("Kernel wait thread!");
         halt();
     }
 }
@@ -34,7 +32,6 @@ thread* get_current_thread() {
 void schedule_thread(thread* thrd) {
     bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
     if (thrd->on_scheduler_queue || thrd->state == RUNNING) {
-        panic("JUST FOR TEST"); // TODO: Remove this
         spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
         return;
     }
@@ -54,8 +51,6 @@ void schedule_thread_exit() {
 }
 
 struct cpu_context* context_switch(struct cpu_context* context) {
-    println("Context switch!");
-
     bool interrupts_enabled = spin_lock_irq_save(&scheduler_lock);
     thread* old_thread = current_thread;
     queue_node* new_node = queue_pop(&run_queue);

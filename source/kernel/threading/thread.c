@@ -1,8 +1,10 @@
 #include "thread.h"
 #include "../interrupts/irq.h"
 #include "../lib/id_generator.h"
+#include "../lib/kprint.h"
 #include "../scheduler/scheduler.h"
-#include "thread_cleaner.h"
+#include "cleaners/process_cleaner.h"
+#include "cleaners/thread_cleaner.h"
 #include "threading.h"
 
 void thread_start(thread* thrd) { schedule_thread(thrd); }
@@ -84,6 +86,8 @@ bool thread_join(thread* child, u64* exit_code) {
 
 void thread_exit(u64 exit_code) {
     thread* current = get_current_thread();
+    process* proc = current->proc;
+
     bool interrupts_enabled = spin_lock_irq_save(&current->lock);
     current->exiting = true;
     current->exit_code = exit_code;
@@ -105,11 +109,24 @@ void thread_exit(u64 exit_code) {
     WAIT_FOR_IRQ(&refc->empty_cvar, &current->lock, interrupts_enabled,
                  refc->count == 0);
 
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+
+    // Should clean process information before thread exiting
+    bool cleanup_process = process_exit_thread(proc, (struct thread*) current);
+
+    spin_lock_irq_save(&current->lock);
     current->state = DEAD;
-    schedule_thread_exit();
+    print("Thread exiting!");
+    print_u64(current->id);
+    println("");
     spin_unlock(&current->lock);
 
+    schedule_thread_exit();
+
     thread_cleaner_mark(current);
+    if (cleanup_process)
+        process_cleaner_mark(proc);
+
     local_irq_restore(interrupts_enabled);
 
     schedule();
@@ -127,8 +144,6 @@ void thread_group_signal(thread* thread_group, signal sig) {
 }
 
 void thread_destroy(thread* thrd) {
-    process_exit_thread(thrd->proc, (struct thread*) thrd);
-
     threading_free_tid(thrd->id);
     array_list_deinit(&thrd->children);
     kfree(thrd->kernel_stack);

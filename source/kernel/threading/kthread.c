@@ -55,6 +55,10 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     if (!process_add_thread_group(&kernel_process, (struct thread*) thrd))
         goto failed_to_add_thread_to_parent;
 
+    bool interrupts_enabled = spin_lock_irq_save(&kernel_process.lock);
+    ref_acquire(&kernel_process.refc);
+    spin_unlock_irq_restore(&kernel_process.lock, interrupts_enabled);
+
     return true;
 
 failed_to_add_thread_to_parent:

@@ -43,6 +43,7 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
 
     thrd->kernel_stack = kernel_stack;
     thrd->user_stack = stack;
+
     thrd->context = arch_uthread_context_init(thrd, func);
     thrd->state = INITIALISED;
 
@@ -59,13 +60,13 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
     if (parent) {
         if (!thread_add_child(thrd))
             goto failed_to_add_thread_to_parent;
-
-        bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-        ref_acquire(&proc->refc);
-        spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
     } else if (!process_add_thread_group(proc, (struct thread*) thrd)) {
         goto failed_to_add_thread_to_parent;
     }
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    ref_acquire(&proc->refc);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
     return true;
 

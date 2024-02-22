@@ -21,7 +21,7 @@ void kernel_thread() {
     ref_acquire(&user_thread->refc);
     while (1) {
         if (i++ % 10000000 == 0) {
-            print("kernel! Irq refactoring revision!");
+            println("kernel! Processes revision!");
             print_u64(printed);
             println("");
             printed++;
@@ -46,10 +46,10 @@ void kernel_thread() {
                 thread_signal(user_thread, SIGKILL);
                 killed = true;
             }
-        }
 
-        if (printed > 300)
-            break;
+            if (printed > 300 && dead)
+                break;
+        }
     }
 }
 
@@ -85,9 +85,9 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Kernel vm:");
     vm_space_print(kernel_space);
 
-    process init_process;
-    process_init(&init_process, false);
-    vm_space* process_vm = init_process.vm;
+    process* init_process = (process*) kmalloc(sizeof(process));
+    process_init(init_process, false);
+    vm_space* process_vm = init_process->vm;
 
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
@@ -105,7 +105,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
            first.mod_end - first.mod_start);
 
     vmm_set_vm_space(process_vm);
-    user_thread = uthread_create_orphan(&init_process, "test", (void*) 0xF000,
+    user_thread = uthread_create_orphan(init_process, "test", (void*) 0xF000,
                                         (uthread_func*) 0x1000);
 
     kthread_run("kernel-test-thread", kernel_thread);

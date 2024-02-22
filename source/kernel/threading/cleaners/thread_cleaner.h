@@ -1,7 +1,7 @@
 #ifndef SOS_THREAD_CLEANER_H
 #define SOS_THREAD_CLEANER_H
 
-#include "thread.h"
+#include "../thread.h"
 
 void thread_cleaner_init();
 

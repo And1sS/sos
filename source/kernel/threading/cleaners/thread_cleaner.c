@@ -1,8 +1,7 @@
-#include "../interrupts/irq.h"
-#include "../lib/kprint.h"
-#include "../synchronization/con_var.h"
-#include "kthread.h"
-#include "thread.h"
+#include "../../interrupts/irq.h"
+#include "../../lib/kprint.h"
+#include "../../synchronization/con_var.h"
+#include "../kthread.h"
 
 static lock dead_lock = SPIN_LOCK_STATIC_INITIALIZER;
 static con_var dead_cvar = CON_VAR_STATIC_INITIALIZER;

@@ -9,7 +9,7 @@ KERNEL_ELF = $(BUILD_FOLDER)sos-kernel.elf
 
 ASM = nasm
 CC = gcc
-CC_FLAGS = -c -g -O0 -m64 -mcmodel=large -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
+CC_FLAGS = -c -g -O3 -m64 -mcmodel=large -mgeneral-regs-only -nostdlib -nostdinc -fno-builtin -fno-stack-protector -mno-red-zone -nostartfiles -nodefaultlibs \
 		   -Wall -Wextra -Werror
 LINKER = ld
 
