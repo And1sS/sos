@@ -9,46 +9,27 @@
 #include "../threading/uthread.h"
 #include "multiboot.h"
 
-thread* user_thread = NULL;
+process* init_process;
 
 void kernel_thread() {
     u64 i = 0;
-    u64 printed = 0;
     u64 exit_code;
-    bool dead = false;
-    bool killed = false;
 
-    ref_acquire(&user_thread->refc);
+    bool interrupts_enabled = spin_lock_irq_save(&init_process->lock);
+    ref_acquire(&init_process->refc);
+
+    WAIT_FOR_IRQ(&init_process->finish_cvar, &init_process->lock,
+                 interrupts_enabled, init_process->finished);
+    exit_code = init_process->exit_code;
+
+    ref_release(&init_process->refc);
+    spin_unlock_irq_restore(&init_process->lock, interrupts_enabled);
+
     while (1) {
         if (i++ % 10000000 == 0) {
-            println("kernel! Processes revision!");
-            print_u64(printed);
+            print("kernel! Processes revision! Exit code:");
+            print_u64_hex(exit_code);
             println("");
-            printed++;
-
-            if (printed >= 100 && printed % 10 == 0 && !dead)
-                thread_signal(user_thread, SIGINT);
-
-            if (!dead && user_thread->finished) {
-                dead = true;
-                exit_code = user_thread->exit_code;
-                ref_release(&user_thread->refc);
-                user_thread = NULL;
-            }
-
-            if (dead) {
-                print("user exit code: ");
-                print_u64_hex(exit_code);
-                println("");
-            }
-
-            if (printed % 700 == 0 && !killed && !dead) {
-                thread_signal(user_thread, SIGKILL);
-                killed = true;
-            }
-
-            if (printed > 300 && dead)
-                break;
         }
     }
 }
@@ -85,7 +66,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Kernel vm:");
     vm_space_print(kernel_space);
 
-    process* init_process = (process*) kmalloc(sizeof(process));
+    init_process = (process*) kmalloc(sizeof(process));
     process_init(init_process, false);
     vm_space* process_vm = init_process->vm;
 
@@ -105,8 +86,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
            first.mod_end - first.mod_start);
 
     vmm_set_vm_space(process_vm);
-    user_thread = uthread_create_orphan(init_process, "test", (void*) 0xF000,
-                                        (uthread_func*) 0x1000);
+    uthread* user_thread = uthread_create_orphan(
+        init_process, "test", (void*) 0xF000, (uthread_func*) 0x1000);
 
     kthread_run("kernel-test-thread", kernel_thread);
     thread_start(user_thread);

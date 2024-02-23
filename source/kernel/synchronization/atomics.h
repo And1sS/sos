@@ -7,4 +7,6 @@ u64 atomic_exchange(volatile u64* addr, volatile u64 new_value);
 
 void atomic_set(volatile u64* addr, volatile u64 value);
 
+u64 atomic_read(const volatile u64* addr);
+
 #endif

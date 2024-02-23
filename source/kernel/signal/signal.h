@@ -78,6 +78,7 @@ extern signal_disposition default_dispositions[SIGNALS_COUNT + 1];
 
 // For now only limited amount of signals is supported
 typedef enum {
+    NO_SIG = 0,
     SIGHUP = 1,
     SIGINT = 2,
     SIGQUIT = 3,
@@ -88,26 +89,18 @@ typedef enum {
     SIGTERM = 14
 } signal;
 
-typedef struct {
-    signal_disposition disposition;
-    signal_handler* handler;
-} sigaction;
+struct cpu_context;
 
-typedef struct {
-    sigpending pending_signals;
-    sigmask signals_mask;
-    sigaction signal_actions[SIGNALS_COUNT + 1];
-} siginfo;
-
-void check_pending_signals();
+void handle_pending_signals(struct cpu_context* context);
+void handle_signal(signal sig, struct cpu_context* context);
 
 bool signal_raised(sigpending pending_signals, signal sig);
 bool signal_any_raised(sigpending pending_signals);
 bool signal_allowed(sigmask signals_mask, signal sig);
-signal signal_first_raised(sigpending pending_signals);
+signal signal_to_handle(sigpending pending_signals, sigmask signals_mask);
 void signal_raise(sigpending* pending_signals, signal sig);
 void signal_clear(sigpending* pending_signals, signal sig);
-void signal_block(sigmask* signals_mask, signal sig);
-bool signal_set_action(siginfo* signal_info, signal sig, sigaction action);
+bool signal_block(sigmask* signals_mask, signal sig);
+void signal_unblock(sigmask* signals_mask, signal sig);
 
 #endif // SOS_SIGNAL_H

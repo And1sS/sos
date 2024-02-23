@@ -1,6 +1,7 @@
 #include "scheduler.h"
 #include "../idle.h"
 #include "../interrupts/irq.h"
+#include "../lib/kprint.h"
 #include "../memory/virtual/vmm.h"
 #include "../threading/kthread.h"
 
@@ -13,6 +14,7 @@ static kthread* kernel_wait_thread; // shouldn't enter run queue
 
 _Noreturn void kernel_wait_thread_func() {
     while (true) {
+        println("Kernel wait thread");
         halt();
     }
 }

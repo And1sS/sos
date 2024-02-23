@@ -1,11 +1,13 @@
+#include "../lib/types.h"
 #include "../lib/util.h"
-#include "../threading/thread.h"
-#include "syscall.h"
+#include "../threading/process.h"
 
-u64 sys_exit(u64 arg0, struct cpu_context* context) {
+struct cpu_context;
+
+_Noreturn u64 sys_exit(u64 arg0, struct cpu_context* context) {
     UNUSED(context);
 
-    thread_exit(arg0);
+    process_exit(arg0);
 
     __builtin_unreachable();
 }

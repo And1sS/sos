@@ -28,10 +28,9 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->exit_code = 0;
 
     // kernel threads never receive signals
-    thrd->signal_info.signals_mask = ALL_SIGNALS_BLOCKED;
-    thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
-    memset(thrd->signal_info.signal_actions, 0,
-           sizeof(sigaction) * (SIGNALS_COUNT + 1));
+    memset(&thrd->siginfo, 0, sizeof(thread_siginfo));
+    thrd->siginfo.signals_mask = ALL_SIGNALS_BLOCKED;
+    thrd->siginfo.pending_signals = PENDING_SIGNALS_CLEAR;
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     thrd->kernel_thread = true;
@@ -52,7 +51,7 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->scheduler_node = (linked_list_node) LINKED_LIST_NODE_OF(thrd);
 
     // Each kernel thread runs as separate thread group inside kernel process
-    if (!process_add_thread_group(&kernel_process, (struct thread*) thrd))
+    if (!process_add_thread(&kernel_process, (struct thread*) thrd))
         goto failed_to_add_thread_to_parent;
 
     bool interrupts_enabled = spin_lock_irq_save(&kernel_process.lock);

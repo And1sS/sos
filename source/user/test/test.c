@@ -1,10 +1,9 @@
+#include "exit.h"
 #include "pthread.h"
 #include "signal.h"
 #include "syscall.h"
 
 int signals = 0;
-
-void exit(long long number) { syscall1(SYS_EXIT, number); }
 
 void print(const char* str) { syscall1(SYS_PRINT, (long long) str); }
 
@@ -25,7 +24,7 @@ void second_thread_func() {
         printll(i);
         print("\n");
 
-        if (i == 4000)
+        if (i == 2000)
             break;
 
         i++;

@@ -18,6 +18,8 @@ bool thread_add_child(thread* child) {
         return false;
     }
 
+    // No locking required since this function is called on child thread
+    // creation
     child->parent = current;
     ref_acquire(&child->refc);
     ref_acquire(&current->refc);
@@ -31,24 +33,20 @@ void thread_remove_child(thread* child) {
 
     bool interrupts_enabled = spin_lock_irq_save(&child->lock);
     child->parent = NULL;
-    ref_release(&child->refc);
     spin_unlock_irq_restore(&child->lock, interrupts_enabled);
+    thread_lock_guarded_refc_release(child, &child->refc);
 
     interrupts_enabled = spin_lock_irq_save(&current->lock);
 
     array_list_remove(&current->children, child);
-    ref_release(&current->refc);
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+
+    thread_lock_guarded_refc_release(current, &current->refc);
 }
 
 bool thread_detach(thread* child) {
     bool interrupts_enabled = spin_lock_irq_save(&child->lock);
-
-    // If thread has not been detached, then it is at least referenced by
-    // parent(current) thread and waiting on ref count, so we can just add it as
-    // a new process thread group, and it will safely exit from process
-    if (child->parent != get_current_thread()
-        || !process_add_thread_group(child->proc, (struct thread*) child)) {
+    if (child->parent != get_current_thread()) {
         spin_unlock_irq_restore(&child->lock, interrupts_enabled);
         return false;
     }
@@ -94,17 +92,19 @@ void thread_exit(u64 exit_code) {
 
     while (current->children.size != 0) {
         thread* child = array_list_remove_first(&current->children);
+        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 
-        if (child) {
-            spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-            thread_join(child, NULL);
-            interrupts_enabled = spin_lock_irq_save(&current->lock);
-        }
+        thread_join(child, NULL);
+
+        interrupts_enabled = spin_lock_irq_save(&current->lock);
     }
 
     current->finished = true;
-    con_var_broadcast(&current->finish_cvar);
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 
+    con_var_broadcast_guarded(&current->finish_cvar, &current->lock);
+
+    interrupts_enabled = spin_lock_irq_save(&current->lock);
     ref_count* refc = &current->refc;
     WAIT_FOR_IRQ(&refc->empty_cvar, &current->lock, interrupts_enabled,
                  refc->count == 0);
@@ -112,7 +112,7 @@ void thread_exit(u64 exit_code) {
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 
     // Should clean process information before thread exiting
-    bool cleanup_process = process_exit_thread(proc, (struct thread*) current);
+    bool cleanup_process = process_exit_thread();
 
     spin_lock_irq_save(&current->lock);
     current->state = DEAD;
@@ -132,17 +132,6 @@ void thread_exit(u64 exit_code) {
     schedule();
 }
 
-void thread_group_signal(thread* thread_group, signal sig) {
-    bool interrupts_enabled = spin_lock_irq_save(&thread_group->lock);
-    thread_signal(thread_group, sig);
-    ARRAY_LIST_FOR_EACH(&thread_group->children, thread * iter) {
-        spin_unlock_irq_restore(&thread_group->lock, interrupts_enabled);
-        thread_group_signal(iter, sig);
-
-        interrupts_enabled = spin_lock_irq_save(&thread_group->lock);
-    }
-}
-
 void thread_destroy(thread* thrd) {
     threading_free_tid(thrd->id);
     array_list_deinit(&thrd->children);
@@ -158,8 +147,8 @@ void thread_yield() { schedule(); }
 bool thread_signal(thread* thrd, signal sig) {
     bool signal_set = false;
     bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
-    if (!thrd->exiting && signal_allowed(thrd->signal_info.signals_mask, sig)) {
-        signal_raise(&thrd->signal_info.pending_signals, sig);
+    if (!thrd->exiting && !thrd->kernel_thread) {
+        signal_raise(&thrd->siginfo.pending_signals, sig);
         signal_set = true;
     }
     spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
@@ -170,10 +159,82 @@ bool thread_signal(thread* thrd, signal sig) {
     return signal_set;
 }
 
-bool thread_set_sigaction(thread* thrd, signal sig, sigaction action) {
+bool thread_signal_if_allowed(thread* thrd, signal sig) {
+    bool signal_set = false;
     bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
-    bool action_set = signal_set_action(&thrd->signal_info, sig, action);
+    if (!thrd->exiting && signal_allowed(thrd->siginfo.signals_mask, sig)
+        && !thrd->kernel_thread) {
+        signal_raise(&thrd->siginfo.pending_signals, sig);
+        signal_set = true;
+    }
     spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
 
+    if (signal_set)
+        schedule_thread(thrd);
+
+    return signal_set;
+}
+
+bool thread_signal_allowed(thread* thrd, signal sig) {
+    bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
+    bool allowed = signal_allowed(thrd->siginfo.signals_mask, sig);
+    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
+
+    return allowed;
+}
+
+bool thread_set_sigaction(signal sig, sigaction action) {
+    thread* current = get_current_thread();
+
+    bool action_set = false;
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    if (!current->exiting && !current->kernel_thread && sig != SIGKILL) {
+        current->siginfo.signal_actions[sig] = action;
+        action_set = true;
+    }
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+
     return action_set;
+}
+
+sigaction thread_get_sigaction(signal sig) {
+    thread* current = get_current_thread();
+
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    sigaction action = current->siginfo.signal_actions[sig];
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+
+    return action;
+}
+
+bool thread_signal_block(signal sig) {
+    thread* current = get_current_thread();
+
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    bool blocked = signal_block(&current->siginfo.signals_mask, sig);
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+
+    return blocked;
+}
+
+void thread_signal_unblock(signal sig) {
+    thread* current = get_current_thread();
+
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    signal_unblock(&current->siginfo.signals_mask, sig);
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+}
+
+void thread_lock_guarded_refc_release(thread* thrd, ref_count* refc) {
+    bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
+
+    if (refc->count == 0) {
+        panic("ref_count is less than 0");
+    }
+
+    u64 new_count = --refc->count;
+    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
+    if (new_count == 0) {
+        con_var_broadcast_guarded(&refc->empty_cvar, &thrd->lock);
+    }
 }

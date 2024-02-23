@@ -14,3 +14,9 @@ long long pthread_join(pthread thread, long long* exit_code) {
 long long pthread_detach(pthread thread) {
     return syscall1(SYS_PTHREAD_DETACH, (long long) thread);
 }
+
+_Noreturn void pthread_exit(long long code) {
+    syscall1(SYS_PTHREAD_EXIT, code);
+
+    __builtin_unreachable();
+}

@@ -31,10 +31,9 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
     thrd->finished = false;
     thrd->exit_code = 0;
 
-    thrd->signal_info.signals_mask = ALL_SIGNALS_UNBLOCKED;
-    thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
-    memset(thrd->signal_info.signal_actions, 0,
-           sizeof(sigaction) * (SIGNALS_COUNT + 1));
+    memset(&thrd->siginfo, 0, sizeof(thread_siginfo));
+    thrd->siginfo.signals_mask = ALL_SIGNALS_UNBLOCKED;
+    thrd->siginfo.pending_signals = PENDING_SIGNALS_CLEAR;
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
 
@@ -57,18 +56,22 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
     thrd->lock = SPIN_LOCK_STATIC_INITIALIZER;
     thrd->scheduler_node = (linked_list_node) LINKED_LIST_NODE_OF(thrd);
 
-    if (parent) {
-        if (!thread_add_child(thrd))
-            goto failed_to_add_thread_to_parent;
-    } else if (!process_add_thread_group(proc, (struct thread*) thrd)) {
+    if (parent && !thread_add_child(thrd))
         goto failed_to_add_thread_to_parent;
-    }
+
+    if (!process_add_thread(proc, (struct thread*) thrd))
+        goto failed_to_add_thread_to_process;
 
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
     ref_acquire(&proc->refc);
     spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
     return true;
+
+failed_to_add_thread_to_process:
+    if (parent) {
+        thread_remove_child(thrd);
+    }
 
 failed_to_add_thread_to_parent:
     array_list_deinit(&thrd->children);

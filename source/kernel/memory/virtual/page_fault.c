@@ -1,5 +1,6 @@
 #include "page_fault.h"
 #include "../../arch/common/context.h"
+#include "../../error/errno.h"
 #include "../../scheduler/scheduler.h"
 
 struct cpu_context* handle_page_fault(struct cpu_context* context) {

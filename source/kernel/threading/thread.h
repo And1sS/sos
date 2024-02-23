@@ -20,6 +20,16 @@ typedef enum {
     DEAD = 4
 } thread_state;
 
+typedef struct {
+    signal_handler* handler;
+} sigaction;
+
+typedef struct {
+    sigpending pending_signals;
+    sigmask signals_mask;
+    sigaction signal_actions[SIGNALS_COUNT + 1];
+} thread_siginfo;
+
 struct cpu_context;
 
 typedef struct _thread {
@@ -30,7 +40,8 @@ typedef struct _thread {
     void* user_stack;
     process* proc;
 
-    // context should be accessed only within the thread, so no locking required
+    // context should be accessed only within the scheduler, so no locking
+    // required
     struct cpu_context* context;
 
     linked_list_node scheduler_node; // this is used in scheduler and thread
@@ -38,6 +49,9 @@ typedef struct _thread {
 
     lock lock; // guards fields below and also guards thread against
                // de-allocation
+               // lock order:
+               // 1) process -> thread
+               // 2) parent -> child
 
     // state should be modified only within the thread
     thread_state state;
@@ -47,11 +61,11 @@ typedef struct _thread {
     bool finished;
     u64 exit_code;
 
-    siginfo signal_info;
+    thread_siginfo siginfo;
+
+    u64 should_die; // Used in kernel threads - just a testable flag.
 
     ref_count refc;
-
-    bool should_die; // used in kernel threads
 
     struct _thread* parent;
     array_list children; // children threads
@@ -63,8 +77,15 @@ void thread_start(thread* thread);
 
 // These functions should be called within thread
 bool thread_add_child(thread* child);
+void thread_remove_child(thread* child);
 bool thread_detach(thread* child);
 bool thread_join(thread* child, u64* exit_code);
+
+bool thread_set_sigaction(signal sig, sigaction action);
+sigaction thread_get_sigaction(signal sig);
+
+bool thread_signal_block(signal sig);
+void thread_signal_unblock(signal sig);
 
 void thread_exit(u64 exit_code);
 void thread_yield();
@@ -73,6 +94,13 @@ void thread_yield();
 void thread_destroy(thread* thread);
 
 bool thread_signal(thread* thread, signal sig);
-bool thread_set_sigaction(thread* thread, signal sig, sigaction action);
+bool thread_signal_if_allowed(thread* thrd, signal sig);
+bool thread_signal_allowed(thread* thrd, signal sig);
+
+/*
+ * Acquires and releases thread lock. Should be used when releasing
+ * references guarded by thread lock.
+ */
+void thread_lock_guarded_refc_release(thread* thrd, ref_count* refc);
 
 #endif // SOS_THREAD_H

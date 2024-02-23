@@ -16,7 +16,7 @@ extern handle_soft_irq
 extern handle_hard_irq
 
 extern update_tss ; defined in tss.c
-extern check_pending_signals ; defined in signal.c
+extern handle_pending_signals ; defined in signal.c
 
 
 %macro save_ds 0
@@ -52,7 +52,9 @@ extern check_pending_signals ; defined in signal.c
 
 %macro restore_state 0
     call update_tss
-    call check_pending_signals
+
+    mov rdi, rsp
+    call handle_pending_signals
 
     restore_ds
     pop rax

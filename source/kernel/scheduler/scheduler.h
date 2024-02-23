@@ -8,14 +8,15 @@ void scheduler_init();
 
 thread* get_current_thread();
 
+// This function acquires/releases current thread lock, so they should not be
+// called with thread`s lock held
 void schedule_thread(thread* thrd);
+
 void schedule_thread_exit();
 
+// These functions acquire/release current thread lock, so they should not be
+// called with thread`s lock held
 struct cpu_context* context_switch(struct cpu_context* context);
 void schedule();
-
-void stop_thread(thread* thrd);
-void block_thread(thread* thrd);
-void unblock_thread(thread* thrd);
 
 #endif // SOS_SCHEDULER_H

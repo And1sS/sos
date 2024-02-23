@@ -43,3 +43,16 @@ void con_var_broadcast(con_var* var) {
         schedule_thread((thread*) waiter->value);
     }
 }
+
+void con_var_broadcast_guarded(con_var* var, lock* lock) {
+    bool interrupts_enabled = spin_lock_irq_save(lock);
+    while (var->wait_queue.size != 0) {
+        queue_node* waiter = queue_pop(&var->wait_queue);
+        spin_unlock_irq_restore(lock, interrupts_enabled);
+
+        schedule_thread((thread*) waiter->value);
+
+        interrupts_enabled = spin_lock_irq_save(lock);
+    }
+    spin_unlock_irq_restore(lock, interrupts_enabled);
+}
