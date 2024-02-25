@@ -116,9 +116,6 @@ void thread_exit(u64 exit_code) {
 
     spin_lock_irq_save(&current->lock);
     current->state = DEAD;
-    print("Thread exiting!");
-    print_u64(current->id);
-    println("");
     spin_unlock(&current->lock);
 
     schedule_thread_exit();

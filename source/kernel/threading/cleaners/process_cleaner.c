@@ -25,10 +25,6 @@ _Noreturn void process_cleaner_daemon() {
 
             // Do not destroy process until its lock is available
             spin_lock(&proc->lock);
-
-            print("destroying proc: ");
-            print_u64(proc->id);
-
             process_destroy(proc);
             cur = linked_list_remove_first_node(&dead_list);
         }

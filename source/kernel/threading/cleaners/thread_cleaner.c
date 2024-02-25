@@ -26,10 +26,6 @@ _Noreturn void thread_cleaner_daemon() {
 
             // Do not destroy thread until its lock is available
             spin_lock(&thrd->lock);
-
-            print("destroying thread: ");
-            print_u64(thrd->id);
-
             thread_destroy(thrd);
             cur = linked_list_remove_first_node(&dead_list);
         }
