@@ -38,6 +38,7 @@ typedef struct {
 bool process_init(process* proc, bool kernel_process);
 void process_destroy(process* proc);
 
+bool process_signal(process* proc, signal sig);
 bool process_add_thread(process* proc, struct thread* thrd);
 void process_kill(process* proc);
 
@@ -48,6 +49,5 @@ void process_exit(u64 exit_code);
 
 signal_disposition process_get_signal_disposition(signal sig);
 bool process_set_signal_disposition(signal sig, signal_disposition disposition);
-
 
 #endif // SOS_PROCESS_H

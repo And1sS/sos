@@ -10,6 +10,6 @@ global signal_trampoline_code_start
 global signal_trampoline_code_end
 
 signal_trampoline_code_start:
-    mov rax, 3 ; SYS_SIGRET
+    mov rax, 4 ; SYS_SIGRET
     int 0x80
 signal_trampoline_code_end:

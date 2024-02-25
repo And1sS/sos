@@ -13,23 +13,25 @@ process* init_process;
 
 void kernel_thread() {
     u64 i = 0;
-    u64 exit_code;
+    u64 printed = 0;
 
     bool interrupts_enabled = spin_lock_irq_save(&init_process->lock);
     ref_acquire(&init_process->refc);
-
-    WAIT_FOR_IRQ(&init_process->finish_cvar, &init_process->lock,
-                 interrupts_enabled, init_process->finished);
-    exit_code = init_process->exit_code;
-
-    ref_release(&init_process->refc);
     spin_unlock_irq_restore(&init_process->lock, interrupts_enabled);
 
     while (1) {
-        if (i++ % 10000000 == 0) {
-            print("kernel! Processes revision! Exit code:");
-            print_u64_hex(exit_code);
+        if (i++ % 100000 == 0) {
+            print("kernel! Processes revision! Print cnt:");
+            print_u64(printed);
             println("");
+            printed++;
+
+            if (init_process->finished) {
+                ref_release(&init_process->refc);
+                return;
+            } else if (printed % 100 == 0){
+                process_signal(init_process, SIGINT);
+            }
         }
     }
 }
@@ -89,8 +91,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     uthread* user_thread = uthread_create_orphan(
         init_process, "test", (void*) 0xF000, (uthread_func*) 0x1000);
 
-    kthread_run("kernel-test-thread", kernel_thread);
     thread_start(user_thread);
+    kthread_run("kernel-test-thread", kernel_thread);
 
     local_irq_enable();
     while (true) {
