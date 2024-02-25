@@ -18,8 +18,8 @@ extern handle_hard_irq
 extern update_tss ; defined in tss.c
 extern handle_pending_signals ; defined in signal.c
 
-
 %macro save_ds 0
+    mov rbx, 0
     mov bx, ds
     push rbx
     mov rbx, 0x10
@@ -72,6 +72,8 @@ extern handle_pending_signals ; defined in signal.c
     pop r13
     pop r14
     pop r15
+
+    add rsp, 8 ; remove error code from stack
 %endmacro
 
 ; x86-64 exception with error code handler stub
@@ -92,7 +94,6 @@ esr_%1:
     mov rsp, rax
 
     restore_state
-    add rsp, 8 ; remove error code from stack
 
     iretq
 %endmacro
@@ -102,6 +103,7 @@ esr_%1:
 %macro esr_no_error_code 1
 global esr_%1
 esr_%1:
+    push 0 ; push fake error code
     save_state
 
     mov rdi, %1  ; interrupt number
@@ -121,6 +123,7 @@ esr_%1:
 %macro isr_soft 1
 global isr_%1
 isr_%1:
+    push 0 ; push fake error code
     save_state
 
     mov rdi, %1  ; interrupt number
@@ -140,6 +143,7 @@ isr_%1:
 global isr_%1
 isr_%1:
     cli
+    push 0 ; push fake error code
     save_state
 
     mov rdi, %1
