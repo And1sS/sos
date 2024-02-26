@@ -50,10 +50,10 @@ void __attribute__((section(".entrypoint"))) main() {
     long long printed = 0;
     for (volatile long long i = 0;; i++) {
         if (i % 100000 == 0) {
-            print("user space, SIGINT cnt: ");
-            printll(signals);
-            print(", print cnt: ");
+            print("user space, print cnt:");
             printll(printed);
+            print(", SIGINT count                      : ");
+            printll(signals);
             print("\n");
             printed++;
         }

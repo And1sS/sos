@@ -1,7 +1,5 @@
 #include "kthread.h"
 #include "../arch/common/thread.h"
-#include "../arch/common/vmm.h"
-#include "../lib/id_generator.h"
 #include "../scheduler/scheduler.h"
 #include "process.h"
 #include "threading.h"
@@ -10,9 +8,11 @@ process kernel_process;
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
-    bool allocated_tid = threading_allocate_tid(&thrd->id);
-    if (!allocated_tid)
+    if (!threading_allocate_tid(&thrd->id))
         goto failed_to_allocate_tid;
+
+    if (!id_generator_get_id(&kernel_process.tgid_generator, &thrd->tgid))
+        goto failed_to_allocate_tgid;
 
     void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
     if (!kernel_stack)
@@ -67,6 +67,9 @@ failed_to_init_child_list:
     kfree(kernel_stack);
 
 failed_to_allocate_kernel_stack:
+    id_generator_free_id(&kernel_process.tgid_generator, thrd->tgid);
+
+failed_to_allocate_tgid:
     threading_free_tid(thrd->id);
 
 failed_to_allocate_tid:

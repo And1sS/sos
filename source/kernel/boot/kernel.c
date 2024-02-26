@@ -20,7 +20,7 @@ void kernel_thread() {
     spin_unlock_irq_restore(&init_process->lock, interrupts_enabled);
 
     while (1) {
-        if (i++ % 100000 == 0) {
+        if (i++ % 1000000 == 0) {
             print("kernel! Processes revision! Print cnt:");
             print_u64(printed);
             println("");
@@ -78,18 +78,16 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     // temporary hardcoded loading of test.bin for test, which code and data are
     // within single page, start is mapped to 0x1000, entrypoint is 0x1000
     vm_space_map_page(process_vm, 0x1000, flags);
-    vm_space_map_pages(process_vm, 0xF000, 2, flags);
-    vm_space_map_pages(process_vm, 0xF0000, 2, flags);
-    println("Process vm after mapping: ");
-    vm_space_print(process_vm);
 
     void* forked_text_page = vm_space_get_page_view(process_vm, 0x1000);
     memcpy(forked_text_page, (void*) P2V(first.mod_start),
            first.mod_end - first.mod_start);
 
-    vmm_set_vm_space(process_vm);
     uthread* user_thread = uthread_create_orphan(
-        init_process, "test", (void*) 0xF000, (uthread_func*) 0x1000);
+        init_process, "test", (uthread_func*) 0x1000);
+
+    println("Process vm after mapping: ");
+    vm_space_print(process_vm);
 
     thread_start(user_thread);
     kthread_run("kernel-test-thread", kernel_thread);

@@ -10,8 +10,11 @@ static id_generator pid_gen;
 extern process kernel_process;
 
 void threading_init() {
-    id_generator_init(&tid_gen);
-    id_generator_init(&pid_gen);
+    if (!id_generator_init(&tid_gen))
+        panic("Can't init tid generator");
+
+    if (!id_generator_init(&pid_gen))
+        panic("Can't init pid generator");
 
     if (!process_init(&kernel_process, true))
         panic("Can't init kernel process");

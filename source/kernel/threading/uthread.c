@@ -1,29 +1,34 @@
 #include "uthread.h"
-#include "../arch/common/context.h"
 #include "../arch/common/thread.h"
-#include "../arch/common/vmm.h"
-#include "../memory/heap/kheap.h"
-#include "../memory/memory_map.h"
 #include "../scheduler/scheduler.h"
 #include "process.h"
 #include "threading.h"
 
 #define UTHREAD_CHILDREN_INITIAL_CAPACITY 8
 
+const vm_area_flags USER_STACK_FLAGS = {
+    .writable = true, .executable = true, .user_access_allowed = true};
+
+void* uthread_map_user_stack(process* proc, u64 tgid);
+
 bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
-                  void* stack, uthread_func* func) {
+                  uthread_func* func) {
 
     memset(thrd, 0, sizeof(thread));
-    bool allocated_tid = threading_allocate_tid(&thrd->id);
-    if (!allocated_tid)
+    if (!threading_allocate_tid(&thrd->id))
         goto failed_to_allocate_tid;
 
-    void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
-    if (!kernel_stack)
-        goto failed_to_allocate_kernel_stack;
+    if (!id_generator_get_id(&proc->tgid_generator, &thrd->tgid))
+        goto failed_to_allocate_tgid;
 
-    memset(kernel_stack, 0, THREAD_KERNEL_STACK_SIZE);
-    memset(stack, 0, THREAD_KERNEL_STACK_SIZE);
+    thrd->kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
+    if (!thrd->kernel_stack)
+        goto failed_to_allocate_kernel_stack;
+    memset(thrd->kernel_stack, 0, THREAD_KERNEL_STACK_SIZE);
+
+    thrd->user_stack = (void*) uthread_map_user_stack(proc, thrd->tgid);
+    if (!thrd->user_stack)
+        goto failed_to_map_user_stack;
 
     thrd->name = name;
 
@@ -39,9 +44,6 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
 
     thrd->kernel_thread = false;
     thrd->should_die = false;
-
-    thrd->kernel_stack = kernel_stack;
-    thrd->user_stack = stack;
 
     thrd->context = arch_uthread_context_init(thrd, func);
     thrd->state = INITIALISED;
@@ -77,36 +79,60 @@ failed_to_add_thread_to_parent:
     array_list_deinit(&thrd->children);
 
 failed_to_init_child_list:
-    kfree(kernel_stack);
+    kfree(thrd->kernel_stack);
 
+failed_to_map_user_stack:
 failed_to_allocate_kernel_stack:
+    id_generator_free_id(&proc->tgid_generator, thrd->tgid);
+
+failed_to_allocate_tgid:
     threading_free_tid(thrd->id);
 
 failed_to_allocate_tid:
     return false;
 }
 
-uthread* uthread_create_orphan(process* proc, string name, void* stack,
-                               uthread_func* func) {
-
-    // TODO: Add pointer checks, e.g. that stack and func is in user space
+uthread* uthread_create_orphan(process* proc, string name, uthread_func* func) {
     uthread* thrd = (uthread*) kmalloc(sizeof(uthread));
-    if (!thrd) {
-        return false;
+    if (thrd) {
+        uthread_init(proc, NULL, thrd, name, func);
     }
 
-    uthread_init(proc, NULL, thrd, name, stack, func);
     return thrd;
 }
 
-uthread* uthread_create(string name, void* stack, uthread_func* func) {
+uthread* uthread_create(string name, uthread_func* func) {
     uthread* current = get_current_thread();
-    // TODO: Add pointer checks, e.g. that stack and func is in user space
     uthread* thrd = (uthread*) kmalloc(sizeof(uthread));
-    if (!thrd) {
-        return false;
+    if (thrd) {
+        uthread_init(current->proc, current, thrd, name, func);
     }
 
-    uthread_init(current->proc, current, thrd, name, stack, func);
     return thrd;
+}
+
+void* uthread_map_user_stack(process* proc, u64 tgid) {
+    u64 user_stack_addr = (USER_SPACE_END_VADDR + 1) - (tgid + 1) * USER_STACK_SIZE;
+    void* user_stack = NULL;
+
+    rw_spin_lock_write_irq(&proc->vm->lock);
+    vm_pages_mapping_result user_stack_mapping_result = vm_space_map_pages(
+        proc->vm, user_stack_addr, USER_STACK_PAGE_COUNT, USER_STACK_FLAGS);
+
+    if (user_stack_mapping_result.status != SUCCESS) {
+        vm_space_unmap_pages(proc->vm, user_stack_addr,
+                             user_stack_mapping_result.mapped_pages_count);
+    } else {
+        user_stack = (void*) user_stack_addr;
+
+        for (u64 i = 0; i < USER_STACK_PAGE_COUNT; i++) {
+            void* page = vm_space_get_page_view(proc->vm, (u64) user_stack_addr
+                                                              + i * PAGE_SIZE);
+
+            memset(page, 0, PAGE_SIZE);
+        }
+    }
+    rw_spin_unlock_write_irq(&proc->vm->lock);
+
+    return user_stack;
 }

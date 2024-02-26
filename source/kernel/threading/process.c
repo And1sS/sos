@@ -4,6 +4,7 @@
 #include "../memory/virtual/vmm.h"
 #include "../scheduler/scheduler.h"
 #include "threading.h"
+#include "uthread.h"
 
 bool process_init(process* proc, bool kernel_process) {
     if (!threading_allocate_pid(&proc->id))
@@ -17,6 +18,9 @@ bool process_init(process* proc, bool kernel_process) {
     if (!proc->vm)
         goto failed_to_fork_vm_space;
 
+    if (!id_generator_init(&proc->tgid_generator))
+        goto failed_to_init_tgid_generator;
+
     proc->cleaner_node = (linked_list_node) LINKED_LIST_NODE_OF(proc);
 
     proc->kernel_process = kernel_process;
@@ -27,6 +31,9 @@ bool process_init(process* proc, bool kernel_process) {
     memset(&proc->siginfo, 0, sizeof(process_siginfo));
 
     return true;
+
+failed_to_init_tgid_generator:
+    vm_space_destroy(proc->vm);
 
 failed_to_fork_vm_space:
     array_list_deinit(&proc->threads);
@@ -66,6 +73,19 @@ bool process_exit_thread() {
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
     ref_release(&proc->refc);
     array_list_remove(&proc->threads, current);
+
+    // Unmap user stack for user threads
+    // should be performed before releasing tgid to avoid race condition,
+    // if other thread obtains released tgid and maps that area before we
+    // unmapped it
+    if (!current->kernel_thread) {
+        rw_spin_lock_write(&proc->vm->lock);
+        vm_space_unmap_pages(proc->vm, (u64) current->user_stack,
+                             USER_STACK_PAGE_COUNT);
+        rw_spin_unlock_write(&proc->vm->lock);
+    }
+
+    id_generator_free_id(&proc->tgid_generator, current->tgid);
 
     // last leaving thread awaits for process refcount to reach zero
     if (!proc->kernel_process && proc->threads.size == 0) {

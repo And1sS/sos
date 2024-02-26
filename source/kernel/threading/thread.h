@@ -33,11 +33,13 @@ typedef struct {
 struct cpu_context;
 
 typedef struct _thread {
-    u64 id;
+    u64 id; // global thread id
+    u64 tgid; // id inside thread group (process)
     string name;
     bool kernel_thread;
     void* kernel_stack;
     void* user_stack;
+
     process* proc;
 
     // context should be accessed only within the scheduler, so no locking

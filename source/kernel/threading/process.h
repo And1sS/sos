@@ -2,6 +2,7 @@
 #define SOS_PROCESS_H
 
 #include "../lib/container/array_list/array_list.h"
+#include "../lib/id_generator.h"
 #include "../memory/memory_map.h"
 #include "../memory/virtual/vm.h"
 #include "../signal/signal.h"
@@ -29,6 +30,8 @@ typedef struct {
     u64 exit_code;
 
     process_siginfo siginfo;
+
+    id_generator tgid_generator;
     array_list threads;
 
     ref_count refc;
