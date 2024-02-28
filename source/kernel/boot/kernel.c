@@ -29,7 +29,7 @@ void kernel_thread() {
             if (init_process->finished) {
                 ref_release(&init_process->refc);
                 return;
-            } else if (printed % 100 == 0){
+            } else if (printed % 100 == 0) {
                 process_signal(init_process, SIGINT);
             }
         }
@@ -83,8 +83,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     memcpy(forked_text_page, (void*) P2V(first.mod_start),
            first.mod_end - first.mod_start);
 
-    uthread* user_thread = uthread_create_orphan(
-        init_process, "test", (uthread_func*) 0x1000);
+    uthread* user_thread =
+        uthread_create_orphan(init_process, "test", (uthread_func*) 0x1000);
 
     println("Process vm after mapping: ");
     vm_space_print(process_vm);

@@ -120,6 +120,10 @@ void thread_exit(u64 exit_code) {
 
     schedule_thread_exit();
 
+    // TODO: there is definitely a race condition that will arise when SMP
+    //       implemented, since thread cleaner may run in parallel and try to
+    //       free kernel stack while we are still exiting current thread using
+    //       its kernel stack
     thread_cleaner_mark(current);
     if (cleanup_process)
         process_cleaner_mark(proc);
