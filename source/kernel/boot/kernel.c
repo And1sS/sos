@@ -9,40 +9,28 @@
 #include "../threading/uthread.h"
 #include "multiboot.h"
 
-thread* user_thread = NULL;
+process* init_process;
 
-_Noreturn void kernel_thread() {
+void kernel_thread() {
     u64 i = 0;
     u64 printed = 0;
-    u64 exit_code;
-    bool dead = false;
-    bool killed = false;
 
-    ref_acquire(&user_thread->refc);
+    bool interrupts_enabled = spin_lock_irq_save(&init_process->lock);
+    ref_acquire(&init_process->refc);
+    spin_unlock_irq_restore(&init_process->lock, interrupts_enabled);
+
     while (1) {
-        if (i++ % 10000000 == 0) {
-            println("kernel! Irq refactoring revision!");
+        if (i++ % 1000000 == 0) {
+            print("kernel! Processes revision! Print cnt:");
+            print_u64(printed);
+            println("");
             printed++;
 
-            if (printed >= 100 && printed % 10 == 0 && !dead)
-                thread_signal(user_thread, SIGINT);
-
-            if (!dead && user_thread->finished) {
-                dead = true;
-                exit_code = user_thread->exit_code;
-                ref_release(&user_thread->refc);
-                user_thread = NULL;
-            }
-
-            if (dead) {
-                print("user exit code: ");
-                print_u64_hex(exit_code);
-                println("");
-            }
-
-            if (printed % 700 == 0 && !killed && !dead) {
-                thread_signal(user_thread, SIGKILL);
-                killed = true;
+            if (init_process->finished) {
+                ref_release(&init_process->refc);
+                return;
+            } else if (printed % 100 == 0) {
+                process_signal(init_process, SIGINT);
             }
         }
     }
@@ -80,31 +68,29 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Kernel vm:");
     vm_space_print(kernel_space);
 
-    vm_space* forked_space = vm_space_fork(kernel_space);
-
-    println("Forked vm:");
-    vm_space_print(forked_space);
+    init_process = (process*) kmalloc(sizeof(process));
+    process_init(init_process, false);
+    vm_space* process_vm = init_process->vm;
 
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
 
     // temporary hardcoded loading of test.bin for test, which code and data are
     // within single page, start is mapped to 0x1000, entrypoint is 0x1000
-    vm_space_map_page(forked_space, 0x1000, flags);
-    vm_space_map_pages(forked_space, 0xF000, 2, flags);
-    println("Forked vm after mapping: ");
-    vm_space_print(forked_space);
+    vm_space_map_page(process_vm, 0x1000, flags);
 
-    void* forked_text_page = vm_space_get_page_view(forked_space, 0x1000);
+    void* forked_text_page = vm_space_get_page_view(process_vm, 0x1000);
     memcpy(forked_text_page, (void*) P2V(first.mod_start),
            first.mod_end - first.mod_start);
 
-    vmm_set_vm_space(forked_space);
-    user_thread =
-        uthread_create_orphan("test", (void*) 0xF000, (uthread_func*) 0x1000);
+    uthread* user_thread =
+        uthread_create_orphan(init_process, "test", (uthread_func*) 0x1000);
 
-    kthread_run("kernel-test-thread", kernel_thread);
+    println("Process vm after mapping: ");
+    vm_space_print(process_vm);
+
     thread_start(user_thread);
+    kthread_run("kernel-test-thread", kernel_thread);
 
     local_irq_enable();
     while (true) {

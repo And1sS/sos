@@ -44,4 +44,16 @@ bool con_var_wait_irq_save(con_var* var, lock* lock, bool interrupts_enabled);
 void con_var_signal(con_var* var);
 void con_var_broadcast(con_var* var);
 
+/*
+ * Special case function, used in case we need to broadcast changes in con var
+ * guarded by thread lock. Acquires and releases provided lock, thus breaks
+ * atomicity.
+ *
+ * In particular, this is needed only because when we call broadcast with thread
+ * lock held, and thread which lock is held should be awakened using
+ * schedule_thread and deadlock occurs, since scheduler tries to take that
+ * thread`s lock.
+ */
+void con_var_broadcast_guarded(con_var* var, lock* lock);
+
 #endif // SOS_CON_VAR_H

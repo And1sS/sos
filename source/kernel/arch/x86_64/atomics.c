@@ -15,3 +15,5 @@ void atomic_set(volatile u64* addr, volatile u64 value) {
 
     __asm__ volatile ("mfence");
 }
+
+u64 atomic_read(const volatile u64* addr) { return *addr; }

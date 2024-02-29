@@ -24,10 +24,10 @@ typedef enum {
 } signal;
 
 typedef struct {
-    signal_disposition disposition;
     signal_handler* handler;
 } sigaction;
 
-long set_sigaction(signal sig, const sigaction* action);
+long pthread_sigaction(signal sig, const sigaction* action);
+long process_set_signal_disposition(signal sig, signal_disposition disposition);
 
 #endif // SOS_USER_SIGNAL_H

@@ -1,9 +1,9 @@
+#include "exit.h"
+#include "pthread.h"
 #include "signal.h"
 #include "syscall.h"
 
 int signals = 0;
-
-void exit(long long number) { syscall1(SYS_EXIT, number); }
 
 void print(const char* str) { syscall1(SYS_PRINT, (long long) str); }
 
@@ -16,24 +16,46 @@ void sigint_handler() {
     signals++;
 }
 
+void second_thread_func() {
+    long long i = 1;
+    while (1) {
+
+        print("Hello from second thread!  ");
+        printll(i);
+        print("\n");
+
+        if (i == 3000)
+            break;
+
+        i++;
+    }
+
+    pthread_exit(0xCAFE);
+}
+
 const sigaction sigint_action = {.handler = (signal_handler*) sigint_handler};
-const sigaction sigkill_action = {.disposition = IGNORE};
+const sigaction sigkill_action = {};
 
 void __attribute__((section(".entrypoint"))) main() {
-    // This one should succeed (e.g. return 0)
-    long sigint_act_set = set_sigaction(SIGINT, &sigint_action);
-    // This one should fail (e.g. return value < 0)
-    long sigkill_act_set = set_sigaction(SIGKILL, &sigkill_action);
+    process_set_signal_disposition(SIGINT, IGNORE);
 
+    // This one should succeed (e.g. return 0)
+    long sigint_act_set = pthread_sigaction(SIGINT, &sigint_action);
+    // This one should fail (e.g. return value < 0)
+    long sigkill_act_set = pthread_sigaction(SIGKILL, &sigkill_action);
+
+    pthread thread;
+    pthread_run("second-test-thread", second_thread_func, &thread);
+
+    long long printed = 0;
     for (volatile long long i = 0;; i++) {
         if (i % 100000 == 0) {
-            print("user space, sigint: ");
-            printll(sigint_act_set);
-            print(", sigkill: ");
-            printll(sigkill_act_set);
-            print(", cnt: ");
+            print("user space, print cnt:");
+            printll(printed);
+            print(", SIGINT count                      : ");
             printll(signals);
             print("\n");
+            printed++;
         }
 
         if (signals == 50)
