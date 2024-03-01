@@ -1,4 +1,5 @@
 #include "exit.h"
+#include "fork.h"
 #include "pthread.h"
 #include "signal.h"
 #include "syscall.h"
@@ -16,15 +17,20 @@ void sigint_handler() {
     signals++;
 }
 
-void second_thread_func() {
-    long long i = 1;
-    while (1) {
+int threads = 1;
 
-        print("Hello from second thread!  ");
+void thread_func() {
+    long long i = 1;
+    int current = ++threads;
+
+    while (1) {
+        print("Hello from thread ");
+        printll(current);
+        print(", cnt: ");
         printll(i);
         print("\n");
 
-        if (i == 3000)
+        if (i == 500)
             break;
 
         i++;
@@ -44,23 +50,26 @@ void __attribute__((section(".entrypoint"))) main() {
     // This one should fail (e.g. return value < 0)
     long sigkill_act_set = pthread_sigaction(SIGKILL, &sigkill_action);
 
-    pthread thread;
-    pthread_run("second-test-thread", second_thread_func, &thread);
+    //    pthread thread;
+    //    for (long long i = 0; i < 10; i++) {
+    //        pthread_run("other-thread", thread_func, &thread);
+    //    }
 
-    long long printed = 0;
-    for (volatile long long i = 0;; i++) {
-        if (i % 100000 == 0) {
-            print("user space, print cnt:");
-            printll(printed);
-            print(", SIGINT count                      : ");
-            printll(signals);
-            print("\n");
-            printed++;
-        }
+    long long pid = fork();
+    long long pid1 = fork();
+    long long pid2 = fork();
 
-        if (signals == 50)
-            break;
+    if (pid < 0) {
+        print("ERROR");
+        exit(-1);
     }
+//    const char* to_print = pid == 0 ? "CHILD! " : "PARENT! ";
+//
+//    for (;;) {
+//        print(to_print);
+//        printll(pid);
+//        print("\n");
+//    }
 
     print("EXITING!\n");
     exit(0xDEADB33F);

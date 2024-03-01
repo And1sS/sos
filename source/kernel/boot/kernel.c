@@ -4,7 +4,6 @@
 #include "../memory/heap/kheap.h"
 #include "../memory/virtual/vmm.h"
 #include "../scheduler/scheduler.h"
-#include "../threading/kthread.h"
 #include "../threading/threading.h"
 #include "../threading/uthread.h"
 #include "multiboot.h"
@@ -68,29 +67,27 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Kernel vm:");
     vm_space_print(kernel_space);
 
-    init_process = (process*) kmalloc(sizeof(process));
-    process_init(init_process, false);
-    vm_space* process_vm = init_process->vm;
+    init_process = process_create();
 
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
 
     // temporary hardcoded loading of test.bin for test, which code and data are
     // within single page, start is mapped to 0x1000, entrypoint is 0x1000
-    vm_space_map_page(process_vm, 0x1000, flags);
+    vm_space_map_page(init_process->vm, 0x1000, flags);
 
-    void* forked_text_page = vm_space_get_page_view(process_vm, 0x1000);
+    void* forked_text_page = vm_space_get_page_view(init_process->vm, 0x1000);
     memcpy(forked_text_page, (void*) P2V(first.mod_start),
            first.mod_end - first.mod_start);
 
-    uthread* user_thread =
-        uthread_create_orphan(init_process, "test", (uthread_func*) 0x1000);
+    uthread* user_thread = uthread_create_orphan(init_process, "test", NULL,
+                                                 (uthread_func*) 0x1000);
 
     println("Process vm after mapping: ");
-    vm_space_print(process_vm);
+    vm_space_print(init_process->vm);
 
     thread_start(user_thread);
-    kthread_run("kernel-test-thread", kernel_thread);
+    // kthread_run("kernel-test-thread", kernel_thread);
 
     local_irq_enable();
     while (true) {

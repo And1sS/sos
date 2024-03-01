@@ -15,6 +15,7 @@ typedef void uthread_func();
 uthread* uthread_create(string name, uthread_func* func);
 
 // should be called when creating first thread
-uthread* uthread_create_orphan(process* proc, string name, uthread_func* func);
+uthread* uthread_create_orphan(process* proc, string name, void* user_stack,
+                               uthread_func* func);
 
 #endif // SOS_UTHREAD_H

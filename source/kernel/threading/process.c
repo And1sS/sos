@@ -1,6 +1,6 @@
 #include "process.h"
-#include "../lib/kprint.h"
-#include "../memory/heap/kheap.h"
+#include "../arch/x86_64/cpu/cpu_context.h"
+#include "../error/errno.h"
 #include "../memory/virtual/vmm.h"
 #include "../scheduler/scheduler.h"
 #include "threading.h"
@@ -13,8 +13,12 @@ bool process_init(process* proc, bool kernel_process) {
     if (!array_list_init(&proc->threads, 8))
         goto failed_to_init_thread_list;
 
-    vm_space* kernel_vm = vmm_kernel_vm_space();
-    proc->vm = kernel_process ? kernel_vm : vm_space_fork(kernel_vm);
+    if (!array_list_init(&proc->children, 8))
+        goto failed_to_init_children_list;
+
+    proc->vm = kernel_process ? vmm_kernel_vm_space()
+                              : vm_space_fork(vmm_current_vm_space());
+
     if (!proc->vm)
         goto failed_to_fork_vm_space;
 
@@ -30,12 +34,17 @@ bool process_init(process* proc, bool kernel_process) {
     proc->finished = false;
     memset(&proc->siginfo, 0, sizeof(process_siginfo));
 
+    // TODO: add to parent
+
     return true;
 
 failed_to_init_tgid_generator:
     vm_space_destroy(proc->vm);
 
 failed_to_fork_vm_space:
+    array_list_deinit(&proc->children);
+
+failed_to_init_children_list:
     array_list_deinit(&proc->threads);
 
 failed_to_init_thread_list:
@@ -45,13 +54,73 @@ failed_to_allocate_pid:
     return false;
 }
 
+process* process_create() {
+    process* proc = kmalloc(sizeof(process));
+    if (!proc)
+        return NULL;
+
+    if (!process_init(proc, false)) {
+        kfree(proc);
+        return NULL;
+    }
+
+    return proc;
+}
+
 void process_destroy(process* proc) {
     if (proc->kernel_process)
         panic("Trying to destroy kernel process");
 
     vm_space_destroy(proc->vm);
+
     threading_free_pid(proc->id);
+
+    id_generator_deinit(&proc->tgid_generator);
+
+    array_list_deinit(&proc->threads);
+    array_list_deinit(&proc->children);
+
     kfree(proc);
+}
+
+u64 process_fork(struct cpu_context* context) {
+    thread* current = get_current_thread();
+    process* proc = current->proc;
+
+    process* created = process_create();
+    if (!created)
+        goto failed_to_create_process;
+
+    if (!id_generator_get_id(&created->tgid_generator, &current->tgid))
+        goto failed_to_set_created_process_start_thread_tgid;
+
+    cpu_context* current_arch_context = (cpu_context*) context;
+
+    thread* start_thread =
+        uthread_create_orphan(created, "main", current->user_stack,
+                              (uthread_func*) current_arch_context->rip);
+    if (!start_thread)
+        goto failed_to_create_start_process_thread;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    memcpy(&created->siginfo.dispositions, &proc->siginfo.dispositions,
+           sizeof(signal_disposition) * (SIGNALS_COUNT + 1));
+    array_list_add_last(&proc->children, created);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    cpu_context* forked_arch_context = (cpu_context*) start_thread->context;
+    *forked_arch_context = *current_arch_context;
+    forked_arch_context->rax = 0;
+
+    thread_start(start_thread);
+
+    return created->id;
+
+failed_to_create_start_process_thread:
+failed_to_set_created_process_start_thread_tgid:
+
+failed_to_create_process:
+    return -ENOMEM;
 }
 
 bool process_add_thread(process* proc, struct thread* thrd) {

@@ -7,6 +7,10 @@ bool id_generator_init(id_generator* generator) {
     return generator->set != NULL;
 }
 
+void id_generator_deinit(id_generator* generator) {
+    bitset_destroy(generator->set);
+}
+
 bool id_generator_get_id(id_generator* generator, u64* result) {
     bool interrupts_enabled = spin_lock_irq_save(&generator->lock);
     bool allocated = bitset_allocate_index(generator->set, result);

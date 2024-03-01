@@ -12,7 +12,7 @@ const vm_area_flags USER_STACK_FLAGS = {
 void* uthread_map_user_stack(process* proc, u64 tgid);
 
 bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
-                  uthread_func* func) {
+                  void* user_stack, uthread_func* func) {
 
     memset(thrd, 0, sizeof(thread));
     if (!threading_allocate_tid(&thrd->id))
@@ -26,9 +26,13 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
         goto failed_to_allocate_kernel_stack;
     memset(thrd->kernel_stack, 0, THREAD_KERNEL_STACK_SIZE);
 
-    thrd->user_stack = (void*) uthread_map_user_stack(proc, thrd->tgid);
-    if (!thrd->user_stack)
-        goto failed_to_map_user_stack;
+    if (!user_stack) {
+        thrd->user_stack = (void*) uthread_map_user_stack(proc, thrd->tgid);
+        if (!thrd->user_stack)
+            goto failed_to_map_user_stack;
+    } else {
+        thrd->user_stack = user_stack;
+    }
 
     thrd->name = name;
 
@@ -92,10 +96,12 @@ failed_to_allocate_tid:
     return false;
 }
 
-uthread* uthread_create_orphan(process* proc, string name, uthread_func* func) {
+uthread* uthread_create_orphan(process* proc, string name, void* user_stack,
+                               uthread_func* func) {
+
     uthread* thrd = (uthread*) kmalloc(sizeof(uthread));
     if (thrd) {
-        uthread_init(proc, NULL, thrd, name, func);
+        uthread_init(proc, NULL, thrd, name, user_stack, func);
     }
 
     return thrd;
@@ -105,14 +111,15 @@ uthread* uthread_create(string name, uthread_func* func) {
     uthread* current = get_current_thread();
     uthread* thrd = (uthread*) kmalloc(sizeof(uthread));
     if (thrd) {
-        uthread_init(current->proc, current, thrd, name, func);
+        uthread_init(current->proc, current, thrd, name, NULL, func);
     }
 
     return thrd;
 }
 
 void* uthread_map_user_stack(process* proc, u64 tgid) {
-    u64 user_stack_addr = (USER_SPACE_END_VADDR + 1) - (tgid + 1) * USER_STACK_SIZE;
+    u64 user_stack_addr =
+        (USER_SPACE_END_VADDR + 1) - (tgid + 1) * USER_STACK_SIZE;
     void* user_stack = NULL;
 
     rw_spin_lock_write_irq(&proc->vm->lock);

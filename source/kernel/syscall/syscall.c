@@ -49,6 +49,7 @@ static syscall_descriptor syscall_handlers[1024] = {
     [SYS_PTHREAD_JOIN] = SYSCALL2(sys_pthread_join),
 
     [SYS_EXIT] = SYSCALL1(sys_exit),
+    [SYS_FORK] = SYSCALL0(sys_fork),
 
     [SYSCALLS_IMPLEMENTED_COUNT + 1 ... SYSCALLS_MAX_COUNT - 1] = {0}};
 

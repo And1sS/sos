@@ -34,12 +34,19 @@ typedef struct {
     id_generator tgid_generator;
     array_list threads;
 
+    array_list children;
+
     ref_count refc;
     con_var finish_cvar;
 } process;
 
 bool process_init(process* proc, bool kernel_process);
+
+// Creates user process
+process* process_create();
 void process_destroy(process* proc);
+
+u64 process_fork(struct cpu_context* context);
 
 bool process_signal(process* proc, signal sig);
 bool process_add_thread(process* proc, struct thread* thrd);
