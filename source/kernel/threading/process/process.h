@@ -1,12 +1,12 @@
 #ifndef SOS_PROCESS_H
 #define SOS_PROCESS_H
 
-#include "../lib/container/array_list/array_list.h"
-#include "../lib/id_generator.h"
-#include "../memory/memory_map.h"
-#include "../memory/virtual/vm.h"
-#include "../signal/signal.h"
-#include "../synchronization/spin_lock.h"
+#include "../../lib/container/array_list/array_list.h"
+#include "../../lib/id_generator.h"
+#include "../../memory/memory_map.h"
+#include "../../memory/virtual/vm.h"
+#include "../../signal/signal.h"
+#include "../../synchronization/spin_lock.h"
 
 struct thread;
 
@@ -15,7 +15,7 @@ typedef struct {
     signal_disposition dispositions[SIGNALS_COUNT + 1];
 } process_siginfo;
 
-typedef struct {
+typedef struct _process {
     u64 id;
     bool kernel_process;
     vm_space* vm;
@@ -34,30 +34,36 @@ typedef struct {
     id_generator tgid_generator;
     array_list threads;
 
+    struct _process* parent;
     array_list children;
+    con_var child_changed_cvar;
 
     ref_count refc;
     con_var finish_cvar;
 } process;
 
-bool process_init(process* proc, bool kernel_process);
+void set_init_process(process* proc);
 
-// Creates user process
-process* process_create();
+bool process_init(process* proc, bool kernel_process);
 void process_destroy(process* proc);
 
-u64 process_fork(struct cpu_context* context);
-
-bool process_signal(process* proc, signal sig);
-bool process_add_thread(process* proc, struct thread* thrd);
 void process_kill(process* proc);
 
 // These functions should be called from process
+bool process_add_child(process* child);
+bool process_remove_child(process* child);
+
+bool process_add_thread(process* proc, struct thread* thrd);
+
 bool process_exit_thread(); // returns whether this is the last thread and it
                             // should clean process
 void process_exit(u64 exit_code);
 
 signal_disposition process_get_signal_disposition(signal sig);
 bool process_set_signal_disposition(signal sig, signal_disposition disposition);
+
+bool process_signal(process* proc, signal sig);
+
+u64 process_wait_any(u64* exit_code);
 
 #endif // SOS_PROCESS_H

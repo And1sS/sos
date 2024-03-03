@@ -21,7 +21,11 @@ signal_disposition default_dispositions[SIGNALS_COUNT + 1] = {
     CORE_DUMP, // Signal not supported for now
     CORE_DUMP, // Signal not supported for now
     [SIGTERM] = TERMINATE,
-    [SIGTERM + 1 ... SIGNALS_COUNT] = FALLBACK_TO_DEFAULT};
+    CORE_DUMP,          // Signal not supported for now
+    CORE_DUMP,          // Signal not supported for now
+    [SIGCHLD] = IGNORE, // Signal not supported for now
+
+    [SIGCHLD + 1 ... SIGNALS_COUNT] = FALLBACK_TO_DEFAULT};
 
 bool signal_raised(sigpending pending_signals, signal sig) {
     return (pending_signals >> sig) & 1;

@@ -4,8 +4,9 @@
 #include "../memory/heap/kheap.h"
 #include "../memory/virtual/vmm.h"
 #include "../scheduler/scheduler.h"
+#include "../threading/process/uprocess.h"
+#include "../threading/thread/uthread.h"
 #include "../threading/threading.h"
-#include "../threading/uthread.h"
 #include "multiboot.h"
 
 process* init_process;
@@ -67,8 +68,10 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Kernel vm:");
     vm_space_print(kernel_space);
 
-    init_process = process_create();
+    init_process = uprocess_create();
 
+    set_init_process(init_process);
+    
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
 

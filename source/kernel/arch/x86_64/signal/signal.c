@@ -1,6 +1,6 @@
 #include "../../common/signal.h"
 #include "../../../memory/virtual/umem.h"
-#include "../../../threading/thread.h"
+#include "../../../threading/thread/thread.h"
 #include "../cpu/cpu_context.h"
 #include "../cpu/gdt.h"
 #include "../cpu/rflags.h"

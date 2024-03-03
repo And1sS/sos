@@ -1,8 +1,8 @@
 #include "uthread.h"
-#include "../arch/common/thread.h"
-#include "../scheduler/scheduler.h"
-#include "process.h"
-#include "threading.h"
+#include "../../arch/common/thread.h"
+#include "../../scheduler/scheduler.h"
+#include "../process/process.h"
+#include "../threading.h"
 
 #define UTHREAD_CHILDREN_INITIAL_CAPACITY 8
 

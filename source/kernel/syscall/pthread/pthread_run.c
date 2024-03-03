@@ -1,7 +1,7 @@
 #include "../../error/errno.h"
 #include "../../lib/util.h"
 #include "../../memory/virtual/umem.h"
-#include "../../threading/uthread.h"
+#include "../../threading/thread/uthread.h"
 
 u64 sys_pthread_run(u64 arg0, u64 arg1, u64 arg2, struct cpu_context* context) {
     UNUSED(context);

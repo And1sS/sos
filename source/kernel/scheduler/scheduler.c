@@ -3,7 +3,7 @@
 #include "../interrupts/irq.h"
 #include "../lib/kprint.h"
 #include "../memory/virtual/vmm.h"
-#include "../threading/kthread.h"
+#include "../threading/thread/kthread.h"
 
 static lock scheduler_lock = SPIN_LOCK_STATIC_INITIALIZER;
 static queue run_queue = QUEUE_STATIC_INITIALIZER;

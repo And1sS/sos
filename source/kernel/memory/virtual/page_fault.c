@@ -1,12 +1,16 @@
 #include "page_fault.h"
 #include "../../arch/common/context.h"
+#include "../../arch/x86_64/cpu/registers.h"
 #include "../../error/errno.h"
+#include "../../lib/kprint.h"
 #include "../../scheduler/scheduler.h"
 
 struct cpu_context* handle_page_fault(struct cpu_context* context) {
     thread* current = get_current_thread();
     if (!current || current->kernel_thread
         || !arch_is_userspace_context(context)) {
+
+        print_u64(get_cr2());
 
         arch_print_cpu_context(context);
         panic("Unhandled page fault");

@@ -1,7 +1,7 @@
 #ifndef SOS_PROCESS_CLEANER_H
 #define SOS_PROCESS_CLEANER_H
 
-#include "../process.h"
+#include "../process/process.h"
 
 void process_cleaner_init();
 

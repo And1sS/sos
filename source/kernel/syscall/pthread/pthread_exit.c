@@ -1,5 +1,5 @@
 #include "../../lib/util.h"
-#include "../../threading/thread.h"
+#include "../../threading/thread/thread.h"
 #include "../syscall.h"
 
 u64 sys_pthread_exit(u64 arg0, struct cpu_context* context) {

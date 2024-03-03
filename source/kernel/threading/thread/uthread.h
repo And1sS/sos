@@ -1,7 +1,7 @@
 #ifndef SOS_UTHREAD_H
 #define SOS_UTHREAD_H
 
-#include "../arch/common/vmm.h"
+#include "../../arch/common/vmm.h"
 #include "thread.h"
 
 typedef void uthread_func();

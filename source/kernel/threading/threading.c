@@ -2,7 +2,7 @@
 #include "../lib/id_generator.h"
 #include "cleaners/process_cleaner.h"
 #include "cleaners/thread_cleaner.h"
-#include "process.h"
+#include "process/process.h"
 
 static id_generator tid_gen;
 static id_generator pid_gen;

@@ -1,6 +1,6 @@
 #include "../lib/types.h"
 #include "../lib/util.h"
-#include "../threading/process.h"
+#include "../threading/process/process.h"
 
 struct cpu_context;
 

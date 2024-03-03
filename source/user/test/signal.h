@@ -20,7 +20,8 @@ typedef enum {
     SIGABRT = 6,
     SIGKILL = 9,
     SIGSEGV = 11,
-    SIGTERM = 14
+    SIGTERM = 14,
+    SIGCHLD = 17
 } signal;
 
 typedef struct {

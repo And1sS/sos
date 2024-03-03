@@ -1,6 +1,6 @@
 #include "process_cleaner.h"
 #include "../../lib/kprint.h"
-#include "../kthread.h"
+#include "../thread/kthread.h"
 
 static lock dead_lock = SPIN_LOCK_STATIC_INITIALIZER;
 static con_var dead_cvar = CON_VAR_STATIC_INITIALIZER;
@@ -25,6 +25,9 @@ _Noreturn void process_cleaner_daemon() {
 
             // Do not destroy process until its lock is available
             spin_lock(&proc->lock);
+            print("Destroying process: ");
+            print_u64(proc->id);
+            println("");
             process_destroy(proc);
             cur = linked_list_remove_first_node(&dead_list);
         }

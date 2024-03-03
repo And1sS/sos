@@ -1,14 +1,14 @@
 #ifndef SOS_THREAD_H
 #define SOS_THREAD_H
 
-#include "../lib/container/array_list/array_list.h"
-#include "../lib/container/linked_list/linked_list.h"
-#include "../lib/ref_count/ref_count.h"
-#include "../lib/types.h"
-#include "../signal/signal.h"
-#include "../synchronization/completion.h"
-#include "../synchronization/spin_lock.h"
-#include "process.h"
+#include "../../lib/container/array_list/array_list.h"
+#include "../../lib/container/linked_list/linked_list.h"
+#include "../../lib/ref_count/ref_count.h"
+#include "../../lib/types.h"
+#include "../../signal/signal.h"
+#include "../../synchronization/completion.h"
+#include "../../synchronization/spin_lock.h"
+#include "../process/process.h"
 
 #define THREAD_KERNEL_STACK_SIZE 8192
 

@@ -1,8 +1,8 @@
 #ifndef SOS_ARCH_COMMON_THREAD_H
 #define SOS_ARCH_COMMON_THREAD_H
 
-#include "../../threading/kthread.h"
-#include "../../threading/uthread.h"
+#include "../../threading/thread/kthread.h"
+#include "../../threading/thread/uthread.h"
 
 struct cpu_context;
 

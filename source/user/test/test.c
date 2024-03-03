@@ -40,13 +40,16 @@ void thread_func() {
 }
 
 const sigaction sigint_action = {.handler = (signal_handler*) sigint_handler};
+
 const sigaction sigkill_action = {};
 
+int init = 0;
 void __attribute__((section(".entrypoint"))) main() {
     process_set_signal_disposition(SIGINT, IGNORE);
 
     // This one should succeed (e.g. return 0)
     long sigint_act_set = pthread_sigaction(SIGINT, &sigint_action);
+    //    long sigchld_act_set = pthread_sigaction(SIGCHLD, &)
     // This one should fail (e.g. return value < 0)
     long sigkill_act_set = pthread_sigaction(SIGKILL, &sigkill_action);
 
@@ -55,21 +58,31 @@ void __attribute__((section(".entrypoint"))) main() {
     //        pthread_run("other-thread", thread_func, &thread);
     //    }
 
-    long long pid = fork();
     long long pid1 = fork();
     long long pid2 = fork();
+    long long pid3 = fork();
 
-    if (pid < 0) {
-        print("ERROR");
-        exit(-1);
-    }
-//    const char* to_print = pid == 0 ? "CHILD! " : "PARENT! ";
-//
-//    for (;;) {
-//        print(to_print);
-//        printll(pid);
-//        print("\n");
+//    if (pid < 0) {
+//        print("ERROR\n");
+//        exit(-1);
 //    }
+
+    if (pid1 && pid2 && pid3) {
+        print("PARENT!\n");
+        for (;;) {
+            printll(syscall0(11));
+        }
+    } else {
+        print("CHILD!\n");
+    }
+
+    //    const char* to_print = pid == 0 ? "CHILD! " : "PARENT! ";
+    //
+    //    for (;;) {
+    //        print(to_print);
+    //        printll(pid);
+    //        print("\n");
+    //    }
 
     print("EXITING!\n");
     exit(0xDEADB33F);

@@ -1,11 +1,9 @@
 #include "thread.h"
-#include "../interrupts/irq.h"
-#include "../lib/id_generator.h"
-#include "../lib/kprint.h"
-#include "../scheduler/scheduler.h"
-#include "cleaners/process_cleaner.h"
-#include "cleaners/thread_cleaner.h"
-#include "threading.h"
+#include "../../interrupts/irq.h"
+#include "../../scheduler/scheduler.h"
+#include "../cleaners/process_cleaner.h"
+#include "../cleaners/thread_cleaner.h"
+#include "../threading.h"
 
 void thread_start(thread* thrd) { schedule_thread(thrd); }
 
