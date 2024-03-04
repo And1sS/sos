@@ -16,7 +16,7 @@ void threading_init() {
     if (!id_generator_init(&pid_gen))
         panic("Can't init pid generator");
 
-    if (!process_init(&kernel_process, true))
+    if (!process_init(NULL, &kernel_process, true))
         panic("Can't init kernel process");
 
     thread_cleaner_init();

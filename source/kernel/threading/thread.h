@@ -33,7 +33,7 @@ typedef struct {
 struct cpu_context;
 
 typedef struct _thread {
-    u64 id; // global thread id
+    u64 id;   // global thread id
     u64 tgid; // id inside thread group (process)
     string name;
     bool kernel_thread;
@@ -89,6 +89,8 @@ sigaction thread_get_sigaction(signal sig);
 bool thread_signal_block(signal sig);
 void thread_signal_unblock(signal sig);
 
+void thread_set_state(thread_state state);
+
 void thread_exit(u64 exit_code);
 void thread_yield();
 
@@ -98,6 +100,8 @@ void thread_destroy(thread* thread);
 bool thread_signal(thread* thread, signal sig);
 bool thread_signal_if_allowed(thread* thrd, signal sig);
 bool thread_signal_allowed(thread* thrd, signal sig);
+
+bool thread_any_pending_signals();
 
 /*
  * Acquires and releases thread lock. Should be used when releasing

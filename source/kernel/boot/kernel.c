@@ -8,7 +8,7 @@
 #include "../threading/uthread.h"
 #include "multiboot.h"
 
-process* init_process;
+extern process* init_process;
 
 void kernel_thread() {
     u64 i = 0;
@@ -67,7 +67,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Kernel vm:");
     vm_space_print(kernel_space);
 
-    init_process = process_create();
+    init_process = process_create_user();
+    set_init_process(init_process);
 
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};

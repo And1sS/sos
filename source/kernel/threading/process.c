@@ -3,10 +3,128 @@
 #include "../error/errno.h"
 #include "../memory/virtual/vmm.h"
 #include "../scheduler/scheduler.h"
+#include "../synchronization/wait.h"
 #include "threading.h"
 #include "uthread.h"
 
-bool process_init(process* proc, bool kernel_process) {
+#define MAX_PROC 4096
+
+process* init_process;
+static process* process_list[MAX_PROC];
+
+/*
+ *  lock order:
+ *  process_table_lock ->
+ *  init_process lock ->
+ *  parent lock ->
+ *  child lock
+ */
+static lock process_table_lock = SPIN_LOCK_STATIC_INITIALIZER;
+
+void set_init_process(process* init) { init_process = init; }
+
+static bool add_process_to_table(process* proc) {
+    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
+    process_list[proc->id] = proc;
+    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
+
+    return true;
+}
+
+static bool remove_process_from_table(process* proc) {
+    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
+    process_list[proc->id] = NULL;
+    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
+
+    return true;
+}
+
+static void process_transfer_child_to_init(process* child) {
+    process* proc = get_current_thread()->proc;
+    if (proc == init_process)
+        panic("Trying to transfer child from init to init");
+    if (proc->kernel_process)
+        panic("Trying to transfer child from kernel process");
+
+    bool interrupts_enabled = spin_lock_irq_save(&init_process->lock);
+    spin_lock(&proc->lock);
+    spin_lock(&child->lock);
+
+    if (child->parent != proc)
+        panic("Trying to transfer process which is not child");
+
+    array_list_remove(&proc->children, child);
+    ref_release(&proc->refc);
+
+    child->parent = init_process;
+    // TODO: This may fail, but it has no right to do so, so replace array list
+    // with linked list and static node inside process, so that this will never
+    // fail
+    array_list_add_last(&init_process->children, child);
+    ref_acquire(&init_process->refc);
+
+    spin_unlock(&child->lock);
+    spin_unlock(&proc->lock);
+    spin_unlock_irq_restore(&init_process->lock, interrupts_enabled);
+
+    process_signal(init_process, SIGCHLD);
+}
+
+static void process_transfer_children_to_init() {
+    process* current = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    while (current->children.size != 0) {
+        process* child = array_list_get(&current->children, 0);
+        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+
+        process_transfer_child_to_init(child);
+
+        interrupts_enabled = spin_lock_irq_save(&current->lock);
+    }
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+}
+
+static bool process_add_child(process* child) {
+    process* proc = get_current_thread()->proc;
+
+    if (proc->kernel_process)
+        panic("Trying to add child to kernel process");
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    bool added = !proc->exiting && array_list_add_last(&proc->children, child);
+    if (added) {
+        child->parent = proc;
+        ref_acquire(&proc->refc);
+        // No locking required since this function is called on child thread
+        // creation
+        ref_acquire(&child->refc);
+    }
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return added;
+}
+
+// Assumes that current process lock is held and interrupts are disabled
+static void process_remove_child(process* child) {
+    process* proc = get_current_thread()->proc;
+    if (proc->kernel_process)
+        panic("Trying to remove child from kernel process");
+
+    spin_lock(&child->lock);
+
+    if (child->parent != proc)
+        panic("Trying to remove invalid child");
+
+    ref_release(&proc->refc);
+    child->parent = NULL;
+    ref_release(&child->refc);
+    spin_unlock(&child->lock);
+
+    array_list_remove(&proc->children, child);
+}
+
+bool process_init(process* parent, process* proc, bool kernel_process) {
     if (!threading_allocate_pid(&proc->id))
         goto failed_to_allocate_pid;
 
@@ -34,9 +152,21 @@ bool process_init(process* proc, bool kernel_process) {
     proc->finished = false;
     memset(&proc->siginfo, 0, sizeof(process_siginfo));
 
-    // TODO: add to parent
+    if (parent && !process_add_child(proc))
+        goto failed_to_add_process_to_parent;
+
+    if (!add_process_to_table(proc))
+        goto failed_to_add_process_to_table;
 
     return true;
+
+failed_to_add_process_to_table:
+    if (parent) {
+        process_remove_child(proc);
+    }
+
+failed_to_add_process_to_parent:
+    id_generator_deinit(&proc->tgid_generator);
 
 failed_to_init_tgid_generator:
     vm_space_destroy(proc->vm);
@@ -54,12 +184,14 @@ failed_to_allocate_pid:
     return false;
 }
 
-process* process_create() {
+process* process_create_user() {
     process* proc = kmalloc(sizeof(process));
     if (!proc)
         return NULL;
 
-    if (!process_init(proc, false)) {
+    thread* current = get_current_thread();
+    process* parent = current ? current->proc : NULL;
+    if (!process_init(parent, proc, false)) {
         kfree(proc);
         return NULL;
     }
@@ -68,8 +200,7 @@ process* process_create() {
 }
 
 void process_destroy(process* proc) {
-    if (proc->kernel_process)
-        panic("Trying to destroy kernel process");
+    remove_process_from_table(proc);
 
     vm_space_destroy(proc->vm);
 
@@ -87,7 +218,7 @@ u64 process_fork(struct cpu_context* context) {
     thread* current = get_current_thread();
     process* proc = current->proc;
 
-    process* created = process_create();
+    process* created = process_create_user();
     if (!created)
         goto failed_to_create_process;
 
@@ -105,7 +236,6 @@ u64 process_fork(struct cpu_context* context) {
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
     memcpy(&created->siginfo.dispositions, &proc->siginfo.dispositions,
            sizeof(signal_disposition) * (SIGNALS_COUNT + 1));
-    array_list_add_last(&proc->children, created);
     spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
     cpu_context* forked_arch_context = (cpu_context*) start_thread->context;
@@ -123,21 +253,118 @@ failed_to_create_process:
     return -ENOMEM;
 }
 
+// u64 process_wait(u64 pid, struct cpu_context* context) {
+//     bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
+//     process* current = get_current_thread()->proc;
+//     process* proc = process_list[pid];
+//     if (!proc) {
+//         spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
+//         return -ECHILD;
+//     }
+//
+//     spin_lock(&proc->lock);
+//     bool is_child = proc->parent == current;
+//     spin_unlock(&proc->lock);
+//
+//     if (!is_child) {
+//         spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
+//         return -ECHILD;
+//     }
+//
+//
+// }
+
+static bool any_child_exited(array_list* children, process** finished) {
+    ARRAY_LIST_FOR_EACH(children, process * iter) {
+        bool interrupts_enabled = spin_lock_irq_save(&iter->lock);
+        if (iter->finished) {
+            *finished = iter;
+            spin_unlock_irq_restore(&iter->lock, interrupts_enabled);
+            return true;
+        }
+
+        spin_unlock_irq_restore(&iter->lock, interrupts_enabled);
+    }
+
+    return false;
+}
+
+u64 process_wait_any(u64* exit_code) {
+    thread* current = get_current_thread();
+    process* proc = current->proc;
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+
+    if (proc->children.size == 0) {
+        spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+        return -ECHILD;
+    }
+
+    process* exited;
+    bool interrupted =
+        WAIT_FOR_IRQ_INTERRUPTABLE(&proc->lock, interrupts_enabled,
+                                   any_child_exited(&proc->children, &exited));
+
+    if (interrupted) {
+        spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+        return -EINTR;
+    }
+
+    spin_lock(&exited->lock);
+    u64 exit_pid = exited->id;
+    *exit_code = exited->exit_code;
+    spin_unlock(&exited->lock);
+
+    process_remove_child(exited);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return exit_pid;
+}
+
 bool process_add_thread(process* proc, struct thread* thrd) {
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-    if (proc->exiting)
-        panic("Trying to add new thread to finishing process");
-
-    bool added = array_list_add_last(&proc->threads, thrd);
+    bool added = !proc->exiting && array_list_add_last(&proc->threads, thrd);
     spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
     return added;
 }
 
+static void process_finalize() {
+    process* proc = get_current_thread()->proc;
+    if (proc == init_process)
+        panic("Trying to destroy init process");
+    if (proc->kernel_process)
+        panic("Trying to destroy kernel process");
+
+    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
+    spin_lock(&proc->lock);
+    process* parent = proc->parent;
+    spin_unlock(&proc->lock);
+
+    // Since we have locked process table, process pointer we read is still
+    // valid. (Because at the time we read it from proc->parent it was still
+    // alive, and for it to be invalid it has to take process table lock).
+    //
+    // True parent may have been changed (since parent may have passed current
+    // process to init), but we should not bother signaling exact parent, since
+    // if current thread has been moved to init as child, it will be signaled
+    // anyway.
+    if (parent) {
+        process_signal(parent, SIGCHLD);
+    }
+    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
+
+    process_transfer_children_to_init();
+
+    interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    ref_count* refc = &proc->refc;
+    CON_VAR_WAIT_FOR_IRQ(&refc->empty_cvar, &proc->lock, interrupts_enabled,
+                         refc->count == 0);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+}
+
 bool process_exit_thread() {
     thread* current = get_current_thread();
     process* proc = current->proc;
-    bool destroy = false;
 
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
     ref_release(&proc->refc);
@@ -149,29 +376,29 @@ bool process_exit_thread() {
     // unmapped it
     if (!current->kernel_thread) {
         rw_spin_lock_write(&proc->vm->lock);
-        vm_space_unmap_pages(proc->vm, (u64) current->user_stack,
-                             USER_STACK_PAGE_COUNT);
+        bool unmapped = vm_space_unmap_pages(
+            proc->vm, (u64) current->user_stack, USER_STACK_PAGE_COUNT);
         rw_spin_unlock_write(&proc->vm->lock);
+
+        if (!unmapped)
+            thread_signal(current, SIGSEGV);
     }
 
     id_generator_free_id(&proc->tgid_generator, current->tgid);
 
-    // last leaving thread awaits for process refcount to reach zero
+    // last leaving user thread awaits for process refcount to reach zero and
+    // does other finalizations
     if (!proc->kernel_process && proc->threads.size == 0) {
         proc->finished = true;
         con_var_broadcast(&proc->finish_cvar);
+        spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
-        // TODO: send SIGCHLD to parent process
-
-        ref_count* refc = &proc->refc;
-        WAIT_FOR_IRQ(&refc->empty_cvar, &proc->lock, interrupts_enabled,
-                     refc->count == 0);
-
-        destroy = true;
+        process_finalize();
+        return true;
     }
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
-    return destroy;
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+    return false;
 }
 
 void process_exit(u64 exit_code) {

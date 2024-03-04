@@ -10,7 +10,11 @@ void con_var_wait(con_var* var, lock* lock) {
     thread* current = get_current_thread();
     queue_node waiter_node = QUEUE_NODE_OF(current);
     queue_push(&var->wait_queue, &waiter_node);
-    current->state = BLOCKED; // TODO: This should be guarded by thread lock
+    if (lock == &current->lock) {
+        current->state = BLOCKED; // TODO: This should be guarded by thread lock
+    } else {
+        thread_set_state(BLOCKED);
+    }
 
     spin_unlock(lock);
     schedule();
@@ -22,7 +26,11 @@ bool con_var_wait_irq_save(con_var* var, lock* lock, bool interrupts_enabled) {
     thread* current = get_current_thread();
     queue_node waiter_node = QUEUE_NODE_OF(current);
     queue_push(&var->wait_queue, &waiter_node);
-    current->state = BLOCKED; // TODO: This should be guarded by thread lock
+    if (lock == &current->lock) {
+        current->state = BLOCKED;
+    } else {
+        thread_set_state(BLOCKED);
+    }
 
     spin_unlock_irq_restore(lock, interrupts_enabled);
     schedule();

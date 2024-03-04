@@ -3,6 +3,7 @@
 #include "pthread.h"
 #include "signal.h"
 #include "syscall.h"
+#include "wait.h"
 
 int signals = 0;
 
@@ -63,13 +64,28 @@ void __attribute__((section(".entrypoint"))) main() {
         print("ERROR");
         exit(-1);
     }
-//    const char* to_print = pid == 0 ? "CHILD! " : "PARENT! ";
-//
-//    for (;;) {
-//        print(to_print);
-//        printll(pid);
-//        print("\n");
-//    }
+
+    long long exit_code;
+    long long exit_pid;
+
+    while ((exit_pid = wait(&exit_code)) > 0) {
+        print("Child exited: ");
+        printll(exit_pid);
+        print(", with code: ");
+        printll(exit_code);
+        print("\n");
+    }
+
+    if (pid != 0 && pid1 != 0 && pid2 != 0) {
+        for (;;);
+    }
+    //    const char* to_print = pid == 0 ? "CHILD! " : "PARENT! ";
+    //
+    //    for (;;) {
+    //        print(to_print);
+    //        printll(pid);
+    //        print("\n");
+    //    }
 
     print("EXITING!\n");
     exit(0xDEADB33F);

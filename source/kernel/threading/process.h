@@ -15,7 +15,7 @@ typedef struct {
     signal_disposition dispositions[SIGNALS_COUNT + 1];
 } process_siginfo;
 
-typedef struct {
+typedef struct _process {
     u64 id;
     bool kernel_process;
     vm_space* vm;
@@ -34,19 +34,23 @@ typedef struct {
     id_generator tgid_generator;
     array_list threads;
 
+    struct _process* parent;
     array_list children;
 
     ref_count refc;
     con_var finish_cvar;
 } process;
 
-bool process_init(process* proc, bool kernel_process);
+void set_init_process(process* init);
+
+bool process_init(process* parent, process* proc, bool kernel_process);
 
 // Creates user process
-process* process_create();
+process* process_create_user();
 void process_destroy(process* proc);
 
 u64 process_fork(struct cpu_context* context);
+u64 process_wait_any(u64* exit_code);
 
 bool process_signal(process* proc, signal sig);
 bool process_add_thread(process* proc, struct thread* thrd);

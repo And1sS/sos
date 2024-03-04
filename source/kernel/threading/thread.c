@@ -66,8 +66,8 @@ bool thread_join(thread* child, u64* exit_code) {
         return false;
     }
 
-    WAIT_FOR_IRQ(&child->finish_cvar, &child->lock, interrupts_enabled,
-                 child->finished);
+    CON_VAR_WAIT_FOR_IRQ(&child->finish_cvar, &child->lock, interrupts_enabled,
+                         child->finished);
 
     if (exit_code) {
         *exit_code = child->exit_code;
@@ -106,9 +106,8 @@ void thread_exit(u64 exit_code) {
 
     interrupts_enabled = spin_lock_irq_save(&current->lock);
     ref_count* refc = &current->refc;
-    WAIT_FOR_IRQ(&refc->empty_cvar, &current->lock, interrupts_enabled,
-                 refc->count == 0);
-
+    CON_VAR_WAIT_FOR_IRQ(&refc->empty_cvar, &current->lock, interrupts_enabled,
+                         refc->count == 0);
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 
     // Should clean process information before thread exiting
@@ -152,12 +151,21 @@ bool thread_signal(thread* thrd, signal sig) {
         signal_raise(&thrd->siginfo.pending_signals, sig);
         signal_set = true;
     }
-    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
+    spin_unlock(&thrd->lock);
 
     if (signal_set)
         schedule_thread(thrd);
 
+    local_irq_restore(interrupts_enabled);
+
     return signal_set;
+}
+
+void thread_set_state(thread_state state) {
+    thread* current = get_current_thread();
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    current->state = state;
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 }
 
 bool thread_signal_if_allowed(thread* thrd, signal sig) {
@@ -168,10 +176,12 @@ bool thread_signal_if_allowed(thread* thrd, signal sig) {
         signal_raise(&thrd->siginfo.pending_signals, sig);
         signal_set = true;
     }
-    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
+    spin_unlock(&thrd->lock);
 
     if (signal_set)
         schedule_thread(thrd);
+
+    local_irq_restore(interrupts_enabled);
 
     return signal_set;
 }
@@ -182,6 +192,17 @@ bool thread_signal_allowed(thread* thrd, signal sig) {
     spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
 
     return allowed;
+}
+
+bool thread_any_pending_signals() {
+    thread* current = get_current_thread();
+
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    bool raised = signal_any_raised(current->siginfo.pending_signals
+                                    & current->siginfo.signals_mask);
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+
+    return raised;
 }
 
 bool thread_set_sigaction(signal sig, sigaction action) {

@@ -16,6 +16,7 @@
 #define SYS_EXIT 9
 
 #define SYS_FORK 10
+#define SYS_WAIT 11
 
 long long syscall0(int syscall_number);
 long long syscall1(int syscall_number, long long arg0);
