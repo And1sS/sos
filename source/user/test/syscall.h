@@ -17,6 +17,7 @@
 
 #define SYS_FORK 10
 #define SYS_WAIT 11
+#define SYS_GETPID 12
 
 long long syscall0(int syscall_number);
 long long syscall1(int syscall_number, long long arg0);

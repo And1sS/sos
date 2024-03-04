@@ -15,8 +15,9 @@
 #define SYS_EXIT 9
 #define SYS_FORK 10
 #define SYS_WAIT 11
+#define SYS_GET_PID 12
 
-#define SYSCALLS_IMPLEMENTED_COUNT 11
+#define SYSCALLS_IMPLEMENTED_COUNT 12
 #define SYSCALLS_MAX_COUNT 1024
 
 struct cpu_context;
@@ -43,6 +44,7 @@ u64 sys_pthread_join(u64 arg0, u64 arg1, struct cpu_context* context);
 _Noreturn u64 sys_exit(u64 arg0, struct cpu_context* context);
 
 u64 sys_fork(struct cpu_context* context);
-u64 sys_wait(u64 arg0, struct cpu_context* context);
+u64 sys_wait(u64 arg0, u64 arg1, struct cpu_context* context);
+u64 sys_getpid(struct cpu_context* context);
 
 #endif // SOS_SYSCALL_H

@@ -49,8 +49,10 @@ bool process_init(process* parent, process* proc, bool kernel_process);
 process* process_create_user();
 void process_destroy(process* proc);
 
+u64 process_get_id(process* proc);
+
 u64 process_fork(struct cpu_context* context);
-u64 process_wait_any(u64* exit_code);
+u64 process_wait(u64 pid, u64* exit_code);
 
 bool process_signal(process* proc, signal sig);
 bool process_add_thread(process* proc, struct thread* thrd);

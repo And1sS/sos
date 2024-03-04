@@ -50,7 +50,8 @@ static syscall_descriptor syscall_handlers[1024] = {
 
     [SYS_EXIT] = SYSCALL1(sys_exit),
     [SYS_FORK] = SYSCALL0(sys_fork),
-    [SYS_WAIT] = SYSCALL1(sys_wait),
+    [SYS_WAIT] = SYSCALL2(sys_wait),
+    [SYS_GET_PID] = SYSCALL0(sys_getpid),
 
     [SYSCALLS_IMPLEMENTED_COUNT + 1 ... SYSCALLS_MAX_COUNT - 1] = {0}};
 

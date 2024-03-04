@@ -1,5 +1,6 @@
 #include "exit.h"
 #include "fork.h"
+#include "getpid.h"
 #include "pthread.h"
 #include "signal.h"
 #include "syscall.h"
@@ -68,8 +69,10 @@ void __attribute__((section(".entrypoint"))) main() {
     long long exit_code;
     long long exit_pid;
 
-    while ((exit_pid = wait(&exit_code)) > 0) {
-        print("Child exited: ");
+    while ((exit_pid = wait(0, &exit_code)) > 0) {
+        print("Proc: ");
+        printll(getpid());
+        print(", child exited: ");
         printll(exit_pid);
         print(", with code: ");
         printll(exit_code);

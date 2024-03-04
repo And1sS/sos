@@ -253,58 +253,69 @@ failed_to_create_process:
     return -ENOMEM;
 }
 
-// u64 process_wait(u64 pid, struct cpu_context* context) {
-//     bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
-//     process* current = get_current_thread()->proc;
-//     process* proc = process_list[pid];
-//     if (!proc) {
-//         spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
-//         return -ECHILD;
-//     }
-//
-//     spin_lock(&proc->lock);
-//     bool is_child = proc->parent == current;
-//     spin_unlock(&proc->lock);
-//
-//     if (!is_child) {
-//         spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
-//         return -ECHILD;
-//     }
-//
-//
-// }
+u64 process_get_id(process* proc) {
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    u64 pid = proc->id;
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return pid;
+}
+
+static bool process_is_finished(process* proc) {
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    bool finished = proc->finished;
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return finished;
+}
 
 static bool any_child_exited(array_list* children, process** finished) {
-    ARRAY_LIST_FOR_EACH(children, process * iter) {
-        bool interrupts_enabled = spin_lock_irq_save(&iter->lock);
-        if (iter->finished) {
-            *finished = iter;
-            spin_unlock_irq_restore(&iter->lock, interrupts_enabled);
+    ARRAY_LIST_FOR_EACH(children, process * child) {
+        if (process_is_finished(child)) {
+            *finished = child;
             return true;
         }
-
-        spin_unlock_irq_restore(&iter->lock, interrupts_enabled);
     }
 
     return false;
 }
 
-u64 process_wait_any(u64* exit_code) {
-    thread* current = get_current_thread();
-    process* proc = current->proc;
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-
-    if (proc->children.size == 0) {
-        spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
-        return -ECHILD;
+static process* child_by_pid(array_list* children, u64 pid) {
+    ARRAY_LIST_FOR_EACH(children, process * child) {
+        if (process_get_id(child) == pid) {
+            return child;
+        }
     }
 
-    process* exited;
-    bool interrupted =
-        WAIT_FOR_IRQ_INTERRUPTABLE(&proc->lock, interrupts_enabled,
-                                   any_child_exited(&proc->children, &exited));
+    return NULL;
+}
 
-    if (interrupted) {
+u64 process_wait(u64 pid, u64* exit_code) {
+    process* proc = get_current_thread()->proc;
+    process* exited;
+    bool interrupted;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    if (!pid) {
+        interrupted = WAIT_FOR_IRQ_INTERRUPTABLE(
+            &proc->lock, interrupts_enabled,
+            proc->children.size == 0
+                || any_child_exited(&proc->children, &exited));
+    } else {
+        interrupted = WAIT_FOR_IRQ_INTERRUPTABLE(
+            &proc->lock, interrupts_enabled,
+            proc->children.size == 0
+                || !(exited = child_by_pid(&proc->children, pid))
+                || process_is_finished(exited));
+    }
+
+    if (!interrupted && proc->children.size == 0) {
+        spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+        return -ECHILD;
+    } else if (!interrupted && !exited) {
+        spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+        return -EINVAL;
+    } else if (interrupted) {
         spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
         return -EINTR;
     }
@@ -344,10 +355,10 @@ static void process_finalize() {
     // valid. (Because at the time we read it from proc->parent it was still
     // alive, and for it to be invalid it has to take process table lock).
     //
-    // True parent may have been changed (since parent may have passed current
-    // process to init), but we should not bother signaling exact parent, since
-    // if current thread has been moved to init as child, it will be signaled
-    // anyway.
+    // True parent may have been changed (since parent may have passed
+    // current process to init), but we should not bother signaling exact
+    // parent, since if current thread has been moved to init as child, it
+    // will be signaled anyway.
     if (parent) {
         process_signal(parent, SIGCHLD);
     }
@@ -386,8 +397,8 @@ bool process_exit_thread() {
 
     id_generator_free_id(&proc->tgid_generator, current->tgid);
 
-    // last leaving user thread awaits for process refcount to reach zero and
-    // does other finalizations
+    // last leaving user thread awaits for process refcount to reach zero
+    // and does other finalizations
     if (!proc->kernel_process && proc->threads.size == 0) {
         proc->finished = true;
         con_var_broadcast(&proc->finish_cvar);
