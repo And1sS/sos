@@ -67,8 +67,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     println("Kernel vm:");
     vm_space_print(kernel_space);
 
-    init_process = process_create_user();
-    set_init_process(init_process);
+    init_process = create_user_init_process();
 
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};

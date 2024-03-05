@@ -21,108 +21,13 @@ static process* process_list[MAX_PROC];
  */
 static lock process_table_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
-void set_init_process(process* init) { init_process = init; }
+static bool add_process_to_table(process* proc);
+static bool remove_process_from_table(process* proc);
 
-static bool add_process_to_table(process* proc) {
-    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
-    process_list[proc->id] = proc;
-    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
-
-    return true;
-}
-
-static bool remove_process_from_table(process* proc) {
-    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
-    process_list[proc->id] = NULL;
-    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
-
-    return true;
-}
-
-static void process_transfer_child_to_init(process* child) {
-    process* proc = get_current_thread()->proc;
-    if (proc == init_process)
-        panic("Trying to transfer child from init to init");
-    if (proc->kernel_process)
-        panic("Trying to transfer child from kernel process");
-
-    bool interrupts_enabled = spin_lock_irq_save(&init_process->lock);
-    spin_lock(&proc->lock);
-    spin_lock(&child->lock);
-
-    if (child->parent != proc)
-        panic("Trying to transfer process which is not child");
-
-    array_list_remove(&proc->children, child);
-    ref_release(&proc->refc);
-
-    child->parent = init_process;
-    // TODO: This may fail, but it has no right to do so, so replace array list
-    // with linked list and static node inside process, so that this will never
-    // fail
-    array_list_add_last(&init_process->children, child);
-    ref_acquire(&init_process->refc);
-
-    spin_unlock(&child->lock);
-    spin_unlock(&proc->lock);
-    spin_unlock_irq_restore(&init_process->lock, interrupts_enabled);
-
-    process_signal(init_process, SIGCHLD);
-}
-
-static void process_transfer_children_to_init() {
-    process* current = get_current_thread()->proc;
-
-    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
-    while (current->children.size != 0) {
-        process* child = array_list_get(&current->children, 0);
-        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-
-        process_transfer_child_to_init(child);
-
-        interrupts_enabled = spin_lock_irq_save(&current->lock);
-    }
-    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-}
-
-static bool process_add_child(process* child) {
-    process* proc = get_current_thread()->proc;
-
-    if (proc->kernel_process)
-        panic("Trying to add child to kernel process");
-
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-    bool added = !proc->exiting && array_list_add_last(&proc->children, child);
-    if (added) {
-        child->parent = proc;
-        ref_acquire(&proc->refc);
-        // No locking required since this function is called on child thread
-        // creation
-        ref_acquire(&child->refc);
-    }
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
-
-    return added;
-}
-
+static bool process_add_child(process* child);
+static void process_remove_child(process* child);
 // Assumes that current process lock is held and interrupts are disabled
-static void process_remove_child(process* child) {
-    process* proc = get_current_thread()->proc;
-    if (proc->kernel_process)
-        panic("Trying to remove child from kernel process");
-
-    spin_lock(&child->lock);
-
-    if (child->parent != proc)
-        panic("Trying to remove invalid child");
-
-    ref_release(&proc->refc);
-    child->parent = NULL;
-    ref_release(&child->refc);
-    spin_unlock(&child->lock);
-
-    array_list_remove(&proc->children, child);
-}
+static void process_remove_child_unsafe(process* child);
 
 bool process_init(process* parent, process* proc, bool kernel_process) {
     if (!threading_allocate_pid(&proc->id))
@@ -184,7 +89,7 @@ failed_to_allocate_pid:
     return false;
 }
 
-process* process_create_user() {
+static process* create_user_process() {
     process* proc = kmalloc(sizeof(process));
     if (!proc)
         return NULL;
@@ -197,6 +102,14 @@ process* process_create_user() {
     }
 
     return proc;
+}
+
+process* create_user_init_process() {
+    init_process = create_user_process();
+    if (!init_process)
+        panic("Can't create user init process");
+
+    return init_process;
 }
 
 void process_destroy(process* proc) {
@@ -214,11 +127,27 @@ void process_destroy(process* proc) {
     kfree(proc);
 }
 
+bool process_add_thread(process* proc, struct thread* thrd) {
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    bool added = !proc->exiting && array_list_add_last(&proc->threads, thrd);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return added;
+}
+
+u64 process_get_id(process* proc) {
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    u64 pid = proc->id;
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return pid;
+}
+
 u64 process_fork(struct cpu_context* context) {
     thread* current = get_current_thread();
     process* proc = current->proc;
 
-    process* created = process_create_user();
+    process* created = create_user_process();
     if (!created)
         goto failed_to_create_process;
 
@@ -253,14 +182,6 @@ failed_to_create_process:
     return -ENOMEM;
 }
 
-u64 process_get_id(process* proc) {
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-    u64 pid = proc->id;
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
-
-    return pid;
-}
-
 static bool process_is_finished(process* proc) {
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
     bool finished = proc->finished;
@@ -292,7 +213,7 @@ static process* child_by_pid(array_list* children, u64 pid) {
 
 u64 process_wait(u64 pid, u64* exit_code) {
     process* proc = get_current_thread()->proc;
-    process* exited;
+    process* exited = NULL;
     bool interrupted;
 
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
@@ -325,18 +246,56 @@ u64 process_wait(u64 pid, u64* exit_code) {
     *exit_code = exited->exit_code;
     spin_unlock(&exited->lock);
 
-    process_remove_child(exited);
+    process_remove_child_unsafe(exited);
     spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
     return exit_pid;
 }
 
-bool process_add_thread(process* proc, struct thread* thrd) {
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-    bool added = !proc->exiting && array_list_add_last(&proc->threads, thrd);
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+static void process_transfer_child_to_init(process* child) {
+    process* proc = get_current_thread()->proc;
+    if (proc == init_process)
+        panic("Trying to transfer child from init to init");
+    if (proc->kernel_process)
+        panic("Trying to transfer child from kernel process");
 
-    return added;
+    bool interrupts_enabled = spin_lock_irq_save(&init_process->lock);
+    spin_lock(&proc->lock);
+    spin_lock(&child->lock);
+
+    if (child->parent != proc)
+        panic("Trying to transfer process which is not child");
+
+    array_list_remove(&proc->children, child);
+    ref_release(&proc->refc);
+
+    child->parent = init_process;
+    // TODO: This may fail, but it has no right to do so, so replace array list
+    // with linked list and static node inside process, so that this will never
+    // fail
+    array_list_add_last(&init_process->children, child);
+    ref_acquire(&init_process->refc);
+
+    spin_unlock(&child->lock);
+    spin_unlock(&proc->lock);
+    spin_unlock_irq_restore(&init_process->lock, interrupts_enabled);
+
+    process_signal(init_process, SIGCHLD);
+}
+
+static void process_transfer_children_to_init() {
+    process* current = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    while (current->children.size != 0) {
+        process* child = array_list_get(&current->children, 0);
+        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+
+        process_transfer_child_to_init(child);
+
+        interrupts_enabled = spin_lock_irq_save(&current->lock);
+    }
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 }
 
 static void process_finalize() {
@@ -484,4 +443,61 @@ void process_kill(process* proc) {
         panic("Trying to kill kernel process");
 
     process_signal(proc, SIGKILL);
+}
+
+static bool process_add_child(process* child) {
+    process* proc = get_current_thread()->proc;
+
+    if (proc->kernel_process)
+        panic("Trying to add child to kernel process");
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    bool added = !proc->exiting && array_list_add_last(&proc->children, child);
+    if (added) {
+        child->parent = proc;
+        ref_acquire(&proc->refc);
+        // No locking required since this function is called on child thread
+        // creation
+        ref_acquire(&child->refc);
+    }
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return added;
+}
+
+// Assumes that current process lock is held and interrupts are disabled
+static void process_remove_child_unsafe(process* child) {
+    process* proc = get_current_thread()->proc;
+
+    spin_lock(&child->lock);
+
+    ref_release(&proc->refc);
+    child->parent = NULL;
+    ref_release(&child->refc);
+    spin_unlock(&child->lock);
+
+    array_list_remove(&proc->children, child);
+}
+
+static void process_remove_child(process* child) {
+    process* proc = get_current_thread()->proc;
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    process_remove_child_unsafe(child);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+}
+
+static bool add_process_to_table(process* proc) {
+    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
+    process_list[proc->id] = proc;
+    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
+
+    return true;
+}
+
+static bool remove_process_from_table(process* proc) {
+    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
+    process_list[proc->id] = NULL;
+    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
+
+    return true;
 }

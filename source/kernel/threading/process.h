@@ -41,13 +41,10 @@ typedef struct _process {
     con_var finish_cvar;
 } process;
 
-void set_init_process(process* init);
-
 bool process_init(process* parent, process* proc, bool kernel_process);
-
-// Creates user process
-process* process_create_user();
 void process_destroy(process* proc);
+
+process* create_user_init_process();
 
 u64 process_get_id(process* proc);
 
