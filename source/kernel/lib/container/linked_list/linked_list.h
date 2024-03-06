@@ -9,6 +9,18 @@
                            *__next = node ? node->next : NULL;                 \
          node; node = __next, __next = node ? node->next : NULL)
 
+#define LINKED_LIST_FIND(list, node, predicate)                                \
+    ({                                                                         \
+        linked_list_node* ___result = NULL;                                    \
+        LINKED_LIST_FOR_EACH(list, node) {                                     \
+            if ((predicate)) {                                                 \
+                ___result = node;                                              \
+                break;                                                         \
+            }                                                                  \
+        }                                                                      \
+        ___result;                                                             \
+    })
+
 typedef struct linked_list_node {
     void* value;
     struct linked_list_node* prev;

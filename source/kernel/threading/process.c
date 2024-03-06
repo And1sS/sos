@@ -185,30 +185,9 @@ static bool process_is_finished(process* proc) {
     return finished;
 }
 
-static bool any_child_exited(linked_list* children, process** finished) {
-    LINKED_LIST_FOR_EACH(children, child_node) {
-        if (process_is_finished(child_node->value)) {
-            *finished = child_node->value;
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static process* child_by_pid(linked_list* children, u64 pid) {
-    LINKED_LIST_FOR_EACH(children, child_node) {
-        if (process_get_id(child_node->value) == pid) {
-            return child_node->value;
-        }
-    }
-
-    return NULL;
-}
-
 u64 process_wait(u64 pid, u64* exit_code) {
     process* proc = get_current_thread()->proc;
-    process* exited = NULL;
+    linked_list_node* exited_node = NULL;
     bool interrupted;
 
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
@@ -216,19 +195,23 @@ u64 process_wait(u64 pid, u64* exit_code) {
         interrupted = WAIT_FOR_IRQ_INTERRUPTABLE(
             &proc->lock, interrupts_enabled,
             proc->children.size == 0
-                || any_child_exited(&proc->children, &exited));
+                || (exited_node = LINKED_LIST_FIND(
+                        &proc->children, child_node,
+                        process_is_finished(child_node->value))));
     } else {
         interrupted = WAIT_FOR_IRQ_INTERRUPTABLE(
             &proc->lock, interrupts_enabled,
             proc->children.size == 0
-                || !(exited = child_by_pid(&proc->children, pid))
-                || process_is_finished(exited));
+                || !(exited_node = LINKED_LIST_FIND(
+                         &proc->children, child_node,
+                         ((process*) child_node->value)->id == pid))
+                || process_is_finished(exited_node->value));
     }
 
     if (!interrupted && proc->children.size == 0) {
         spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
         return -ECHILD;
-    } else if (!interrupted && !exited) {
+    } else if (!interrupted && !exited_node) {
         spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
         return -EINVAL;
     } else if (interrupted) {
@@ -236,6 +219,7 @@ u64 process_wait(u64 pid, u64* exit_code) {
         return -EINTR;
     }
 
+    process* exited = exited_node->value;
     spin_lock(&exited->lock);
     u64 exit_pid = exited->id;
     *exit_code = exited->exit_code;
