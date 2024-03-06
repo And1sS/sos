@@ -20,10 +20,6 @@ typedef struct _process {
     bool kernel_process;
     vm_space* vm;
 
-    // Node to use in process cleaner to avoid memory allocations that may
-    // potentially crash
-    linked_list_node cleaner_node;
-
     lock lock; // guards all fields below
     bool exiting;
     bool finished;
@@ -35,7 +31,12 @@ typedef struct _process {
     array_list threads;
 
     struct _process* parent;
-    array_list children;
+
+    linked_list_node process_node; // node that will be used in parent process
+                                   // and in process cleaner to store current
+                                   // process  in fail-safe manner
+
+    linked_list children; // stores process_node of children
 
     ref_count refc;
     con_var finish_cvar;

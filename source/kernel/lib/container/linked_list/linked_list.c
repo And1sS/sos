@@ -15,6 +15,11 @@ void linked_list_init(linked_list* list) {
     memset(list, 0, sizeof(linked_list));
 }
 
+void* linked_list_first(linked_list* list) {
+    linked_list_node* node = list->head;
+    return node ? node->value : NULL;
+}
+
 bool linked_list_add_first(linked_list* list, void* value) {
     linked_list_node* node = linked_list_node_create(value);
     if (!node) {

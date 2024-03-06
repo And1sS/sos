@@ -17,7 +17,7 @@ _Noreturn void process_cleaner_daemon() {
     while (true) {
         bool interrupts_enabled = spin_lock_irq_save(&dead_lock);
         CON_VAR_WAIT_FOR_IRQ(&dead_cvar, &dead_lock, interrupts_enabled,
-                     dead_list.size != 0);
+                             dead_list.size != 0);
 
         linked_list_node* cur = linked_list_remove_first_node(&dead_list);
         while (cur) {
@@ -37,7 +37,7 @@ void process_cleaner_mark(process* proc) {
     bool interrupts_enabled = spin_lock_irq_save(&dead_lock);
     // at this point thread will never be scheduled anymore, so we can utilize
     // its node for our purposes
-    linked_list_add_last_node(&dead_list, &proc->cleaner_node);
+    linked_list_add_last_node(&dead_list, &proc->process_node);
     con_var_broadcast(&dead_cvar);
     spin_unlock_irq_restore(&dead_lock, interrupts_enabled);
 }

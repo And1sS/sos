@@ -36,8 +36,7 @@ bool process_init(process* parent, process* proc, bool kernel_process) {
     if (!array_list_init(&proc->threads, 8))
         goto failed_to_init_thread_list;
 
-    if (!array_list_init(&proc->children, 8))
-        goto failed_to_init_children_list;
+    linked_list_init(&proc->children);
 
     proc->vm = kernel_process ? vmm_kernel_vm_space()
                               : vm_space_fork(vmm_current_vm_space());
@@ -48,7 +47,7 @@ bool process_init(process* parent, process* proc, bool kernel_process) {
     if (!id_generator_init(&proc->tgid_generator))
         goto failed_to_init_tgid_generator;
 
-    proc->cleaner_node = (linked_list_node) LINKED_LIST_NODE_OF(proc);
+    proc->process_node = (linked_list_node) LINKED_LIST_NODE_OF(proc);
 
     proc->kernel_process = kernel_process;
     proc->lock = SPIN_LOCK_STATIC_INITIALIZER;
@@ -77,9 +76,6 @@ failed_to_init_tgid_generator:
     vm_space_destroy(proc->vm);
 
 failed_to_fork_vm_space:
-    array_list_deinit(&proc->children);
-
-failed_to_init_children_list:
     array_list_deinit(&proc->threads);
 
 failed_to_init_thread_list:
@@ -122,7 +118,6 @@ void process_destroy(process* proc) {
     id_generator_deinit(&proc->tgid_generator);
 
     array_list_deinit(&proc->threads);
-    array_list_deinit(&proc->children);
 
     kfree(proc);
 }
@@ -190,10 +185,10 @@ static bool process_is_finished(process* proc) {
     return finished;
 }
 
-static bool any_child_exited(array_list* children, process** finished) {
-    ARRAY_LIST_FOR_EACH(children, process * child) {
-        if (process_is_finished(child)) {
-            *finished = child;
+static bool any_child_exited(linked_list* children, process** finished) {
+    LINKED_LIST_FOR_EACH(children, child_node) {
+        if (process_is_finished(child_node->value)) {
+            *finished = child_node->value;
             return true;
         }
     }
@@ -201,10 +196,10 @@ static bool any_child_exited(array_list* children, process** finished) {
     return false;
 }
 
-static process* child_by_pid(array_list* children, u64 pid) {
-    ARRAY_LIST_FOR_EACH(children, process * child) {
-        if (process_get_id(child) == pid) {
-            return child;
+static process* child_by_pid(linked_list* children, u64 pid) {
+    LINKED_LIST_FOR_EACH(children, child_node) {
+        if (process_get_id(child_node->value) == pid) {
+            return child_node->value;
         }
     }
 
@@ -266,14 +261,11 @@ static void process_transfer_child_to_init(process* child) {
     if (child->parent != proc)
         panic("Trying to transfer process which is not child");
 
-    array_list_remove(&proc->children, child);
+    linked_list_remove_node(&proc->children, &child->process_node);
     ref_release(&proc->refc);
 
     child->parent = init_process;
-    // TODO: This may fail, but it has no right to do so, so replace array list
-    // with linked list and static node inside process, so that this will never
-    // fail
-    array_list_add_last(&init_process->children, child);
+    linked_list_add_last_node(&init_process->children, &child->process_node);
     ref_acquire(&init_process->refc);
 
     spin_unlock(&child->lock);
@@ -288,9 +280,11 @@ static void process_transfer_children_to_init() {
 
     bool interrupts_enabled = spin_lock_irq_save(&current->lock);
     while (current->children.size != 0) {
-        process* child = array_list_get(&current->children, 0);
+        process* child = linked_list_first(&current->children);
         spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 
+        // It is safe to break atomicity in this case, since this function will
+        // be invoked in last alive thread
         process_transfer_child_to_init(child);
 
         interrupts_enabled = spin_lock_irq_save(&current->lock);
@@ -452,8 +446,9 @@ static bool process_add_child(process* child) {
         panic("Trying to add child to kernel process");
 
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-    bool added = !proc->exiting && array_list_add_last(&proc->children, child);
+    bool added = !proc->exiting;
     if (added) {
+        linked_list_add_last_node(&proc->children, &child->process_node);
         child->parent = proc;
         ref_acquire(&proc->refc);
         // No locking required since this function is called on child thread
@@ -476,7 +471,7 @@ static void process_remove_child_unsafe(process* child) {
     ref_release(&child->refc);
     spin_unlock(&child->lock);
 
-    array_list_remove(&proc->children, child);
+    linked_list_remove_node(&proc->children, &child->process_node);
 }
 
 static void process_remove_child(process* child) {
