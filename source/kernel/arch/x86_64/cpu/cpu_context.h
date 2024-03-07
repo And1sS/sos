@@ -21,6 +21,8 @@ typedef struct __attribute__((__packed__)) {
     u64 r14;
     u64 r15;
 
+    u64 error_code;
+
     u64 rip;
     u64 cs;
     u64 rflags;

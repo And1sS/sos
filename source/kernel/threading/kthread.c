@@ -4,7 +4,7 @@
 #include "../lib/id_generator.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/physical/pmm.h"
-#include "../scheduler/scheduler.h"
+#include "scheduler.h"
 #include "threading.h"
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
@@ -41,6 +41,8 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->kernel_stack = kernel_stack;
     thrd->context = arch_kthread_context_init(thrd, func);
     thrd->state = INITIALISED;
+    thrd->currently_running = false;
+    thrd->on_run_queue = false;
 
     thrd->parent = NULL;
     array_list_init(&thrd->children, 0);

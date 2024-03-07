@@ -114,8 +114,12 @@ void linked_list_remove_node(linked_list* list, linked_list_node* node) {
         node->prev = NULL;
         node->next = NULL;
 
-        prev->next = next;
-        next->prev = prev;
+        if (prev) {
+            prev->next = next;
+        }
+        if (next) {
+            next->prev = prev;
+        }
     }
 }
 

@@ -99,7 +99,9 @@ typedef struct {
     sigaction signal_actions[SIGNALS_COUNT + 1];
 } siginfo;
 
-void check_pending_signals();
+struct cpu_context;
+
+void check_pending_signals(struct cpu_context* context);
 
 bool signal_raised(sigpending pending_signals, signal sig);
 bool signal_any_raised(sigpending pending_signals);

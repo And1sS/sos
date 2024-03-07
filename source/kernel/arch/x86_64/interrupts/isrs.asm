@@ -52,6 +52,8 @@ extern check_pending_signals ; defined in signal.c
 
 %macro restore_state 0
     call update_tss
+
+    mov rdi, rsp
     call check_pending_signals
 
     restore_ds
@@ -70,6 +72,8 @@ extern check_pending_signals ; defined in signal.c
     pop r13
     pop r14
     pop r15
+
+    add rsp, 8 ; remove error code from stack
 %endmacro
 
 ; x86-64 exception with error code handler stub
@@ -90,7 +94,6 @@ esr_%1:
     mov rsp, rax
 
     restore_state
-    add rsp, 8 ; remove error code from stack
 
     iretq
 %endmacro
@@ -100,6 +103,7 @@ esr_%1:
 %macro esr_no_error_code 1
 global esr_%1
 esr_%1:
+    push 0 ; push fake error code
     save_state
 
     mov rdi, %1  ; interrupt number
@@ -119,6 +123,7 @@ esr_%1:
 %macro isr_soft 1
 global isr_%1
 isr_%1:
+    push 0 ; push fake error code
     save_state
 
     mov rdi, %1  ; interrupt number
@@ -138,6 +143,7 @@ isr_%1:
 global isr_%1
 isr_%1:
     cli
+    push 0 ; push fake error code
     save_state
 
     mov rdi, %1
@@ -192,7 +198,40 @@ esr_no_error_code 31
 %endrep
 
 %assign i 48
-%rep    256 - 48
+%rep    250 - 48
+        isr_soft i
+%assign i i+1
+%endrep
+
+
+; Scheduler isr stub, will handle software interrupt #250
+; Exists only because context switch should be done atomically
+extern scheduler_lock
+extern scheduler_unlock
+
+global isr_250
+isr_250:
+    cli
+    push 0 ; push fake error code
+    save_state
+
+    call scheduler_lock
+
+    mov rdi, 250
+    mov rsi, rsp
+    call handle_soft_irq
+
+    ; Now we run in probably new context
+    mov rsp, rax
+
+    call scheduler_unlock
+
+    restore_state
+    iretq
+
+
+%assign i 251
+%rep    256 - 251
         isr_soft i
 %assign i i+1
 %endrep

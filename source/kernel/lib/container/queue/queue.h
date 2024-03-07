@@ -17,5 +17,6 @@
 #define queue_node_create linked_list_node_create
 #define queue_push linked_list_add_last_node
 #define queue_pop linked_list_remove_first_node
+#define queue_remove linked_list_remove_node
 
 #endif // OS_QUEUE_H

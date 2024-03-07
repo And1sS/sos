@@ -4,7 +4,7 @@
 #include "../arch/common/vmm.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/memory_map.h"
-#include "../scheduler/scheduler.h"
+#include "scheduler.h"
 #include "threading.h"
 
 #define UTHREAD_CHILDREN_INITIAL_CAPACITY 8
@@ -46,6 +46,8 @@ bool uthread_init(uthread* parent, uthread* thrd, string name, void* stack,
     thrd->user_stack = stack;
     thrd->context = arch_uthread_context_init(thrd, func);
     thrd->state = INITIALISED;
+    thrd->currently_running = false;
+    thrd->on_run_queue = false;
 
     thrd->parent = NULL;
 

@@ -19,6 +19,10 @@ static struct cpu_context* handle_unknown_irq(u8 irq_num,
 }
 
 static struct cpu_context* handle_irq(u8 irq_num, struct cpu_context* context) {
+    if (irq_num >= 32 && irq_num < 47) {
+        pic_ack(irq_num);
+    }
+
     rw_spin_lock_read_irq(&irq_handlers_lock);
     irq_handler* handler = irq_handlers[irq_num];
     rw_spin_unlock_read_irq(&irq_handlers_lock);
@@ -26,10 +30,6 @@ static struct cpu_context* handle_irq(u8 irq_num, struct cpu_context* context) {
     struct cpu_context* new_context =
         handler != NULL ? handler(context)
                         : handle_unknown_irq(irq_num, context);
-
-    if (irq_num >= 32 && irq_num < 47) {
-        pic_ack(irq_num);
-    }
 
     return new_context;
 }

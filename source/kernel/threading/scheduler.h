@@ -2,7 +2,7 @@
 #define SOS_SCHEDULER_H
 
 #include "../lib/container/linked_list/linked_list.h"
-#include "../threading/thread.h"
+#include "thread.h"
 
 void scheduler_init();
 
@@ -14,8 +14,7 @@ void schedule_thread_exit();
 struct cpu_context* context_switch(struct cpu_context* context);
 void schedule();
 
-void stop_thread(thread* thrd);
-void block_thread(thread* thrd);
-void unblock_thread(thread* thrd);
+void scheduler_lock();
+void scheduler_unlock();
 
 #endif // SOS_SCHEDULER_H

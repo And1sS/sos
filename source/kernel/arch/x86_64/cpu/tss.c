@@ -1,6 +1,6 @@
 #include "tss.h"
 #include "../../../lib/memory_util.h"
-#include "../../../scheduler/scheduler.h"
+#include "../../../threading/scheduler.h"
 #include "gdt.h"
 
 task_state_segment tss;

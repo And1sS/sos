@@ -3,7 +3,7 @@
 #include "../arch/common/signal.h"
 #include "../lib/kprint.h"
 #include "../lib/math.h"
-#include "../scheduler/scheduler.h"
+#include "../threading/scheduler.h"
 
 signal_disposition default_dispositions[SIGNALS_COUNT + 1] = {
     CORE_DUMP,
@@ -64,9 +64,9 @@ static void block_and_clear_all_signals(thread* thrd) {
     thrd->signal_info.signals_mask = ALL_SIGNALS_BLOCKED;
 }
 
-void check_pending_signals() {
+void check_pending_signals(struct cpu_context* context) {
     thread* current = get_current_thread();
-    if (!current || !arch_is_userspace_context(current->context)) {
+    if (!current || !arch_is_userspace_context(context)) {
         return;
     }
 
@@ -83,7 +83,7 @@ void check_pending_signals() {
 
     if (handler) {
         signal_clear(&signal_info->pending_signals, raised);
-        arch_enter_signal_handler(current->context, handler);
+        arch_enter_signal_handler(context, handler);
     } else {
         signal_disposition disposition =
             action.disposition != FALLBACK_TO_DEFAULT
@@ -98,7 +98,7 @@ void check_pending_signals() {
         case TERMINATE:
         case CORE_DUMP:
             println("Core dumped: ");
-            arch_print_cpu_context(current->context);
+            arch_print_cpu_context(context);
             block_and_clear_all_signals(current);
             spin_unlock_irq_restore(&current->lock, interrupts_enabled);
             thread_exit(-1);

@@ -28,13 +28,13 @@ typedef struct _thread {
     void* kernel_stack;
     void* user_stack;
 
-    // state and context should be modified only within the thread, so no
-    // locking required on accesses, visibility is carried by scheduler
-    thread_state state;
+    // these fields are used in scheduler
+    thread_state state; // should be modified within thread
+    // these fields should be modified only by scheduler
     struct cpu_context* context;
-
-    linked_list_node scheduler_node; // this is used in scheduler and thread
-                                     // cleaner, never changes
+    bool currently_running;
+    bool on_run_queue;
+    linked_list_node scheduler_node;
 
     lock lock; // guards fields below and also guards thread against
                // de-allocation

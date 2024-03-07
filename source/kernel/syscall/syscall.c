@@ -1,5 +1,5 @@
 #include "syscall.h"
-#include "../scheduler/scheduler.h"
+#include "../threading/scheduler.h"
 
 typedef u64 syscall0_handler(struct cpu_context* context);
 
