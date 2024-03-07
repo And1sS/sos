@@ -1,6 +1,6 @@
 #include "thread.h"
 #include "../lib/id_generator.h"
-#include "../scheduler/scheduler.h"
+#include "scheduler.h"
 #include "thread_cleaner.h"
 #include "threading.h"
 

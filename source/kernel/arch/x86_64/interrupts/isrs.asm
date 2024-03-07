@@ -52,6 +52,8 @@ extern check_pending_signals ; defined in signal.c
 
 %macro restore_state 0
     call update_tss
+
+    mov rdi, rsp
     call check_pending_signals
 
     restore_ds
@@ -150,6 +152,30 @@ isr_%1:
     restore_state
     iretq
 %endmacro
+
+; Scheduler isr stub, will handle software interrupt #250
+; Exists only because context switch should be done atomically
+extern scheduler_lock
+extern scheduler_unlock
+
+global scheduler_isr
+scheduler_isr:
+    cli
+    save_state
+
+    call scheduler_lock
+
+    mov rdi, 250
+    mov rsi, rsp
+    call handle_soft_irq
+
+    ; Now we run in probably new context
+    mov rsp, rax
+
+    call scheduler_unlock
+
+    restore_state
+    iretq
 
 
 esr_no_error_code 0

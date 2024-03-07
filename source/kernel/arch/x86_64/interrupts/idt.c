@@ -311,7 +311,12 @@ void idt_init(void) {
     SET_ISR(247);
     SET_ISR(248);
     SET_ISR(249);
-    SET_ISR(250);
+
+    // Scheduler routine, defined in isrs.asm
+    extern void scheduler_isr();
+    idt_data[250] = gen_interrupt_descriptor(
+        KERNEL_CODE_SEGMENT_SELECTOR, (u64) scheduler_isr, true, PL_3, false);
+
     SET_ISR(251);
     SET_ISR(252);
     SET_ISR(253);
