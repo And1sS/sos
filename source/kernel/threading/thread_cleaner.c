@@ -23,6 +23,7 @@ _Noreturn void thread_cleaner_daemon() {
 
         linked_list_node* cur = linked_list_remove_first_node(&dead_list);
         while (cur) {
+            spin_unlock_irq_restore(&dead_lock, interrupts_enabled);
             thread* thrd = (thread*) cur->value;
 
             // Do not destroy thread until its lock is available
@@ -32,6 +33,7 @@ _Noreturn void thread_cleaner_daemon() {
             println(thrd->name);
 
             thread_destroy((thread*) cur->value);
+            interrupts_enabled = spin_lock_irq_save(&dead_lock);
             cur = linked_list_remove_first_node(&dead_list);
         }
 
