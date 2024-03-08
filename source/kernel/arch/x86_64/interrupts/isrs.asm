@@ -203,12 +203,15 @@ esr_no_error_code 31
 %assign i i+1
 %endrep
 
-
-; Scheduler isr stub, will handle software interrupt #250
-; Exists only because context switch should be done atomically
+; Scheduler specific stubs
 extern scheduler_lock
 extern scheduler_unlock
+extern context_switch
+extern get_current_thread
+extern thread_unlock
 
+; isr #250 stub, schedule() implementation
+; Exists only because context switch should be done atomically
 global isr_250
 isr_250:
     cli
@@ -217,9 +220,8 @@ isr_250:
 
     call scheduler_lock
 
-    mov rdi, 250
-    mov rsi, rsp
-    call handle_soft_irq
+    mov rdi, rsp
+    call context_switch
 
     ; Now we run in probably new context
     mov rsp, rax
@@ -230,8 +232,39 @@ isr_250:
     iretq
 
 
-%assign i 251
-%rep    256 - 251
+; isr #251 stub, schedule_thread_exit() implementation
+; Exists only because thread unlock should be performed in new context after atomic context switch
+global isr_251
+isr_251:
+    cli
+    push 0 ; push fake error code
+    save_state
+
+    call get_current_thread
+    push rax ; push dead thread pointer
+
+    call scheduler_lock
+
+    mov rdi, rsp
+    call context_switch
+
+    pop rdi ; restore previous thread pointer
+
+    ; Now we run in probably new context
+    mov rsp, rax
+
+    push rdi ; save dead thread again
+    call scheduler_unlock
+
+    pop rdi ; restore in again
+    call thread_unlock ; unlock dead thread lock, so thread cleaner can do its job
+
+    restore_state
+    iretq
+
+
+%assign i 252
+%rep    256 - 252
         isr_soft i
 %assign i i+1
 %endrep

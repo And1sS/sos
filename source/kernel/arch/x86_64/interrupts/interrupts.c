@@ -1,7 +1,6 @@
 #include "interrupts.h"
 #include "../../../memory/virtual/page_fault.h"
 #include "../../../syscall/syscall.h"
-#include "../../../threading/scheduler.h"
 #include "../../../time/timer.h"
 #include "../cpu/cpu_context.h"
 #include "../timer/pit.h"
@@ -29,5 +28,7 @@ void interrupts_init() {
 
     mount_irq_handler(32, handle_timer_interrupt);
     mount_irq_handler(128, syscall_trampoline);
-    mount_irq_handler(250, context_switch);
+
+    // isr 250 is mapped to atomic context switch in isrs.asm
+    // isr 251 is mapped to atomic thread exit in isrs.asm
 }

@@ -70,4 +70,7 @@ void thread_yield();
 bool thread_signal(thread* thread, signal sig);
 bool thread_set_sigaction(thread* thread, signal sig, sigaction action);
 
+// Exists mainly to simplify thread unlocking on exiting.
+void thread_unlock(thread* thread);
+
 #endif // SOS_THREAD_H

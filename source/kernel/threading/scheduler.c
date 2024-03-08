@@ -40,12 +40,6 @@ void schedule_thread(thread* thrd) {
     spin_unlock_irq_restore(&schedule_lock, interrupts_enabled);
 }
 
-void schedule_thread_exit() {
-    bool interrupts_enabled = spin_lock_irq_save(&schedule_lock);
-    current_thread = NULL;
-    spin_unlock_irq_restore(&schedule_lock, interrupts_enabled);
-}
-
 // This should be called with scheduler lock held
 struct cpu_context* context_switch(struct cpu_context* context) {
     thread* old_thread = current_thread;

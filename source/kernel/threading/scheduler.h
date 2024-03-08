@@ -9,10 +9,16 @@ void scheduler_init();
 thread* get_current_thread();
 
 void schedule_thread(thread* thrd);
+
+// Should be called at the end of thread execution with interrupts disabled,
+// thread lock held and thread->state set to DEAD.
+// Will do atomic context switch and release dead thread lock on new context
 void schedule_thread_exit();
 
-struct cpu_context* context_switch(struct cpu_context* context);
+// Does atomic context switch
 void schedule();
+
+struct cpu_context* context_switch(struct cpu_context* context);
 
 void scheduler_lock();
 void scheduler_unlock();

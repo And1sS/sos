@@ -33,7 +33,7 @@ void thread_detach(thread* child) {
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 }
 
-void thread_exit(u64 exit_code) {
+_Noreturn void thread_exit(u64 exit_code) {
     thread* current = get_current_thread();
     bool interrupts_enabled = spin_lock_irq_save(&current->lock);
     current->exiting = true;
@@ -57,11 +57,10 @@ void thread_exit(u64 exit_code) {
                  refc->count == 0);
 
     current->state = DEAD;
-    schedule_thread_exit();
     thread_cleaner_mark(current);
-    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+    schedule_thread_exit();
 
-    schedule();
+    __builtin_unreachable();
 }
 
 void thread_destroy(thread* thrd) {
@@ -95,3 +94,5 @@ bool thread_set_sigaction(thread* thrd, signal sig, sigaction action) {
 
     return action_set;
 }
+
+void thread_unlock(thread* thrd) { spin_unlock(&thrd->lock); }
