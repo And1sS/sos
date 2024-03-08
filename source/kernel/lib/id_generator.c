@@ -1,8 +1,10 @@
 #include "id_generator.h"
 
-void id_generator_init(id_generator* generator) {
+bool id_generator_init(id_generator* generator) {
     generator->set = bitset_create();
     init_lock(&generator->lock);
+
+    return generator->set != NULL;
 }
 
 bool id_generator_get_id(id_generator* generator, u64* result) {

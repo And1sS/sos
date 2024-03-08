@@ -5,7 +5,9 @@
 static id_generator id_gen;
 
 void threading_init() {
-    id_generator_init(&id_gen);
+    if (!id_generator_init(&id_gen))
+        panic("Can't init tid generator");
+
     thread_cleaner_init();
 }
 

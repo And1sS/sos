@@ -9,16 +9,13 @@
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
-    bool allocated_tid = threading_allocate_tid(&thrd->id);
-    if (!allocated_tid)
-        return false;
+    if (!threading_allocate_tid(&thrd->id))
+        goto failed_to_allocate_tid;
 
     void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
+    if (!kernel_stack)
+        goto failed_to_allocate_kernel_stack;
 
-    if (kernel_stack == NULL) {
-        threading_free_tid(thrd->id);
-        return false;
-    }
     memset(kernel_stack, 0, THREAD_KERNEL_STACK_SIZE);
 
     // TODO: copy name string to kernel heap
@@ -45,15 +42,24 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->on_run_queue = false;
 
     thrd->parent = NULL;
-    array_list_init(&thrd->children, 0);
+
+    if (!array_list_init(&thrd->children, 0))
+        goto failed_to_init_child_list;
 
     thrd->finish_cvar = (con_var) CON_VAR_STATIC_INITIALIZER;
-
     thrd->lock = SPIN_LOCK_STATIC_INITIALIZER;
-
     thrd->scheduler_node = (linked_list_node) LINKED_LIST_NODE_OF(thrd);
 
     return true;
+
+failed_to_init_child_list:
+    kfree(kernel_stack);
+
+failed_to_allocate_kernel_stack:
+    threading_free_tid(thrd->id);
+
+failed_to_allocate_tid:
+    return false;
 }
 
 kthread* kthread_create(string name, kthread_func* func) {
@@ -61,8 +67,11 @@ kthread* kthread_create(string name, kthread_func* func) {
     if (!thrd)
         return NULL;
 
-    // TODO: add check and cleanup
-    kthread_init(thrd, name, func);
+    if (!kthread_init(thrd, name, func)) {
+        kfree(thrd);
+        return NULL;
+    }
+
     return thrd;
 }
 
