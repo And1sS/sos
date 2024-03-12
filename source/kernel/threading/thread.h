@@ -30,6 +30,9 @@ typedef struct _thread {
 
     // these fields are used in scheduler
     thread_state state; // should be modified within thread
+                        // TODO: guard writes to this field with barriers to
+                        //       prevent reordering, probably make it u64 and
+                        //       change accesses to atomic_read/atomic_write
     // these fields should be modified only by scheduler
     struct cpu_context* context;
     bool currently_running;
