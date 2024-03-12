@@ -48,12 +48,12 @@ u64 handle_syscall(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5,
                    u64 syscall_number, struct cpu_context* context) {
 
     if (syscall_number >= SYSCALLS_MAX_COUNT)
-        return fallback_syscall_handler(arg0, arg0, arg2, arg3, arg4, arg5,
+        return fallback_syscall_handler(arg0, arg1, arg2, arg3, arg4, arg5,
                                         syscall_number, context);
 
     syscall_descriptor descriptor = syscall_handlers[(u16) syscall_number];
     if (!descriptor.handler)
-        return fallback_syscall_handler(arg0, arg0, arg2, arg3, arg4, arg5,
+        return fallback_syscall_handler(arg0, arg1, arg2, arg3, arg4, arg5,
                                         syscall_number, context);
 
     switch (descriptor.arguments_count) {
