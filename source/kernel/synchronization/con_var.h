@@ -22,14 +22,14 @@ typedef struct {
 
 #define DECLARE_CON_VAR(name) con_var name = CON_VAR_STATIC_INITIALIZER;
 
-#define WAIT_FOR_IRQ(cvar, lock, flags, cond)                                  \
+#define CON_VAR_WAIT_FOR_IRQ(cvar, lock, flags, cond)                          \
     do {                                                                       \
         while (!(cond)) {                                                      \
             (flags) = con_var_wait_irq_save((cvar), (lock), (flags));          \
         }                                                                      \
     } while (0)
 
-#define WAIT_FOR(cvar, lock, cond)                                             \
+#define CON_VAR_WAIT_FOR(cvar, lock, cond)                                     \
     do {                                                                       \
         while (!(cond)) {                                                      \
             (flags) = con_var_wait((cvar), (lock));                            \

@@ -18,8 +18,8 @@ void thread_cleaner_init() {
 _Noreturn void thread_cleaner_daemon() {
     while (true) {
         bool interrupts_enabled = spin_lock_irq_save(&dead_lock);
-        WAIT_FOR_IRQ(&dead_cvar, &dead_lock, interrupts_enabled,
-                     dead_list.size != 0);
+        CON_VAR_WAIT_FOR_IRQ(&dead_cvar, &dead_lock, interrupts_enabled,
+                             dead_list.size != 0);
 
         linked_list_node* cur = linked_list_remove_first_node(&dead_list);
         while (cur) {

@@ -8,8 +8,8 @@ void thread_start(thread* thrd) { schedule_thread(thrd); }
 
 u64 thread_join(thread* child) {
     bool interrupts_enabled = spin_lock_irq_save(&child->lock);
-    WAIT_FOR_IRQ(&child->finish_cvar, &child->lock, interrupts_enabled,
-                 child->finished);
+    CON_VAR_WAIT_FOR_IRQ(&child->finish_cvar, &child->lock, interrupts_enabled,
+                         child->finished);
 
     u64 exit_code = child->exit_code;
     spin_unlock_irq_restore(&child->lock, interrupts_enabled);
@@ -53,8 +53,8 @@ _Noreturn void thread_exit(u64 exit_code) {
     con_var_broadcast(&current->finish_cvar);
 
     ref_count* refc = &current->refc;
-    WAIT_FOR_IRQ(&refc->empty_cvar, &current->lock, interrupts_enabled,
-                 refc->count == 0);
+    CON_VAR_WAIT_FOR_IRQ(&refc->empty_cvar, &current->lock, interrupts_enabled,
+                         refc->count == 0);
 
     current->state = DEAD;
     thread_cleaner_mark(current);
@@ -74,6 +74,15 @@ void thread_destroy(thread* thrd) {
 }
 
 void thread_yield() { schedule(); }
+
+bool thread_any_pending_signals() {
+    thread* current = get_current_thread();
+    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    bool any_raised = signal_any_raised(current->signal_info.pending_signals
+                                        & current->signal_info.signals_mask);
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+    return any_raised;
+}
 
 bool thread_signal(thread* thrd, signal sig) {
     bool signal_set = false;

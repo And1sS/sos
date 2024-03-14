@@ -69,6 +69,7 @@ void thread_exit(u64 exit_code);
 void thread_destroy(thread* thread);
 
 void thread_yield();
+bool thread_any_pending_signals();
 
 bool thread_signal(thread* thread, signal sig);
 bool thread_set_sigaction(thread* thread, signal sig, sigaction action);
