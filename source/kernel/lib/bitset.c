@@ -18,6 +18,11 @@ bitset* bitset_create() {
     return result;
 }
 
+void bitset_destroy(bitset* set) {
+    array_list_destroy(set->chunks);
+    kfree(set);
+}
+
 bool bitset_allocate_index(bitset* set, u64* result) {
     for (u64 i = 0; i < set->chunks->size; ++i) {
         chunk ch = (chunk) array_list_get(set->chunks, i);
