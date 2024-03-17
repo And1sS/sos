@@ -1,5 +1,6 @@
 #include "scheduler.h"
 #include "../idle.h"
+#include "../memory/virtual/vmm.h"
 #include "kthread.h"
 
 static lock schedule_lock = SPIN_LOCK_STATIC_INITIALIZER;
@@ -73,6 +74,8 @@ struct cpu_context* context_switch(struct cpu_context* context) {
     current_thread->state = RUNNING;
     current_thread->on_run_queue = false;
     current_thread->currently_running = true;
+
+    vmm_set_vm_space(current_thread->proc->vm);
 
     return current_thread->context;
 }

@@ -8,8 +8,11 @@
 #include "../signal/signal.h"
 #include "../synchronization/completion.h"
 #include "../synchronization/spin_lock.h"
+#include "process.h"
 
 #define THREAD_KERNEL_STACK_SIZE 8192
+
+struct cpu_context;
 
 typedef enum {
     INITIALISED = 0,
@@ -19,14 +22,20 @@ typedef enum {
     DEAD = 4
 } thread_state;
 
-struct cpu_context;
+typedef struct {
+    sigpending pending_signals;
+    sigmask signals_mask;
+} thread_siginfo;
 
 typedef struct _thread {
-    u64 id;
+    u64 id;   // global thread id
+    u64 tgid; // id inside thread group (process)
     string name;
     bool kernel_thread;
     void* kernel_stack;
     void* user_stack;
+
+    process* proc;
 
     // these fields are used in scheduler
     thread_state state; // should be modified within thread
@@ -46,13 +55,11 @@ typedef struct _thread {
     bool finished;
     u64 exit_code;
 
-    siginfo signal_info;
+    thread_siginfo siginfo;
 
     ref_count refc;
 
     bool should_die; // used in kernel threads
-
-    // here should be pointer to process
 
     struct _thread* parent;
     array_list children; // children threads
@@ -62,17 +69,20 @@ typedef struct _thread {
 
 void thread_start(thread* thread);
 
-void thread_detach(thread* thread);
-u64 thread_join(thread* thread);
+bool thread_add_child(thread* child);
+void thread_remove_child(thread* child);
+
+bool thread_detach(thread* thread);
+bool thread_join(thread* thread, u64* exit_code);
 
 void thread_exit(u64 exit_code);
 void thread_destroy(thread* thread);
 
 void thread_yield();
-bool thread_any_pending_signals();
 
 bool thread_signal(thread* thread, signal sig);
-bool thread_set_sigaction(thread* thread, signal sig, sigaction action);
+bool thread_signal_if_allowed(thread* thread, signal sig);
+bool thread_any_pending_signals();
 
 // Exists mainly to simplify thread unlocking on exiting.
 void thread_unlock(thread* thread);
