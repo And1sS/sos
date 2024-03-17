@@ -10,6 +10,7 @@ vm_space* vmm_kernel_vm_space();
 vm_space* vmm_current_vm_space();
 
 void vmm_set_vm_space(vm_space* space);
+void vmm_switch_to_kernel_vm_space();
 void vmm_notify_vm_space_changed();
 
 bool vmm_invalidate_range(vaddr base, u64 len);

@@ -35,6 +35,8 @@ void vmm_set_vm_space(vm_space* space) {
     // changed
 }
 
+void vmm_switch_to_kernel_vm_space() { vmm_set_vm_space(&kernel_vm_space); }
+
 void vmm_notify_vm_space_changed() {
     // TODO: when implementing support for SMP make this to send IPI to check
     //       whether other CPUs need to also get notified

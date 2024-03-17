@@ -21,7 +21,13 @@ signal_disposition default_dispositions[SIGNALS_COUNT + 1] = {
     CORE_DUMP, // Signal not supported for now
     CORE_DUMP, // Signal not supported for now
     [SIGTERM] = TERMINATE,
-    [SIGTERM + 1 ... SIGNALS_COUNT] = FALLBACK_TO_DEFAULT};
+    CORE_DUMP,          // Signal not supported for now
+    CORE_DUMP,          // Signal not supported for now
+    CORE_DUMP,          // Signal not supported for now
+    CORE_DUMP,          // Signal not supported for now
+    CORE_DUMP,          // Signal not supported for now
+    [SIGCHLD] = IGNORE, // Signal not supported for now
+    [SIGCHLD + 1 ... SIGNALS_COUNT] = FALLBACK_TO_DEFAULT};
 
 bool signal_raised(sigpending pending_signals, signal sig) {
     return (pending_signals >> sig) & 1;
@@ -29,6 +35,13 @@ bool signal_raised(sigpending pending_signals, signal sig) {
 
 bool signal_any_raised(sigpending pending_signals) {
     return pending_signals != PENDING_SIGNALS_CLEAR;
+}
+
+signal signal_to_handle(sigpending pending_signals, sigmask mask) {
+    if (!signal_any_raised(pending_signals))
+        return NOSIG;
+
+    return lsb_u64(pending_signals) & mask;
 }
 
 bool signal_allowed(sigmask signals_mask, signal sig) {
@@ -51,58 +64,72 @@ void signal_block(sigmask* signals_mask, signal sig) {
     *signals_mask &= ~(1 << sig);
 }
 
-bool signal_set_action(siginfo* signal_info, signal sig, sigaction action) {
-    if (sig == SIGKILL)
-        return false;
-
-    signal_info->signal_actions[sig] = action;
-    return true;
+void signal_unblock(sigmask* signals_mask, signal sig) {
+    *signals_mask |= 1 << sig;
 }
 
-static void block_and_clear_all_signals(thread* thrd) {
-    thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
-    thrd->signal_info.signals_mask = ALL_SIGNALS_BLOCKED;
-}
-
-void check_pending_signals(struct cpu_context* context) {
+static signal get_and_clear_signal_to_handle() {
     thread* current = get_current_thread();
-    if (!current || !arch_is_userspace_context(context)) {
-        return;
-    }
+    thread_siginfo* thread_siginfo = &current->siginfo;
+    signal to_handle;
 
     bool interrupts_enabled = spin_lock_irq_save(&current->lock);
-    siginfo* signal_info = &current->signal_info;
-    if (!signal_any_raised(signal_info->pending_signals)) {
-        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-        return;
-    }
+    sigmask mask = thread_siginfo->signals_mask;
+    to_handle = signal_to_handle(thread_siginfo->pending_signals, mask);
 
-    signal raised = signal_first_raised(signal_info->pending_signals);
-    sigaction action = signal_info->signal_actions[raised];
+    if (to_handle != NOSIG)
+        signal_clear(&thread_siginfo->pending_signals, to_handle);
+    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+    if (to_handle != NOSIG)
+        return to_handle;
+
+    process* proc = current->proc;
+    process_siginfo* process_siginfo = &proc->siginfo;
+
+    interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    to_handle = signal_to_handle(process_siginfo->pending_signals, mask);
+
+    if (to_handle != NOSIG)
+        signal_clear(&process_siginfo->pending_signals, to_handle);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return to_handle;
+}
+
+void handle_signal(signal sig, struct cpu_context* context) {
+    sigaction action = process_get_sigaction(sig);
     signal_handler* handler = action.handler;
 
     if (handler) {
-        signal_clear(&signal_info->pending_signals, raised);
         arch_enter_signal_handler(context, handler);
     } else {
         signal_disposition disposition =
             action.disposition != FALLBACK_TO_DEFAULT
                 ? action.disposition
-                : default_dispositions[raised];
+                : default_dispositions[sig];
 
         switch (disposition) {
-        case FALLBACK_TO_DEFAULT:
+        case FALLBACK_TO_DEFAULT: {
             panic("Signal handling error, resolved disposition is fallback");
-            return;
+            __builtin_unreachable();
+        }
 
-        case TERMINATE:
-        case CORE_DUMP:
+        case CORE_DUMP: {
             println("Core dumped: ");
             arch_print_cpu_context(context);
-            block_and_clear_all_signals(current);
+            __attribute__((fallthrough));
+        }
+
+        case TERMINATE: {
+            thread* current = get_current_thread();
+            bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+            current->siginfo.pending_signals = PENDING_SIGNALS_CLEAR;
+            current->siginfo.signals_mask = ALL_SIGNALS_BLOCKED;
             spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-            thread_exit(-1);
+
+            process_exit(128 + sig);
             return;
+        }
 
         case STOP:
         case IGNORE:
@@ -110,5 +137,15 @@ void check_pending_signals(struct cpu_context* context) {
             break;
         }
     }
-    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
+}
+
+void handle_pending_signals(struct cpu_context* context) {
+    thread* current = get_current_thread();
+    if (!current || !arch_is_userspace_context(context)) {
+        return;
+    }
+
+    signal sig = get_and_clear_signal_to_handle();
+    if (sig)
+        handle_signal(sig, context);
 }
