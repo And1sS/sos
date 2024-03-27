@@ -56,6 +56,7 @@ bool process_init(process* parent, process* proc, bool kernel_process) {
     proc->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     proc->exiting = false;
     proc->finished = false;
+    proc->finish_cvar = (con_var) CON_VAR_STATIC_INITIALIZER;
     memset(&proc->siginfo, 0, sizeof(process_siginfo));
 
     if (parent && !process_add_child(proc))
@@ -362,8 +363,6 @@ _Noreturn void process_exit_thread() {
     current->state = DEAD;
     thread_cleaner_mark(current);
     schedule_thread_exit();
-
-    __builtin_unreachable();
 }
 
 void process_exit(u64 exit_code) {

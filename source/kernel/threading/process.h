@@ -43,8 +43,6 @@ typedef struct _process {
 } process;
 
 bool process_init(process* parent, process* proc, bool kernel_process);
-void process_destroy(process* proc);
-
 process* create_user_init_process();
 
 u64 process_get_id(process* proc);
@@ -57,9 +55,8 @@ bool process_add_thread(process* proc, struct thread* thrd);
 void process_kill(process* proc);
 
 // These functions should be called from process
-_Noreturn void process_exit_thread(); // returns whether this is the last thread
-                                      // and it should clean process
-void process_exit(u64 exit_code);
+_Noreturn void process_exit_thread();
+_Noreturn void process_exit(u64 exit_code);
 
 bool process_set_sigaction(signal sig, sigaction action);
 sigaction process_get_sigaction(signal sig);

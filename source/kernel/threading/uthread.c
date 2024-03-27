@@ -100,8 +100,12 @@ uthread* uthread_create_orphan(process* proc, string name, void* user_stack,
                                uthread_func* func) {
 
     uthread* thrd = (uthread*) kmalloc(sizeof(uthread));
-    if (thrd) {
-        uthread_init(proc, NULL, thrd, name, user_stack, func);
+    if (!thrd)
+        return NULL;
+
+    if (!uthread_init(proc, NULL, thrd, name, user_stack, func)) {
+        kfree(thrd);
+        return NULL;
     }
 
     return thrd;
@@ -110,8 +114,12 @@ uthread* uthread_create_orphan(process* proc, string name, void* user_stack,
 uthread* uthread_create(string name, uthread_func* func) {
     uthread* current = get_current_thread();
     uthread* thrd = (uthread*) kmalloc(sizeof(uthread));
-    if (thrd) {
-        uthread_init(current->proc, current, thrd, name, NULL, func);
+    if (!thrd)
+        return NULL;
+
+    if (!uthread_init(current->proc, current, thrd, name, NULL, func)) {
+        kfree(thrd);
+        return NULL;
     }
 
     return thrd;
