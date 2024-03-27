@@ -1,9 +1,12 @@
+#include "exit.h"
+#include "fork.h"
+#include "getpid.h"
+#include "pthread.h"
 #include "signal.h"
 #include "syscall.h"
+#include "wait.h"
 
 int signals = 0;
-
-void exit(long long number) { syscall1(SYS_EXIT, number); }
 
 void print(const char* str) { syscall1(SYS_PRINT, (long long) str); }
 
@@ -16,30 +19,79 @@ void sigint_handler() {
     signals++;
 }
 
+int threads = 1;
+
+void thread_func() {
+    long long i = 1;
+    int current = ++threads;
+
+    while (1) {
+        print("Hello from thread ");
+        printll(current);
+        print(", cnt: ");
+        printll(i);
+        print("\n");
+
+        if (i == 500)
+            break;
+
+        i++;
+    }
+
+    pthread_exit(0xCAFE);
+}
+
 const sigaction sigint_action = {.handler = (signal_handler*) sigint_handler};
 const sigaction sigkill_action = {.disposition = IGNORE};
 
 void __attribute__((section(".entrypoint"))) main() {
+
     // This one should succeed (e.g. return 0)
-    long sigint_act_set = set_sigaction(SIGINT, &sigint_action);
+    long sigint_act_set = process_set_sigaction(SIGINT, &sigint_action);
     // This one should fail (e.g. return value < 0)
-    long sigkill_act_set = set_sigaction(SIGKILL, &sigkill_action);
+    long sigkill_act_set = process_set_sigaction(SIGKILL, &sigkill_action);
 
-    for (volatile long long i = 0;; i++) {
-        if (i % 100000 == 0) {
-            print("user space, sigint: ");
-            printll(sigint_act_set);
-            print(", sigkill: ");
-            printll(sigkill_act_set);
-            print(", cnt: ");
-            printll(signals);
-            print("\n");
-        }
+    //    pthread thread;
+    //    for (long long i = 0; i < 10; i++) {
+    //        pthread_run("other-thread", thread_func, &thread);
+    //    }
 
-        if (signals == 50)
-            break;
+    long long pid = fork();
+    long long pid1 = fork();
+    long long pid2 = fork();
+
+    if (pid < 0) {
+        print("ERROR");
+        exit(-1);
     }
 
-    print("EXITING!\n");
+    long long exit_code;
+    long long exit_pid;
+
+    while ((exit_pid = wait(0, &exit_code)) > 0) {
+        print("Proc: ");
+        printll(getpid());
+        print(", child exited: ");
+        printll(exit_pid);
+        print(", with code: ");
+        printll(exit_code);
+        print("\n");
+    }
+
+    if (pid != 0 && pid1 != 0 && pid2 != 0) {
+        for (;;)
+            ;
+    }
+    //    const char* to_print = pid == 0 ? "CHILD! " : "PARENT! ";
+    //
+    //    for (;;) {
+    //        print(to_print);
+    //        printll(pid);
+    //        print("\n");
+    //    }
+
+    print("Process: ");
+    printll(getpid());
+    print(" exiting!\n");
     exit(0xDEADB33F);
 }
