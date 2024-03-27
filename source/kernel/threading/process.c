@@ -362,8 +362,6 @@ _Noreturn void process_exit_thread() {
     current->state = DEAD;
     thread_cleaner_mark(current);
     schedule_thread_exit();
-
-    __builtin_unreachable();
 }
 
 void process_exit(u64 exit_code) {

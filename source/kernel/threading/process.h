@@ -59,7 +59,7 @@ void process_kill(process* proc);
 // These functions should be called from process
 _Noreturn void process_exit_thread(); // returns whether this is the last thread
                                       // and it should clean process
-void process_exit(u64 exit_code);
+_Noreturn void process_exit(u64 exit_code);
 
 bool process_set_sigaction(signal sig, sigaction action);
 sigaction process_get_sigaction(signal sig);

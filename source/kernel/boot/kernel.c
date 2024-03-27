@@ -94,7 +94,7 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     user_thread =
         uthread_create_orphan(init, "test", NULL, (uthread_func*) 0x1000);
 
-    kthread_run("kernel-test-thread", kernel_thread);
+//    kthread_run("kernel-test-thread", kernel_thread);
     thread_start(user_thread);
 
     vm_space_print(init->vm);

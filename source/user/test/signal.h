@@ -28,6 +28,6 @@ typedef struct {
     signal_handler* handler;
 } sigaction;
 
-long set_sigaction(signal sig, const sigaction* action);
+long process_set_sigaction(signal sig, const sigaction* action);
 
 #endif // SOS_USER_SIGNAL_H

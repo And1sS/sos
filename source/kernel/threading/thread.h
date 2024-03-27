@@ -75,7 +75,7 @@ void thread_remove_child(thread* child);
 bool thread_detach(thread* thread);
 bool thread_join(thread* thread, u64* exit_code);
 
-void thread_exit(u64 exit_code);
+_Noreturn void thread_exit(u64 exit_code);
 void thread_destroy(thread* thread);
 
 void thread_yield();
