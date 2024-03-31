@@ -12,6 +12,7 @@ static paddr mboot_end = NULL;
 
 static bool addr_inside(paddr addr, paddr start, paddr end);
 static bool frame_intersects(paddr frame, paddr start, paddr end);
+static bool frame_inside(paddr frame, paddr start, paddr end);
 
 static paddr find_end_of_memory(const multiboot_info* mboot_info);
 static paddr find_kernel_start(const multiboot_info* mboot_info);
@@ -41,6 +42,12 @@ static bool frame_intersects(paddr frame, paddr start, paddr end) {
     frame = FRAME(frame);
     return addr_inside(frame, start, end)
            || addr_inside(frame + PAGE_SIZE, start, end);
+}
+
+static bool frame_inside(paddr frame, paddr start, paddr end) {
+    frame = FRAME(frame);
+    return addr_inside(frame, start, end)
+           && addr_inside(frame + PAGE_SIZE, start, end);
 }
 
 static void pmm_maybe_free_frame(const multiboot_info* const mboot_info,
@@ -117,8 +124,7 @@ static bool is_frame_available(const multiboot_info* mboot_info, paddr frame) {
         u64 entry_end = entry_start + entry->length - 1;
 
         // TODO: Add enum for ram types
-        if (frame_intersects(frame, entry_start, entry_end)
-            && entry->type == 1) {
+        if (frame_inside(frame, entry_start, entry_end) && entry->type == 1) {
             return true;
         }
     }
