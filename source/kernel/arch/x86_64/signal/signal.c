@@ -73,8 +73,11 @@ void arch_enter_signal_handler(struct cpu_context* context,
  *
  * Note: cs, ss and flags registers should be copied with care, since we should
  * not let user enter kernel space or disable interrupts.
+ * Since this function is needed to implement syscall for returning from signal
+ * handler, rax register will be scratched by syscall return value. To preserve
+ * it, rax is returned.
  */
-void arch_return_from_signal_handler(struct cpu_context* context) {
+u64 arch_return_from_signal_handler(struct cpu_context* context) {
     cpu_context* arch_context = (cpu_context*) context;
 
     void* src = (void*) arch_context->rsp + TRAMPOLINE_CODE_SIZE;
@@ -85,4 +88,6 @@ void arch_return_from_signal_handler(struct cpu_context* context) {
     arch_context->ss = USER_DATA_SEGMENT_SELECTOR;
     arch_context->cs = USER_CODE_SEGMENT_SELECTOR;
     arch_context->rflags |= RFLAGS_IRQ_ENABLED_FLAG | RFLAGS_INIT_FLAGS;
+
+    return arch_context->rax;
 }
