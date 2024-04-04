@@ -3,9 +3,8 @@
 
 linked_list* linked_list_create() {
     linked_list* list = (linked_list*) kmalloc(sizeof(linked_list));
-    if (!list) {
-        return list;
-    }
+    if (!list)
+        return NULL;
 
     linked_list_init(list);
     return list;
@@ -22,9 +21,8 @@ void* linked_list_first(linked_list* list) {
 
 bool linked_list_add_first(linked_list* list, void* value) {
     linked_list_node* node = linked_list_node_create(value);
-    if (!node) {
+    if (!node)
         return false;
-    }
 
     linked_list_add_first_node(list, node);
     return true;
@@ -32,9 +30,8 @@ bool linked_list_add_first(linked_list* list, void* value) {
 
 bool linked_list_add_last(linked_list* list, void* value) {
     linked_list_node* node = linked_list_node_create(value);
-    if (!node) {
+    if (!node)
         return false;
-    }
 
     linked_list_add_last_node(list, node);
     return true;
@@ -42,33 +39,29 @@ bool linked_list_add_last(linked_list* list, void* value) {
 
 void* linked_list_remove_first(linked_list* list) {
     linked_list_node* node = linked_list_remove_first_node(list);
-    void* value = NULL;
-    if (node) {
-        value = node->value;
-        kfree(node);
-    }
+    if (!node)
+        return NULL;
 
+    void* value = node->value;
+    kfree(node);
     return value;
 }
 
 void* linked_list_remove_last(linked_list* list) {
     linked_list_node* node = linked_list_remove_last_node(list);
-    void* value = NULL;
-    if (node) {
-        value = node->value;
-        kfree(node);
-    }
+    if (!node)
+        return NULL;
 
+    void* value = node->value;
+    kfree(node);
     return value;
 }
 
 linked_list_node* linked_list_node_create(void* value) {
     linked_list_node* node =
         (linked_list_node*) kmalloc(sizeof(linked_list_node));
-
-    if (!node) {
-        return node;
-    }
+    if (!node)
+        return NULL;
 
     memset(node, 0, sizeof(linked_list_node));
     node->value = value;
@@ -79,7 +72,7 @@ void linked_list_add_first_node(linked_list* list, linked_list_node* node) {
     node->prev = NULL;
     node->next = NULL;
 
-    if (!list->size) {
+    if (!list->head) {
         list->head = node;
         list->tail = node;
     } else {
@@ -95,7 +88,7 @@ void linked_list_add_last_node(linked_list* list, linked_list_node* node) {
     node->prev = NULL;
     node->next = NULL;
 
-    if (!list->size) {
+    if (!list->head) {
         list->head = node;
         list->tail = node;
     } else {
@@ -112,7 +105,7 @@ void linked_list_remove_node(linked_list* list, linked_list_node* node) {
         linked_list_remove_first_node(list);
     } else if (list->tail == node) {
         linked_list_remove_last_node(list);
-    } else {
+    } else if (node->prev && node->next) {
         linked_list_node* prev = node->prev;
         linked_list_node* next = node->next;
 
@@ -125,13 +118,13 @@ void linked_list_remove_node(linked_list* list, linked_list_node* node) {
         if (next) {
             next->prev = prev;
         }
+        list->size--;
     }
 }
 
 linked_list_node* linked_list_remove_first_node(linked_list* list) {
-    if (!list->size) {
+    if (!list->head)
         return NULL;
-    }
 
     list->size--;
 
@@ -153,9 +146,8 @@ linked_list_node* linked_list_remove_first_node(linked_list* list) {
 }
 
 linked_list_node* linked_list_remove_last_node(linked_list* list) {
-    if (!list->size) {
+    if (!list->head)
         return NULL;
-    }
 
     list->size--;
 
