@@ -251,19 +251,26 @@ bool grow_heap(u64 size) {
     u64 start = KHEAP_START_VADDR + kheap.capacity;
     u64 end = start + aligned_size;
 
+    u64 mapped = 0;
     for (u64 vframe = start; vframe < end; vframe += PAGE_SIZE) {
         vm_area_flags flags = {.writable = true};
-        arch_map_kernel_page(vframe, flags);
+        if (!arch_map_kernel_page(vframe, flags))
+            break;
+
+        mapped += PAGE_SIZE;
     }
 
-    memset((void*) start, 0, aligned_size);
+    if (!mapped)
+        return false;
 
-    block* blk = init_orphan_block(start, aligned_size);
+    memset((void*) start, 0, mapped);
+
+    block* blk = init_orphan_block(start, mapped);
     blk->used = true;
     kfree_unsafe(free_space(blk));
 
-    kheap.capacity += aligned_size;
-    return true;
+    kheap.capacity += mapped;
+    return mapped == aligned_size;
 }
 
 bin* find_best_fit_bin(u64 size) {

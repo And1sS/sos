@@ -110,7 +110,7 @@ void* array_list_remove_last(array_list* list) {
         return NULL;
     }
 
-    return list->array[list->size--];
+    return list->array[list->size-- - 1];
 }
 
 bool array_list_remove_idx(array_list* list, u64 idx) {
