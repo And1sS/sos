@@ -174,7 +174,7 @@ static bool vm_space_cut_area_unsafe(vm_space* space, const vm_area* to_cut) {
         curr->length = new_length;
         return true;
     } else {
-        vm_area* right_remainder = (vm_area*) kmalloc(sizeof(vm_area*));
+        vm_area* right_remainder = (vm_area*) kmalloc(sizeof(vm_area));
         if (!right_remainder)
             return false;
 
@@ -273,7 +273,7 @@ static vm_page_mapping_result vm_space_map_page_unsafe(vm_space* space,
                                                        vm_area_flags flags) {
 
     base = PAGE(base);
-    vm_area* new = (vm_area*) kmalloc(sizeof(vm_area*));
+    vm_area* new = (vm_area*) kmalloc(sizeof(vm_area));
     if (!new)
         return OUT_OF_MEMORY;
 
