@@ -1,16 +1,18 @@
 #include "kthread.h"
 #include "../arch/common/thread.h"
-#include "../arch/common/vmm.h"
-#include "../lib/id_generator.h"
-#include "../memory/heap/kheap.h"
-#include "../memory/physical/pmm.h"
+#include "process.h"
 #include "scheduler.h"
 #include "threading.h"
+
+process kernel_process;
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));
     if (!threading_allocate_tid(&thrd->id))
         goto failed_to_allocate_tid;
+
+    if (!id_generator_get_id(&kernel_process.tgid_generator, &thrd->tgid))
+        goto failed_to_allocate_tgid;
 
     void* kernel_stack = kmalloc_aligned(THREAD_KERNEL_STACK_SIZE, PAGE_SIZE);
     if (!kernel_stack)
@@ -26,10 +28,9 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->exit_code = 0;
 
     // kernel threads never receive signals
-    thrd->signal_info.signals_mask = ALL_SIGNALS_BLOCKED;
-    thrd->signal_info.pending_signals = PENDING_SIGNALS_CLEAR;
-    memset(thrd->signal_info.signal_actions, 0,
-           sizeof(sigaction) * (SIGNALS_COUNT + 1));
+    memset(&thrd->siginfo, 0, sizeof(thread_siginfo));
+    thrd->siginfo.signals_mask = ALL_SIGNALS_BLOCKED;
+    thrd->siginfo.pending_signals = PENDING_SIGNALS_CLEAR;
 
     thrd->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     thrd->kernel_thread = true;
@@ -38,10 +39,9 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->kernel_stack = kernel_stack;
     thrd->context = arch_kthread_context_init(thrd, func);
     thrd->state = INITIALISED;
-    thrd->currently_running = false;
-    thrd->on_run_queue = false;
 
     thrd->parent = NULL;
+    thrd->proc = &kernel_process;
 
     if (!array_list_init(&thrd->children, 0))
         goto failed_to_init_child_list;
@@ -50,12 +50,26 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     thrd->lock = SPIN_LOCK_STATIC_INITIALIZER;
     thrd->scheduler_node = (linked_list_node) LINKED_LIST_NODE_OF(thrd);
 
+    // Each kernel thread runs as separate thread group inside kernel process
+    if (!process_add_thread(&kernel_process, (struct thread*) thrd))
+        goto failed_to_add_thread_to_parent;
+
+    bool interrupts_enabled = spin_lock_irq_save(&kernel_process.lock);
+    ref_acquire(&kernel_process.refc);
+    spin_unlock_irq_restore(&kernel_process.lock, interrupts_enabled);
+
     return true;
+
+failed_to_add_thread_to_parent:
+    array_list_deinit(&thrd->children);
 
 failed_to_init_child_list:
     kfree(kernel_stack);
 
 failed_to_allocate_kernel_stack:
+    id_generator_free_id(&kernel_process.tgid_generator, thrd->tgid);
+
+failed_to_allocate_tgid:
     threading_free_tid(thrd->id);
 
 failed_to_allocate_tid:

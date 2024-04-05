@@ -20,7 +20,8 @@ typedef enum {
     SIGABRT = 6,
     SIGKILL = 9,
     SIGSEGV = 11,
-    SIGTERM = 14
+    SIGTERM = 14,
+    SIGCHLD = 20
 } signal;
 
 typedef struct {
@@ -28,6 +29,6 @@ typedef struct {
     signal_handler* handler;
 } sigaction;
 
-long set_sigaction(signal sig, const sigaction* action);
+long process_set_sigaction(signal sig, const sigaction* action);
 
 #endif // SOS_USER_SIGNAL_H

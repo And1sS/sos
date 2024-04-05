@@ -38,9 +38,20 @@ typedef struct {
 static syscall_descriptor syscall_handlers[1024] = {
     [SYS_PRINT] = SYSCALL1(sys_print),
     [SYS_PRINT_U64] = SYSCALL2(sys_print_u64),
+
     [SYS_SIGACTION] = SYSCALL2(sys_set_sigaction),
     [SYS_SIGRET] = SYSCALL0(sys_sigret),
+
+    [SYS_PTHREAD_EXIT] = SYSCALL1(sys_pthread_exit),
+    [SYS_PTHREAD_RUN] = SYSCALL3(sys_pthread_run),
+    [SYS_PTHREAD_DETACH] = SYSCALL1(sys_pthread_detach),
+    [SYS_PTHREAD_JOIN] = SYSCALL2(sys_pthread_join),
+
     [SYS_EXIT] = SYSCALL1(sys_exit),
+
+    [SYS_FORK] = SYSCALL0(sys_fork),
+    [SYS_WAIT] = SYSCALL2(sys_wait),
+    [SYS_GETPID] = SYSCALL0(sys_getpid),
 
     [SYSCALLS_IMPLEMENTED_COUNT + 1 ... SYSCALLS_MAX_COUNT - 1] = {0}};
 
