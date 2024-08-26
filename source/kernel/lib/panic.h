@@ -2,6 +2,6 @@
 #ifndef SOS_PANIC_H
 #define SOS_PANIC_H
 
-void panic(string message);
+_Noreturn void panic(string message);
 
 #endif // SOS_PANIC_H

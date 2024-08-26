@@ -101,9 +101,7 @@ void check_pending_signals(struct cpu_context* context);
 
 bool signal_raised(sigpending pending_signals, signal sig);
 bool signal_any_raised(sigpending pending_signals);
-signal signal_to_handle(sigpending pending_signals, sigmask mask);
 bool signal_allowed(sigmask signals_mask, signal sig);
-signal signal_first_raised(sigpending pending_signals);
 void signal_raise(sigpending* pending_signals, signal sig);
 void signal_clear(sigpending* pending_signals, signal sig);
 void signal_block(sigmask* signals_mask, signal sig);

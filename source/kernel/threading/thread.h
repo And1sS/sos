@@ -27,15 +27,26 @@ typedef struct {
     sigmask signals_mask;
 } thread_siginfo;
 
+/*
+ * Thread locking order:
+ * 1) thread lock
+ * 2) thread signals lock
+ */
 typedef struct _thread {
+    // Immutable data
     u64 id;   // global thread id
     u64 tgid; // id inside thread group (process)
     string name;
     bool kernel_thread;
+    // End of immutable data
+
     void* kernel_stack;
     void* user_stack;
 
     process* proc;
+
+    thread_siginfo siginfo;
+    lock siginfo_lock; // guards siginfo
 
     // these fields are used in scheduler
     thread_state state; // should be modified within thread
@@ -54,8 +65,6 @@ typedef struct _thread {
     bool exiting;
     bool finished;
     u64 exit_code;
-
-    thread_siginfo siginfo;
 
     ref_count refc;
 
@@ -81,7 +90,6 @@ void thread_destroy(thread* thread);
 void thread_yield();
 
 bool thread_signal(thread* thread, signal sig);
-bool thread_signal_if_allowed(thread* thread, signal sig);
 bool thread_any_pending_signals();
 
 // Exists mainly to simplify thread unlocking on exiting.

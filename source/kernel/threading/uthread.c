@@ -41,6 +41,7 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
     thrd->exit_code = 0;
 
     memset(&thrd->siginfo, 0, sizeof(thread_siginfo));
+    thrd->siginfo_lock = SPIN_LOCK_STATIC_INITIALIZER;
     thrd->siginfo.signals_mask = ALL_SIGNALS_UNBLOCKED;
     thrd->siginfo.pending_signals = PENDING_SIGNALS_CLEAR;
 

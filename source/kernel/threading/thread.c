@@ -119,47 +119,29 @@ void thread_yield() { schedule(); }
 
 bool thread_any_pending_signals() {
     thread* current = get_current_thread();
-    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
+    bool interrupts_enabled = spin_lock_irq_save(&current->siginfo_lock);
     bool any_raised = signal_any_raised(current->siginfo.pending_signals
                                         & current->siginfo.signals_mask);
-    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-    if (any_raised)
-        return true;
+    spin_unlock_irq_restore(&current->siginfo_lock, interrupts_enabled);
 
-    return process_any_pending_signals();
+    return any_raised;
 }
 
 bool thread_signal(thread* thrd, signal sig) {
-    bool signal_set = false;
     bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
-    if (!thrd->exiting && !thrd->kernel_thread) {
+
+    spin_lock(&thrd->siginfo_lock);
+    bool signal_set = !thrd->exiting
+                      && signal_allowed(thrd->siginfo.signals_mask, sig)
+                      && !thrd->kernel_thread;
+    if (signal_set)
         signal_raise(&thrd->siginfo.pending_signals, sig);
-        signal_set = true;
-    }
-    spin_unlock(&thrd->lock);
+    spin_unlock(&thrd->siginfo_lock);
 
     if (signal_set)
         schedule_thread(thrd);
 
-    local_irq_restore(interrupts_enabled);
-
-    return signal_set;
-}
-
-bool thread_signal_if_allowed(thread* thrd, signal sig) {
-    bool signal_set = false;
-    bool interrupts_enabled = spin_lock_irq_save(&thrd->lock);
-    if (!thrd->exiting && signal_allowed(thrd->siginfo.signals_mask, sig)
-        && !thrd->kernel_thread) {
-        signal_raise(&thrd->siginfo.pending_signals, sig);
-        signal_set = true;
-    }
-    spin_unlock(&thrd->lock);
-
-    if (signal_set)
-        schedule_thread(thrd);
-
-    local_irq_restore(interrupts_enabled);
+    spin_unlock_irq_restore(&thrd->lock, interrupts_enabled);
 
     return signal_set;
 }

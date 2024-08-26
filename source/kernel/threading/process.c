@@ -58,6 +58,7 @@ bool process_init(process* parent, process* proc, bool kernel_process) {
     proc->finished = false;
     proc->finish_cvar = (con_var) CON_VAR_STATIC_INITIALIZER;
     memset(&proc->siginfo, 0, sizeof(process_siginfo));
+    proc->siginfo_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
     if (parent && !process_add_child(proc))
         goto failed_to_add_process_to_parent;
@@ -160,10 +161,10 @@ u64 process_fork(struct cpu_context* context) {
     if (!start_thread)
         goto failed_to_create_start_process_thread;
 
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    bool interrupts_enabled = spin_lock_irq_save(&proc->siginfo_lock);
     memcpy(&created->siginfo, &proc->siginfo, sizeof(process_siginfo));
     created->siginfo.pending_signals = PENDING_SIGNALS_CLEAR;
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+    spin_unlock_irq_restore(&proc->siginfo_lock, interrupts_enabled);
 
     cpu_context* forked_arch_context = (cpu_context*) start_thread->context;
     *forked_arch_context = *current_arch_context;
@@ -365,7 +366,7 @@ _Noreturn void process_exit_thread() {
     schedule_thread_exit();
 }
 
-void process_exit(u64 exit_code) {
+_Noreturn void process_exit(u64 exit_code) {
     thread* current = get_current_thread();
     process* proc = current->proc;
 
@@ -394,13 +395,16 @@ bool process_signal(process* proc, signal sig) {
     }
 
     ARRAY_LIST_FOR_EACH(&proc->threads, thread * iter) {
-        if (thread_signal_if_allowed(iter, sig)) {
+        if (thread_signal(iter, sig)) {
             spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
             return true;
         }
     }
 
+    spin_lock(&proc->siginfo_lock);
     signal_raise(&proc->siginfo.pending_signals, sig);
+    spin_unlock(&proc->siginfo_lock);
+
     spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
     return true;
@@ -408,14 +412,12 @@ bool process_signal(process* proc, signal sig) {
 
 bool process_set_sigaction(signal sig, sigaction action) {
     process* proc = get_current_thread()->proc;
-    bool action_set = false;
 
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-    if (!proc->exiting && sig != SIGKILL) {
+    bool interrupts_enabled = spin_lock_irq_save(&proc->siginfo_lock);
+    bool action_set = !proc->exiting && sig != SIGKILL;
+    if (action_set)
         proc->siginfo.actions[sig] = action;
-        action_set = true;
-    }
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+    spin_unlock_irq_restore(&proc->siginfo_lock, interrupts_enabled);
 
     return action_set;
 }
@@ -423,9 +425,9 @@ bool process_set_sigaction(signal sig, sigaction action) {
 sigaction process_get_sigaction(signal sig) {
     process* proc = get_current_thread()->proc;
 
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    bool interrupts_enabled = spin_lock_irq_save(&proc->siginfo_lock);
     sigaction action = proc->siginfo.actions[sig];
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+    spin_unlock_irq_restore(&proc->siginfo_lock, interrupts_enabled);
 
     return action;
 }
@@ -433,9 +435,9 @@ sigaction process_get_sigaction(signal sig) {
 bool process_any_pending_signals() {
     process* proc = get_current_thread()->proc;
 
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    bool interrupts_enabled = spin_lock_irq_save(&proc->siginfo_lock);
     bool any_pending = proc->siginfo.pending_signals != PENDING_SIGNALS_CLEAR;
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+    spin_unlock_irq_restore(&proc->siginfo_lock, interrupts_enabled);
 
     return any_pending;
 }

@@ -29,6 +29,7 @@ bool kthread_init(kthread* thrd, string name, kthread_func* func) {
 
     // kernel threads never receive signals
     memset(&thrd->siginfo, 0, sizeof(thread_siginfo));
+    thrd->siginfo_lock = SPIN_LOCK_STATIC_INITIALIZER;
     thrd->siginfo.signals_mask = ALL_SIGNALS_BLOCKED;
     thrd->siginfo.pending_signals = PENDING_SIGNALS_CLEAR;
 

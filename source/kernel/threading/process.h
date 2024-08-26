@@ -15,17 +15,26 @@ typedef struct {
     sigaction actions[SIGNALS_COUNT + 1];
 } process_siginfo;
 
+/*
+ * Process locking order:
+ * 1) process lock
+ * 2) process signals lock
+ */
 typedef struct _process {
+    // Immutable data
     u64 id;
     bool kernel_process;
+    // End of immutable data
+
     vm_space* vm;
+
+    process_siginfo siginfo;
+    lock siginfo_lock; // guards siginfo
 
     lock lock; // guards all fields below
     bool exiting;
     bool finished;
     u64 exit_code;
-
-    process_siginfo siginfo;
 
     id_generator tgid_generator;
     array_list threads;
