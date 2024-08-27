@@ -4,7 +4,8 @@
 #include "scheduler.h"
 #include "threading.h"
 
-process kernel_process;
+// defined in process.c
+extern process kernel_process;
 
 bool kthread_init(kthread* thrd, string name, kthread_func* func) {
     memset(thrd, 0, sizeof(thread));

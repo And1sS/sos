@@ -5,48 +5,10 @@
 #include "../memory/virtual/vmm.h"
 #include "../threading/kthread.h"
 #include "../threading/scheduler.h"
+#include "../threading/thread_cleaner.h"
 #include "../threading/threading.h"
 #include "../threading/uthread.h"
 #include "multiboot.h"
-
-thread* user_thread = NULL;
-
-_Noreturn void kernel_thread() {
-    u64 i = 0;
-    u64 printed = 0;
-    u64 exit_code;
-    bool dead = false;
-    bool killed = false;
-
-    ref_acquire(&user_thread->refc);
-    while (1) {
-        if (i++ % 10000000 == 0) {
-            println("kernel! Thread exit fix revision!");
-            printed++;
-
-            if (printed >= 100 && printed % 10 == 0 && !dead)
-                thread_signal(user_thread, SIGINT);
-
-            if (!dead && user_thread->finished) {
-                dead = true;
-                exit_code = user_thread->exit_code;
-                ref_release(&user_thread->refc);
-                user_thread = NULL;
-            }
-
-            if (dead) {
-                print("user exit code: ");
-                print_u64_hex(exit_code);
-                println("");
-            }
-
-            if (printed % 700 == 0 && !killed && !dead) {
-                thread_signal(user_thread, SIGKILL);
-                killed = true;
-            }
-        }
-    }
-}
 
 void set_up(const multiboot_info* mboot_info) {
     clear_screen();
@@ -62,7 +24,10 @@ void set_up(const multiboot_info* mboot_info) {
     println("");
 
     threading_init();
+    processing_init();
+    thread_cleaner_init();
     scheduler_init();
+
     println("Finished threading initialization!");
 
     print_multiboot_info(mboot_info);
@@ -91,11 +56,8 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     memcpy(user_text, (void*) P2V(first.mod_start),
            first.mod_end - first.mod_start);
 
-    user_thread =
-        uthread_create_orphan(init, "test", NULL, (uthread_func*) 0x1000);
-
-//    kthread_run("kernel-test-thread", kernel_thread);
-    thread_start(user_thread);
+    thread_start(
+        uthread_create_orphan(init, "test", NULL, (uthread_func*) 0x1000));
 
     vm_space_print(init->vm);
     local_irq_enable();
