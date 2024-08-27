@@ -2,6 +2,7 @@
 #include "../arch/x86_64/cpu/cpu_context.h"
 #include "../error/errno.h"
 #include "../interrupts/irq.h"
+#include "../lib/container/hash_table/hash_table.h"
 #include "../memory/virtual/vmm.h"
 #include "../synchronization/wait.h"
 #include "scheduler.h"
@@ -9,30 +10,35 @@
 #include "threading.h"
 #include "uthread.h"
 
-#define MAX_PROC 4096
-
+u64 pcnt = 0;
+process kernel_process;
 process* init_process;
-static process* process_list[MAX_PROC];
 
-/*
- *  lock order:
- *  process_table_lock ->
- *  init_process lock ->
- *  parent lock ->
- *  child lock
- */
+static hash_table process_table;
 static lock process_table_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
-static bool add_process_to_table(process* proc);
-static bool remove_process_from_table(process* proc);
+static id_generator pid_gen;
 
 static bool process_add_child(process* child);
-static void process_remove_child(process* child);
 // Assumes that current process lock is held and interrupts are disabled
 static void process_remove_child_unsafe(process* child);
 
-bool process_init(process* parent, process* proc, bool kernel_process) {
-    if (!threading_allocate_pid(&proc->id))
+void processing_init() {
+    if (!id_generator_init(&pid_gen))
+        panic("Can't init pid generator");
+
+    if (!hash_table_init(&process_table))
+        panic("Can't init process table");
+
+    if (!process_init(&kernel_process, true))
+        panic("Can't init kernel process");
+
+    hash_table_put(&process_table, kernel_process.id, &kernel_process, NULL);
+    pcnt++;
+}
+
+bool process_init(process* proc, bool is_kernel_process) {
+    if (!id_generator_get_id(&pid_gen, &proc->id))
         goto failed_to_allocate_pid;
 
     if (!array_list_init(&proc->threads, 8))
@@ -40,8 +46,8 @@ bool process_init(process* parent, process* proc, bool kernel_process) {
 
     linked_list_init(&proc->children);
 
-    proc->vm = kernel_process ? vmm_kernel_vm_space()
-                              : vm_space_fork(vmm_current_vm_space());
+    proc->vm = is_kernel_process ? vmm_kernel_vm_space()
+                                 : vm_space_fork(vmm_current_vm_space());
 
     if (!proc->vm)
         goto failed_to_fork_vm_space;
@@ -51,7 +57,7 @@ bool process_init(process* parent, process* proc, bool kernel_process) {
 
     proc->process_node = (linked_list_node) LINKED_LIST_NODE_OF(proc);
 
-    proc->kernel_process = kernel_process;
+    proc->kernel_process = is_kernel_process;
     proc->lock = SPIN_LOCK_STATIC_INITIALIZER;
     proc->refc = (ref_count) REF_COUNT_STATIC_INITIALIZER;
     proc->exiting = false;
@@ -60,21 +66,7 @@ bool process_init(process* parent, process* proc, bool kernel_process) {
     memset(&proc->siginfo, 0, sizeof(process_siginfo));
     proc->siginfo_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
-    if (parent && !process_add_child(proc))
-        goto failed_to_add_process_to_parent;
-
-    if (!add_process_to_table(proc))
-        goto failed_to_add_process_to_table;
-
     return true;
-
-failed_to_add_process_to_table:
-    if (parent) {
-        process_remove_child(proc);
-    }
-
-failed_to_add_process_to_parent:
-    id_generator_deinit(&proc->tgid_generator);
 
 failed_to_init_tgid_generator:
     vm_space_destroy(proc->vm);
@@ -83,7 +75,7 @@ failed_to_fork_vm_space:
     array_list_deinit(&proc->threads);
 
 failed_to_init_thread_list:
-    threading_free_pid(proc->id);
+    id_generator_free_id(&pid_gen, proc->id);
 
 failed_to_allocate_pid:
     return false;
@@ -94,13 +86,12 @@ static process* create_user_process() {
     if (!proc)
         return NULL;
 
-    thread* current = get_current_thread();
-    process* parent = current ? current->proc : NULL;
-    if (!process_init(parent, proc, false)) {
+    if (!process_init(proc, false)) {
         kfree(proc);
         return NULL;
     }
 
+    pcnt++;
     return proc;
 }
 
@@ -113,11 +104,10 @@ process* create_user_init_process() {
 }
 
 void process_destroy(process* proc) {
-    remove_process_from_table(proc);
-
+    pcnt--;
     vm_space_destroy(proc->vm);
 
-    threading_free_pid(proc->id);
+    id_generator_free_id(&pid_gen, proc->id);
 
     id_generator_deinit(&proc->tgid_generator);
 
@@ -150,11 +140,7 @@ u64 process_fork(struct cpu_context* context) {
     if (!created)
         goto failed_to_create_process;
 
-    if (!id_generator_get_id(&created->tgid_generator, &current->tgid))
-        goto failed_to_set_created_process_start_thread_tgid;
-
     cpu_context* current_arch_context = (cpu_context*) context;
-
     thread* start_thread =
         uthread_create_orphan(created, "main", current->user_stack,
                               (uthread_func*) current_arch_context->rip);
@@ -170,12 +156,25 @@ u64 process_fork(struct cpu_context* context) {
     *forked_arch_context = *current_arch_context;
     forked_arch_context->rax = 0;
 
+    interrupts_enabled = spin_lock_irq_save(&process_table_lock);
+    bool added_to_table = hash_table_put(&process_table, proc->id, proc, NULL);
+    bool added_to_parent = added_to_table && process_add_child(created);
+    if (!added_to_parent)
+        hash_table_remove(&process_table, proc->id);
+    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
+
+    if (!added_to_table)
+        goto failed_to_add_process_to_table;
+
     thread_start(start_thread);
 
     return created->id;
 
+failed_to_add_process_to_table:
+    thread_destroy(start_thread);
+
 failed_to_create_start_process_thread:
-failed_to_set_created_process_start_thread_tgid:
+    process_destroy(created);
 
 failed_to_create_process:
     return -ENOMEM;
@@ -281,7 +280,8 @@ static void process_transfer_children_to_init() {
 }
 
 static void process_finalize() {
-    process* proc = get_current_thread()->proc;
+    thread* current = get_current_thread();
+    process* proc = current->proc;
     if (proc == init_process)
         panic("Trying to destroy init process");
     if (proc->kernel_process)
@@ -300,17 +300,23 @@ static void process_finalize() {
     // current process to init), but we should not bother signaling exact
     // parent, since if current thread has been moved to init as child, it
     // will be signaled anyway.
-    if (parent) {
+    if (parent)
         process_signal(parent, SIGCHLD);
-    }
     spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
 
     process_transfer_children_to_init();
 
     interrupts_enabled = spin_lock_irq_save(&proc->lock);
     ref_count* refc = &proc->refc;
+
     CON_VAR_WAIT_FOR_IRQ(&refc->empty_cvar, &proc->lock, interrupts_enabled,
                          refc->count == 0);
+
+    spin_unlock(&proc->lock); // Interrupts left disabled on purpose
+
+    spin_lock(&process_table_lock);
+    hash_table_remove(&process_table, proc->id);
+    spin_unlock(&process_table_lock);
 
     vmm_switch_to_kernel_vm_space();
     process_destroy(proc);
@@ -322,7 +328,6 @@ _Noreturn void process_exit_thread() {
 
     bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
     ref_release(&proc->refc);
-    array_list_remove(&proc->threads, current);
 
     // Unmap user stack for user threads
     // should be performed before releasing tgid to avoid race condition,
@@ -339,7 +344,7 @@ _Noreturn void process_exit_thread() {
 
     // last leaving user thread awaits for process refcount to reach zero
     // and cleans up process
-    if (!proc->kernel_process && proc->threads.size == 0) {
+    if (!proc->kernel_process && proc->threads.size == 1) {
         proc->finished = true;
         con_var_broadcast(&proc->finish_cvar);
 
@@ -348,17 +353,20 @@ _Noreturn void process_exit_thread() {
         spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
 
         process_finalize();
+    } else {
+        array_list_remove(&proc->threads, current);
+
+        // Thread exiting should be performed on kernel vm, since after process
+        // lock unlock, its vm may be destroyed while current thread is still
+        // exiting
+        if (!proc->kernel_process)
+            vmm_switch_to_kernel_vm_space();
+
+        // At this point thread won't use any process resources, and will finish
+        // its execution in a couple of process cycles, so it is safe to release
+        // process lock
+        spin_unlock(&proc->lock); // Interrupts left disabled on purpose
     }
-
-    // Thread exiting should be performed on kernel vm, since after process lock
-    // unlock, its vm may be destroyed while current thread is still exiting
-    local_irq_disable();
-    vmm_switch_to_kernel_vm_space();
-
-    // At this point thread won't use any process resources, and will finish its
-    // execution in a couple of process cycles, so it is safe to release process
-    // lock
-    spin_unlock(&proc->lock);
 
     spin_lock(&current->lock);
     current->state = DEAD;
@@ -482,27 +490,4 @@ static void process_remove_child_unsafe(process* child) {
     spin_unlock(&child->lock);
 
     linked_list_remove_node(&proc->children, &child->process_node);
-}
-
-static void process_remove_child(process* child) {
-    process* proc = get_current_thread()->proc;
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-    process_remove_child_unsafe(child);
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
-}
-
-static bool add_process_to_table(process* proc) {
-    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
-    process_list[proc->id] = proc;
-    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
-
-    return true;
-}
-
-static bool remove_process_from_table(process* proc) {
-    bool interrupts_enabled = spin_lock_irq_save(&process_table_lock);
-    process_list[proc->id] = NULL;
-    spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
-
-    return true;
 }

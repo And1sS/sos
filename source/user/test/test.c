@@ -55,7 +55,7 @@ void thread_func() {
         printll(i);
         print("\n");
 
-        if (i == 500)
+        if (i == 5)
             break;
 
         i++;
@@ -73,11 +73,12 @@ void __attribute__((section(".entrypoint"))) main() {
     long sigint_act_set = process_set_sigaction(SIGINT, &sigint_action);
     // This one should fail (e.g. return value < 0)
     long sigkill_act_set = process_set_sigaction(SIGKILL, &sigkill_action);
-    long sigchld_act_set = process_set_sigaction(SIGCHLD, &sigchld_action);
+//    long sigchld_act_set = process_set_sigaction(SIGCHLD, &sigchld_action);
 
-    long long pid = fork();
-    long long pid1 = fork();
-    long long pid2 = fork();
+    for (int i = 0; i < 11; i++) {
+        if (fork() < 0)
+            exit(-2);
+    }
 
     print("Process: ");
     printll(getpid());
@@ -85,18 +86,15 @@ void __attribute__((section(".entrypoint"))) main() {
 
 #define THREADS_COUNT 3
     pthread threads[THREADS_COUNT];
-    for (long long i = 0; i < THREADS_COUNT; i++) {
-        pthread_run("other-thread", thread_func, &threads[i]);
+    int cnt = 0;
+    for (; cnt < THREADS_COUNT; cnt++) {
+       if (pthread_run("other-thread", thread_func, &threads[cnt]) != 0)
+           break;
     }
 
-    for (long long i = 0; i < THREADS_COUNT; i++) {
+    for (long long i = 0; i < cnt; i++) {
         long long exit_code;
         pthread_join(threads[i], &exit_code);
-    }
-
-    if (pid < 0 || pid1 < 0 || pid2 < 0) {
-        print("ERROR");
-        exit(-1);
     }
 
     long long exit_code;
@@ -113,7 +111,7 @@ void __attribute__((section(".entrypoint"))) main() {
     }
 
     // Parent waits forever
-    if (pid != 0 && pid1 != 0 && pid2 != 0) {
+    if (getpid() == 1) {
         for (;;)
             ;
     }

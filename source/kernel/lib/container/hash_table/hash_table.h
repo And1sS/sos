@@ -17,7 +17,7 @@ typedef struct {
 hash_table* hash_table_create();
 void hash_table_destroy(hash_table* table);
 
-void hash_table_init(hash_table* table);
+bool hash_table_init(hash_table* table);
 void hash_table_deinit(hash_table* table);
 
 bool hash_table_put(hash_table* table, u64 key, void* value, void** old_value);

@@ -51,7 +51,9 @@ typedef struct _process {
     con_var finish_cvar;
 } process;
 
-bool process_init(process* parent, process* proc, bool kernel_process);
+void processing_init();
+
+bool process_init(process* proc, bool is_kernel_process);
 process* create_user_init_process();
 
 u64 process_get_id(process* proc);

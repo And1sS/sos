@@ -51,15 +51,20 @@ void hash_table_destroy(hash_table* table) {
     kfree(table);
 }
 
-void hash_table_init(hash_table* table) {
+bool hash_table_init(hash_table* table) {
     table->size = 0;
     table->buckets_num = INITIAL_BUCKETS_NUM;
     table->buckets =
         (linked_list*) kmalloc(table->buckets_num * sizeof(linked_list));
 
+    if (!table->buckets)
+        return false;
+
     for (u64 i = 0; i < table->buckets_num; i++) {
         linked_list_init(&table->buckets[i]);
     }
+
+    return true;
 }
 
 void hash_table_deinit(hash_table* table) {
