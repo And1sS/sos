@@ -10,7 +10,6 @@
 #include "threading.h"
 #include "uthread.h"
 
-u64 pcnt = 0;
 process kernel_process;
 process* init_process;
 
@@ -34,7 +33,6 @@ void processing_init() {
         panic("Can't init kernel process");
 
     hash_table_put(&process_table, kernel_process.id, &kernel_process, NULL);
-    pcnt++;
 }
 
 bool process_init(process* proc, bool is_kernel_process) {
@@ -91,7 +89,6 @@ static process* create_user_process() {
         return NULL;
     }
 
-    pcnt++;
     return proc;
 }
 
@@ -104,15 +101,10 @@ process* create_user_init_process() {
 }
 
 void process_destroy(process* proc) {
-    pcnt--;
     vm_space_destroy(proc->vm);
-
     id_generator_free_id(&pid_gen, proc->id);
-
     id_generator_deinit(&proc->tgid_generator);
-
     array_list_deinit(&proc->threads);
-
     kfree(proc);
 }
 
@@ -159,7 +151,7 @@ u64 process_fork(struct cpu_context* context) {
     interrupts_enabled = spin_lock_irq_save(&process_table_lock);
     bool added_to_table = hash_table_put(&process_table, proc->id, proc, NULL);
     bool added_to_parent = added_to_table && process_add_child(created);
-    if (!added_to_parent)
+    if (added_to_table && !added_to_parent)
         hash_table_remove(&process_table, proc->id);
     spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
 
