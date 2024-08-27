@@ -373,7 +373,9 @@ static page_table* clone_page_table(page_table* table) {
         return NULL;
 
     page_table* cloned_table = TABLE(cloned_pml4);
-    memcpy(cloned_table, table, sizeof(page_table));
+    // Fork makes shallow copy only of kernel half
+    memcpy(cloned_table->entries + PT_ENTRIES / 2,
+           table->entries + PT_ENTRIES / 2, sizeof(page_table) / 2);
 
     for (u16 i = 0; i < PT_ENTRIES / 2; i++) {
         u64 pml4_entry = table->entries[i];

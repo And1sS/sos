@@ -287,6 +287,7 @@ static vm_page_mapping_result vm_space_map_page_unsafe(vm_space* space,
     new->flags = flags;
 
     if (!vm_space_insert_area_unsafe(space, new)) {
+        kfree(new);
         arch_unmap_page(space->table, base);
         return OUT_OF_MEMORY;
     }
