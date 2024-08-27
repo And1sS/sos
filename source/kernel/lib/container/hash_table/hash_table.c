@@ -26,7 +26,7 @@ static bool hash_table_grow(hash_table* table) {
             linked_list_remove_node(bucket, crt_node);
 
             u64 key = entry->key;
-            linked_list_add_last(&new_buckets[key % new_buckets_num], crt_node);
+            linked_list_add_last_node(&new_buckets[key % new_buckets_num], crt_node);
         }
     }
 
