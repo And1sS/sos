@@ -116,14 +116,6 @@ bool process_add_thread(process* proc, struct thread* thrd) {
     return added;
 }
 
-u64 process_get_id(process* proc) {
-    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
-    u64 pid = proc->id;
-    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
-
-    return pid;
-}
-
 u64 process_fork(struct cpu_context* context) {
     thread* current = get_current_thread();
     process* proc = current->proc;
