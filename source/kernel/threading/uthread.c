@@ -8,10 +8,10 @@
 const vm_area_flags USER_STACK_FLAGS = {
     .writable = true, .executable = true, .user_access_allowed = true};
 
-void* uthread_map_user_stack(process* proc, u64 tgid);
+static void* uthread_map_user_stack(process* proc, u64 tgid);
 
-bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
-                  void* user_stack, uthread_func* func) {
+static bool uthread_init(process* proc, uthread* parent, uthread* thrd,
+                         string name, void* user_stack, uthread_func* func) {
 
     memset(thrd, 0, sizeof(thread));
     if (!threading_allocate_tid(&thrd->id))
@@ -94,6 +94,22 @@ failed_to_allocate_tid:
     return false;
 }
 
+static void* uthread_map_user_stack(process* proc, u64 tgid) {
+    u64 stack_addr = (USER_SPACE_END_VADDR + 1) - (tgid + 1) * USER_STACK_SIZE;
+
+    rw_spin_lock_write_irq(&proc->vm->lock);
+    vm_pages_mapping_result result = vm_space_map_pages(
+        proc->vm, stack_addr, USER_STACK_PAGE_COUNT, USER_STACK_FLAGS);
+
+    void* stack = result.status == SUCCESS ? (void*) stack_addr : NULL;
+    if (!stack)
+        vm_space_unmap_pages(proc->vm, stack_addr, result.mapped_pages_count);
+
+    rw_spin_unlock_write_irq(&proc->vm->lock);
+
+    return stack;
+}
+
 uthread* uthread_create_orphan(process* proc, string name, void* user_stack,
                                uthread_func* func) {
 
@@ -121,31 +137,4 @@ uthread* uthread_create(string name, uthread_func* func) {
     }
 
     return thrd;
-}
-
-void* uthread_map_user_stack(process* proc, u64 tgid) {
-    u64 user_stack_addr =
-        (USER_SPACE_END_VADDR + 1) - (tgid + 1) * USER_STACK_SIZE;
-    void* user_stack = NULL;
-
-    rw_spin_lock_write_irq(&proc->vm->lock);
-    vm_pages_mapping_result user_stack_mapping_result = vm_space_map_pages(
-        proc->vm, user_stack_addr, USER_STACK_PAGE_COUNT, USER_STACK_FLAGS);
-
-    if (user_stack_mapping_result.status != SUCCESS) {
-        vm_space_unmap_pages(proc->vm, user_stack_addr,
-                             user_stack_mapping_result.mapped_pages_count);
-    } else {
-        user_stack = (void*) user_stack_addr;
-
-        for (u64 i = 0; i < USER_STACK_PAGE_COUNT; i++) {
-            void* page = vm_space_get_page_view(proc->vm, (u64) user_stack_addr
-                                                              + i * PAGE_SIZE);
-
-            memset(page, 0, PAGE_SIZE);
-        }
-    }
-    rw_spin_unlock_write_irq(&proc->vm->lock);
-
-    return user_stack;
 }
