@@ -53,9 +53,6 @@ typedef struct _process {
 
 void processing_init();
 
-bool process_init(process* proc, bool is_kernel_process);
-process* create_user_init_process();
-
 u64 process_fork(struct cpu_context* context);
 u64 process_wait(u64 pid, u64* exit_code);
 

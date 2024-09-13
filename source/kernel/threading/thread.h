@@ -76,6 +76,11 @@ typedef struct _thread {
     con_var finish_cvar;
 } thread;
 
+void threading_init();
+
+bool threading_allocate_tid(u64* result);
+bool threading_free_tid(u64 tid);
+
 void thread_start(thread* thread);
 
 bool thread_add_child(thread* child);

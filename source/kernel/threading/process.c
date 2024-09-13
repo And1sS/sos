@@ -1,23 +1,22 @@
 #include "process.h"
 #include "../arch/x86_64/cpu/cpu_context.h"
 #include "../error/errno.h"
-#include "../interrupts/irq.h"
 #include "../lib/container/hash_table/hash_table.h"
 #include "../memory/virtual/vmm.h"
 #include "../synchronization/wait.h"
 #include "scheduler.h"
 #include "thread_cleaner.h"
-#include "threading.h"
 #include "uthread.h"
 
 process kernel_process;
-process* init_process;
+process init_process;
 
 static hash_table process_table;
 static lock process_table_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 static id_generator pid_gen;
 
+static bool process_init(process* proc, bool is_kernel_process);
 static bool process_add_child(process* child);
 // Assumes that current process lock is held and interrupts are disabled
 static void process_remove_child_unsafe(process* child);
@@ -32,10 +31,14 @@ void processing_init() {
     if (!process_init(&kernel_process, true))
         panic("Can't init kernel process");
 
+    if (!process_init(&init_process, false))
+        panic("Can't init user init process");
+
     hash_table_put(&process_table, kernel_process.id, &kernel_process, NULL);
+    hash_table_put(&process_table, init_process.id, &init_process, NULL);
 }
 
-bool process_init(process* proc, bool is_kernel_process) {
+static bool process_init(process* proc, bool is_kernel_process) {
     if (!id_generator_get_id(&pid_gen, &proc->id))
         goto failed_to_allocate_pid;
 
@@ -90,14 +93,6 @@ static process* create_user_process() {
     }
 
     return proc;
-}
-
-process* create_user_init_process() {
-    init_process = create_user_process();
-    if (!init_process)
-        panic("Can't create user init process");
-
-    return init_process;
 }
 
 void process_destroy(process* proc) {
@@ -220,12 +215,12 @@ u64 process_wait(u64 pid, u64* exit_code) {
 
 static void process_transfer_child_to_init(process* child) {
     process* proc = get_current_thread()->proc;
-    if (proc == init_process)
+    if (proc == &init_process)
         panic("Trying to transfer child from init to init");
     if (proc->kernel_process)
         panic("Trying to transfer child from kernel process");
 
-    bool interrupts_enabled = spin_lock_irq_save(&init_process->lock);
+    bool interrupts_enabled = spin_lock_irq_save(&init_process.lock);
     spin_lock(&proc->lock);
     spin_lock(&child->lock);
 
@@ -235,15 +230,15 @@ static void process_transfer_child_to_init(process* child) {
     linked_list_remove_node(&proc->children, &child->process_node);
     ref_release(&proc->refc);
 
-    child->parent = init_process;
-    linked_list_add_last_node(&init_process->children, &child->process_node);
-    ref_acquire(&init_process->refc);
+    child->parent = &init_process;
+    linked_list_add_last_node(&init_process.children, &child->process_node);
+    ref_acquire(&init_process.refc);
 
     spin_unlock(&child->lock);
     spin_unlock(&proc->lock);
-    spin_unlock_irq_restore(&init_process->lock, interrupts_enabled);
+    spin_unlock_irq_restore(&init_process.lock, interrupts_enabled);
 
-    process_signal(init_process, SIGCHLD);
+    process_signal(&init_process, SIGCHLD);
 }
 
 static void process_transfer_children_to_init() {
@@ -266,7 +261,7 @@ static void process_transfer_children_to_init() {
 static void process_finalize() {
     thread* current = get_current_thread();
     process* proc = current->proc;
-    if (proc == init_process)
+    if (proc == &init_process)
         panic("Trying to destroy init process");
     if (proc->kernel_process)
         panic("Trying to destroy kernel process");

@@ -2,7 +2,6 @@
 #include "../arch/common/thread.h"
 #include "process.h"
 #include "scheduler.h"
-#include "threading.h"
 
 #define UTHREAD_CHILDREN_INITIAL_CAPACITY 8
 

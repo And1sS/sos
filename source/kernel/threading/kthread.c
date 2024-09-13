@@ -2,7 +2,6 @@
 #include "../arch/common/thread.h"
 #include "process.h"
 #include "scheduler.h"
-#include "threading.h"
 
 // defined in process.c
 extern process kernel_process;
