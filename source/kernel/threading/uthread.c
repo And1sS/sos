@@ -26,13 +26,10 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
         goto failed_to_allocate_kernel_stack;
     memset(thrd->kernel_stack, 0, THREAD_KERNEL_STACK_SIZE);
 
-    if (!user_stack) {
-        thrd->user_stack = (void*) uthread_map_user_stack(proc, thrd->tgid);
-        if (!thrd->user_stack)
-            goto failed_to_map_user_stack;
-    } else {
-        thrd->user_stack = user_stack;
-    }
+    thrd->user_stack =
+        user_stack ? user_stack : uthread_map_user_stack(proc, thrd->tgid);
+    if (!thrd->user_stack)
+        goto failed_to_map_user_stack;
 
     thrd->name = name;
 
@@ -76,17 +73,18 @@ bool uthread_init(process* proc, uthread* parent, uthread* thrd, string name,
     return true;
 
 failed_to_add_thread_to_process:
-    if (parent) {
+    if (parent)
         thread_remove_child(thrd);
-    }
 
 failed_to_add_thread_to_parent:
     array_list_deinit(&thrd->children);
 
 failed_to_init_child_list:
-    kfree(thrd->kernel_stack);
+    // TODO: Unmap mapped user stack
 
 failed_to_map_user_stack:
+    kfree(thrd->kernel_stack);
+
 failed_to_allocate_kernel_stack:
     id_generator_free_id(&proc->tgid_generator, thrd->tgid);
 
