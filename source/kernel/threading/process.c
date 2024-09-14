@@ -1,5 +1,5 @@
 #include "process.h"
-#include "../arch/x86_64/cpu/cpu_context.h"
+#include "../arch/common/context.h"
 #include "../error/errno.h"
 #include "../lib/container/hash_table/hash_table.h"
 #include "../memory/virtual/vmm.h"
@@ -119,10 +119,10 @@ u64 process_fork(struct cpu_context* context) {
     if (!created)
         goto failed_to_create_process;
 
-    cpu_context* current_arch_context = (cpu_context*) context;
-    thread* start_thread =
-        uthread_create_orphan(created, "main", current->user_stack,
-                              (uthread_func*) current_arch_context->rip);
+    thread* start_thread = uthread_create_orphan(
+        created, "main", current->user_stack,
+        (uthread_func*) arch_get_instruction_pointer(context));
+
     if (!start_thread)
         goto failed_to_create_start_process_thread;
 
@@ -131,9 +131,8 @@ u64 process_fork(struct cpu_context* context) {
     created->siginfo.pending_signals = PENDING_SIGNALS_CLEAR;
     spin_unlock_irq_restore(&proc->siginfo_lock, interrupts_enabled);
 
-    cpu_context* forked_arch_context = (cpu_context*) start_thread->context;
-    *forked_arch_context = *current_arch_context;
-    forked_arch_context->rax = 0;
+    arch_clone_cpu_context(context, start_thread->context);
+    arch_set_syscall_return_value(start_thread->context, 0);
 
     interrupts_enabled = spin_lock_irq_save(&process_table_lock);
     bool added_to_table = hash_table_put(&process_table, proc->id, proc, NULL);
