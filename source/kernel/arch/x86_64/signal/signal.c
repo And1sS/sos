@@ -10,14 +10,14 @@
         type __val = val;                                                      \
         rsp -= sizeof(type);                                                   \
         if (!copy_to_user((void*) (rsp), &__val, sizeof(type)))                \
-            thread_exit(-1);                                                   \
+            process_exit(128 + SIGSEGV);                                       \
     } while (0)
 
 #define STACK_PUSH_RAW(rsp, size, src)                                         \
     do {                                                                       \
         rsp -= size;                                                           \
         if (!copy_to_user((void*) (rsp), (void*) (src), size))                 \
-            thread_exit(-1);                                                   \
+            process_exit(128 + SIGSEGV);                                       \
     } while (0)
 
 extern void signal_trampoline_code_start();
@@ -82,7 +82,7 @@ u64 arch_return_from_signal_handler(struct cpu_context* context) {
 
     void* src = (void*) arch_context->rsp + TRAMPOLINE_CODE_SIZE;
     if (!copy_from_user((void*) context, src, sizeof(cpu_context)))
-        thread_exit(-1);
+        process_exit(128 + SIGSEGV);
 
     // make sure user space did not modify cs, ss and flags to mess kernel state
     arch_context->ss = USER_DATA_SEGMENT_SELECTOR;
