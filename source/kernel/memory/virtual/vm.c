@@ -329,6 +329,19 @@ vm_pages_mapping_result vm_space_map_pages(vm_space* space, vaddr base,
                                      .status = page_status};
 }
 
+vm_page_mapping_result vm_space_map_pages_exactly(vm_space* space, vaddr base,
+                                                  u64 count,
+                                                  vm_area_flags flags) {
+    vm_pages_mapping_result result =
+        vm_space_map_pages(space, base, count, flags);
+
+    if (result.status == SUCCESS && result.mapped_pages_count == count)
+        return SUCCESS;
+
+    vm_space_unmap_pages(space, base, result.mapped_pages_count);
+    return result.status;
+}
+
 vm_page_mapping_result vm_space_map_page(vm_space* space, vaddr base,
                                          vm_area_flags flags) {
 

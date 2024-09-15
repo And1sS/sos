@@ -2,9 +2,13 @@
 
 bool id_generator_init(id_generator* generator) {
     generator->set = bitset_create();
-    init_lock(&generator->lock);
+    generator->lock = SPIN_LOCK_STATIC_INITIALIZER;
 
     return generator->set != NULL;
+}
+
+void id_generator_deinit(id_generator* generator) {
+    bitset_destroy(generator->set);
 }
 
 bool id_generator_get_id(id_generator* generator, u64* result) {

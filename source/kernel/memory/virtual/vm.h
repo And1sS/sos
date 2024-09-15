@@ -72,8 +72,14 @@ void vm_space_destroy(vm_space* space);
 // these functions should be called with vm_space lock held for write
 vm_page_mapping_result vm_space_map_page(vm_space* space, vaddr base,
                                          vm_area_flags flags);
+// this routine will try to map as many pages as possible up until `count` and
+// return number of mapped pages
 vm_pages_mapping_result vm_space_map_pages(vm_space* space, vaddr base,
                                            u64 count, vm_area_flags flags);
+// same as above, except this routine maps exactly `count` of pages
+vm_page_mapping_result vm_space_map_pages_exactly(vm_space* space, vaddr base,
+                                                  u64 count,
+                                                  vm_area_flags flags);
 
 bool vm_space_unmap_page(vm_space* space, vaddr base);
 bool vm_space_unmap_pages(vm_space* space, vaddr base, u64 count);

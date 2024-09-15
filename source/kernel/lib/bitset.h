@@ -17,6 +17,7 @@ typedef struct {
 } bitset;
 
 bitset* bitset_create();
+void bitset_destroy(bitset* set);
 
 bool bitset_allocate_index(bitset* set, u64* result);
 bool bitset_free_index(bitset* set, u64 index);

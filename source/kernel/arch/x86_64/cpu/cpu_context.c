@@ -41,3 +41,15 @@ void arch_print_cpu_context(struct cpu_context* context) {
     print_cpu_register("rsp", arch_context->rsp);
     print_cpu_register("ss", arch_context->ss);
 }
+
+void arch_set_syscall_return_value(struct cpu_context* context, u64 value) {
+    ((cpu_context*) context)->rax = value;
+}
+
+u64 arch_get_instruction_pointer(struct cpu_context* context) {
+    return ((cpu_context*) context)->rip;
+}
+
+void arch_clone_cpu_context(struct cpu_context* src, struct cpu_context* dst) {
+    *((cpu_context*) dst) = *((cpu_context*) src);
+}

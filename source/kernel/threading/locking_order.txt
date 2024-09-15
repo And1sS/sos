@@ -1,0 +1,8 @@
+Locking protocol for processes, threads and scheduler that ensures that
+deadlocks won't occur implies strict locking order:
+1) Process table lock
+2) User init process lock
+3) Process lock
+4) Process child lock
+5) Process thread lock
+6) Scheduler lock
