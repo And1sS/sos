@@ -47,18 +47,19 @@ What is implemented:
 - kernel heap (kmalloc, kmalloc_aligned, krealloc, kfree)
 - vga text console
 - synchronization primitives: spinlocks, mutexes, semaphores, conditional variables
-- preemptive multithreading
-- userspace (ring 3) threads
-- initial support for syscalls (via "int 0x80" for x86-64)
+- preemptive scheduling 
 - subset of posix signals
+- Unix-like processes structure with proper threading support
+- userspace/kernelspace
+- subset of posix syscalls - exit, fork, wait, sigaction, pthreads syscalls
 
 TBD:
-- group threads to form processes, ring 0/3 <- currently working on this part
-- parse elf files to run processes
-- syscall interface and basic unix syscalls implementation
+- VFS and ramdisk <- right now working on this part
+- parse elf files, exec syscall
 - modern graphics interface support to get rid of CSM
 - interface for drivers
-- simple hdd driver, virtual file system
+- simple hdd, network card drivers
+- network stack/sockets implementation
 - SMP(simultaneous multi-processing) support
 - compile portable std lib for C for kernel
 - port Doom :D
