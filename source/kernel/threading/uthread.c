@@ -5,6 +5,8 @@
 
 #define UTHREAD_CHILDREN_INITIAL_CAPACITY 8
 
+#define UTHREAD_MAX_STACKS 4096
+
 const vm_area_flags USER_STACK_FLAGS = {
     .writable = true, .executable = true, .user_access_allowed = true};
 
@@ -94,17 +96,40 @@ failed_to_allocate_tid:
     return false;
 }
 
+/*
+ * User thread stacks are allocated from top of user space to bottom.
+ * allocation direction <-- | unused | thread n stack | .. | thread 0 stack |
+ *
+ * If, for some reason, corresponding stack pages are already mapped inside user
+ * space, try to find next unmapped place.
+ */
 static void* uthread_map_user_stack(process* proc, u64 tgid) {
-    u64 stack_addr = (USER_SPACE_END_VADDR + 1) - (tgid + 1) * USER_STACK_SIZE;
+    void* stack = NULL;
 
     rw_spin_lock_write_irq(&proc->vm->lock);
-    vm_pages_mapping_result result = vm_space_map_pages(
-        proc->vm, stack_addr, USER_STACK_PAGE_COUNT, USER_STACK_FLAGS);
+    for (u64 i = tgid; i < UTHREAD_MAX_STACKS; i++) {
+        u64 addr = (USER_SPACE_END_VADDR + 1) - (i + 1) * USER_STACK_SIZE;
+        vm_page_mapping_result result = vm_space_map_pages_exactly(
+            proc->vm, addr, USER_STACK_PAGE_COUNT, USER_STACK_FLAGS);
 
-    void* stack = result.status == SUCCESS ? (void*) stack_addr : NULL;
-    if (!stack)
-        vm_space_unmap_pages(proc->vm, stack_addr, result.mapped_pages_count);
+        switch (result) {
+        case SUCCESS:
+            stack = (void*) addr;
+            goto exit_loop;
 
+        case ALREADY_MAPPED:
+            continue;
+
+        case UNAUTHORIZED:
+        case INVALID_RANGE:
+            panic("Invalid range inside user thread stack mapping");
+
+        case OUT_OF_MEMORY:
+            goto exit_loop;
+        }
+    }
+
+exit_loop:
     rw_spin_unlock_write_irq(&proc->vm->lock);
 
     return stack;

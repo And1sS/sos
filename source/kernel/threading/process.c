@@ -122,7 +122,6 @@ u64 process_fork(struct cpu_context* context) {
     thread* start_thread = uthread_create_orphan(
         created, "main", current->user_stack,
         (uthread_func*) arch_get_instruction_pointer(context));
-
     if (!start_thread)
         goto failed_to_create_start_process_thread;
 
