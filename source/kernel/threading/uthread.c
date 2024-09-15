@@ -81,7 +81,10 @@ failed_to_add_thread_to_parent:
     array_list_deinit(&thrd->children);
 
 failed_to_init_child_list:
-    // TODO: Unmap mapped user stack
+    rw_spin_lock_write(&proc->vm->lock);
+    vm_space_unmap_pages(proc->vm, (u64) thrd->user_stack,
+                         USER_STACK_PAGE_COUNT);
+    rw_spin_unlock_write(&proc->vm->lock);
 
 failed_to_map_user_stack:
     kfree(thrd->kernel_stack);
