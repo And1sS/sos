@@ -58,10 +58,11 @@ void signal_unblock(sigmask* signals_mask, signal sig) {
 }
 
 static signal signal_to_handle(sigpending* pending_signals, sigmask mask) {
-    if (!signal_any_raised(*pending_signals))
+    sigpending masked = *pending_signals & mask;
+    if (!signal_any_raised(masked))
         return NOSIG;
 
-    signal to_handle = lsb_u64(*pending_signals) & mask;
+    signal to_handle = lsb_u64(masked);
     if (to_handle != NOSIG)
         signal_clear(pending_signals, to_handle);
 
