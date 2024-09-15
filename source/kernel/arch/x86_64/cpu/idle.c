@@ -1,4 +1,4 @@
-#include "../../../idle.h"
+#include "../../common/idle.h"
 
 void pause() { __asm__ volatile("pause"); }
 

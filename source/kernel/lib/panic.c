@@ -1,5 +1,5 @@
 #include "panic.h"
-#include "../idle.h"
+#include "../arch/common/idle.h"
 #include "../interrupts/irq.h"
 #include "kprint.h"
 

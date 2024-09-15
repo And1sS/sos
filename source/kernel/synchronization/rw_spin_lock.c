@@ -1,5 +1,5 @@
 #include "rw_spin_lock.h"
-#include "../idle.h"
+#include "../arch/common/idle.h"
 
 void init_rw_lock(rw_spin_lock* lock) {
     lock->writer_involved = false;

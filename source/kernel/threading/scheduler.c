@@ -1,5 +1,5 @@
 #include "scheduler.h"
-#include "../idle.h"
+#include "../arch/common/idle.h"
 #include "../memory/virtual/vmm.h"
 #include "kthread.h"
 

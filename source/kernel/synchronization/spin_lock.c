@@ -1,5 +1,5 @@
 #include "spin_lock.h"
-#include "../idle.h"
+#include "../arch/common/idle.h"
 #include "../interrupts/irq.h"
 
 void init_lock(lock* lock) { atomic_set(lock, UNLOCKED); }
