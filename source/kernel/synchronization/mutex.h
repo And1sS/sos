@@ -18,7 +18,7 @@ typedef struct {
 } mutex;
 
 #define MUTEX_STATIC_INITIALIZER                                               \
-    {                                                                          \
+    (mutex) {                                                                  \
         .lock = SPIN_LOCK_STATIC_INITIALIZER, .locked = false,                 \
         .cvar = CON_VAR_STATIC_INITIALIZER                                     \
     }

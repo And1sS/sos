@@ -25,8 +25,9 @@ const u16 COUNTER_1_ADDR = 0x41;
 const u16 COUNTER_2_ADDR = 0x42;
 const u16 CONTROL_WORD_ADDR = 0x43;
 
+const u16 FREQUENCY = 500;
 // frequency = 1193182 Hz / FREQUENCY_DIVIDER
-const u16 FREQUENCY_DIVIDER = (1 << 16) - 1;
+const u16 FREQUENCY_DIVIDER = 1193182 / FREQUENCY;
 
 void pit_init() {
     outb(CONTROL_WORD_ADDR, gen_control_word(0, LSB_THEN_MSB, 2, false));

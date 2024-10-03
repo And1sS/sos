@@ -3,6 +3,16 @@
 
 #include "../linked_list/linked_list.h"
 
+#define HASH_TABLE_GET_OR_PUT(table, key, creator)                             \
+    ({                                                                         \
+        void* ___result = hash_table_get((table), (key));                      \
+        if (!___result) {                                                      \
+            ___result = (creator);                                             \
+            hash_table_put((table), (key), (___result), NULL);                 \
+        }                                                                      \
+        ___result;                                                             \
+    })
+
 typedef struct {
     u64 key;
     void* value;
