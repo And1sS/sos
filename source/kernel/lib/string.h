@@ -5,7 +5,11 @@
 
 u64 strlen(string str);
 
-bool strcmp(string left, string right);
+string strcpy(string str);
+
+u64 strcmp(string left, string right);
+
+bool streq(string left, string right);
 
 u64 strhash(string str);
 

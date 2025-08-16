@@ -1,6 +1,7 @@
 #ifndef SOS_HASH_TABLE_H
 #define SOS_HASH_TABLE_H
 
+#include "../../kprint.h"
 #include "../../util.h"
 #include "../linked_list/linked_list.h"
 
@@ -223,29 +224,29 @@ typedef bool comparator(void* a, void* b);
         table->size--;                                                         \
         return value;                                                          \
     }                                                                          \
+                                                                               \
+    void name##_print(name* table) {                                           \
+        println("hash table {");                                               \
+        print("size = ");                                                      \
+        print_u64(table->size);                                                \
+        print("; ");                                                           \
+                                                                               \
+        for (u64 i = 0; i < table->buckets_num; i++) {                         \
+            linked_list* bucket = &table->buckets[i];                          \
+            linked_list_node* entry_node = bucket->head;                       \
+            while (entry_node != NULL) {                                       \
+                name##_entry* entry = (name##_entry*) entry_node->value;       \
+                print("key = ");                                           \
+                print_u64((u64) entry->key);                                   \
+                print(", value = ");                                           \
+                print_u64((u64) entry->value);                                 \
+                print("; ");                                                   \
+                entry_node = entry_node->next;                                 \
+            }                                                                  \
+        }                                                                      \
+                                                                               \
+        print("}");                                                          \
+    }                                                                          \
     _Pragma("GCC diagnostic pop")
-
-//    void name##_print(name* table) {
-//        println("hash table {");
-//        print("size = ");
-//        print_u64(table->size);
-//        println("");
-//
-//        for (u64 i = 0; i < table->buckets_num; i++) {
-//            linked_list* bucket = &table->buckets[i];
-//            linked_list_node* entry_node = bucket->head;
-//            while (entry_node != NULL) {
-//                name##_entry* entry = (name##_entry*) entry_node->value;
-//                print("    key = ");
-//                print_u64(entry->key);
-//                print(", value = ");
-//                print_u64((u64) entry->value);
-//                println("");
-//                entry_node = entry_node->next;
-//            }
-//        }
-//
-//        println("}");
-//    }
 
 #endif // SOS_HASH_TABLE_H

@@ -1,5 +1,8 @@
 #include "../arch/common/init.h"
 #include "../arch/common/vmm.h"
+#include "../fs/dcache.h"
+#include "../fs/ramfs/ramfs.h"
+#include "../fs/vfs.h"
 #include "../interrupts/irq.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/virtual/vmm.h"
@@ -37,20 +40,30 @@ void set_up(const multiboot_info* mboot_info) {
 }
 
 void set_up_init_process(module init_module) {
-    vm_area_flags flags = {
-        .writable = true, .user_access_allowed = true, .executable = true};
+    UNUSED(init_module);
+    //    vm_area_flags flags = {
+    //        .writable = true, .user_access_allowed = true, .executable =
+    //        true};
+    //
+    //    // temporary hardcoded loading of test.bin for test, which code and
+    //    data are
+    //    // within single page, start is mapped to 0x1000, entrypoint is 0x1000
+    //    vm_space_map_page(init_process.vm, 0x1000, flags);
+    //    void* user_text = vm_space_get_page_view(init_process.vm, 0x1000);
+    //    memcpy(user_text, (void*) P2V(init_module.mod_start),
+    //           init_module.mod_end - init_module.mod_start);
+    //
+    //    thread_start(uthread_create_orphan(&init_process, "test", NULL,
+    //                                       (uthread_func*) 0x1000));
+    //
+    //    vm_space_print(init_process.vm);
 
-    // temporary hardcoded loading of test.bin for test, which code and data are
-    // within single page, start is mapped to 0x1000, entrypoint is 0x1000
-    vm_space_map_page(init_process.vm, 0x1000, flags);
-    void* user_text = vm_space_get_page_view(init_process.vm, 0x1000);
-    memcpy(user_text, (void*) P2V(init_module.mod_start),
-           init_module.mod_end - init_module.mod_start);
-
-    thread_start(uthread_create_orphan(&init_process, "test", NULL,
-                                       (uthread_func*) 0x1000));
-
-    vm_space_print(init_process.vm);
+    ramfs_init();
+    dcache_init();
+    struct vfs_inode* root = ramfs_mount(NULL, NULL);
+    struct vfs_inode* res;
+    walk(root, "a/../b/./e", &res);
+    print_u64_hex((u64) res);
 }
 
 _Noreturn void kernel_main(paddr multiboot_structure) {

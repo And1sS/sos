@@ -11,7 +11,7 @@ typedef struct {
 } ref_count;
 
 #define REF_COUNT_STATIC_INITIALIZER                                           \
-    { .count = 0, .empty_cvar = CON_VAR_STATIC_INITIALIZER }
+    ((ref_count) {.count = 0, .empty_cvar = CON_VAR_STATIC_INITIALIZER})
 
 void ref_acquire(ref_count* refc);
 void ref_release(ref_count* refc);
