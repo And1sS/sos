@@ -8,10 +8,14 @@
 #include "thread_cleaner.h"
 #include "uthread.h"
 
+static u64 key_hash(u64 key) { return key; }
+static bool key_equals(u64 a, u64 b) { return a == b; }
+DEFINE_HASH_TABLE_NO_MM(ptable, u64, process*, key_hash, key_equals)
+
 process kernel_process;
 process init_process;
 
-static hash_table process_table;
+static ptable process_table;
 static lock process_table_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 static id_generator pid_gen;
@@ -25,7 +29,7 @@ void processing_init() {
     if (!id_generator_init(&pid_gen))
         panic("Can't init pid generator");
 
-    if (!hash_table_init(&process_table))
+    if (!ptable_init(&process_table))
         panic("Can't init process table");
 
     if (!process_init(&kernel_process, true))
@@ -34,8 +38,8 @@ void processing_init() {
     if (!process_init(&init_process, false))
         panic("Can't init user init process");
 
-    hash_table_put(&process_table, kernel_process.id, &kernel_process, NULL);
-    hash_table_put(&process_table, init_process.id, &init_process, NULL);
+    ptable_put(&process_table, kernel_process.id, &kernel_process, NULL);
+    ptable_put(&process_table, init_process.id, &init_process, NULL);
 }
 
 static bool process_init(process* proc, bool is_kernel_process) {
@@ -134,10 +138,10 @@ u64 process_fork(struct cpu_context* context) {
     arch_set_syscall_return_value(start_thread->context, 0);
 
     interrupts_enabled = spin_lock_irq_save(&process_table_lock);
-    bool added_to_table = hash_table_put(&process_table, proc->id, proc, NULL);
+    bool added_to_table = ptable_put(&process_table, proc->id, proc, NULL);
     bool added_to_parent = added_to_table && process_add_child(created);
     if (added_to_table && !added_to_parent)
-        hash_table_remove(&process_table, proc->id);
+        ptable_remove(&process_table, proc->id);
     spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
 
     if (!added_to_table)
@@ -292,7 +296,7 @@ static void process_finalize() {
     spin_unlock(&proc->lock); // Interrupts left disabled on purpose
 
     spin_lock(&process_table_lock);
-    hash_table_remove(&process_table, proc->id);
+    ptable_remove(&process_table, proc->id);
     spin_unlock(&process_table_lock);
 
     vmm_switch_to_kernel_vm_space();
