@@ -1,6 +1,7 @@
 #ifndef SOS_HASH_TABLE_H
 #define SOS_HASH_TABLE_H
 
+#include "../../../memory/heap/kheap.h"
 #include "../../kprint.h"
 #include "../../util.h"
 #include "../linked_list/linked_list.h"
@@ -10,15 +11,14 @@ typedef bool comparator(void* a, void* b);
 
 #define INITIAL_BUCKETS_NUM 16
 
-#define DEFINE_HASH_TABLE_NO_MM(name, key_type, value_type, hasher,            \
-                                comparator)                                    \
+#define DEFINE_HASH_TABLE(name, key_type, value_type, hasher, comparator)      \
     static void ___do_nothing_##name(key_type key) { UNUSED(key); }            \
     static void ___do_nothing_##name##1(value_type value) { UNUSED(value); }   \
-    DEFINE_HASH_TABLE(name, key_type, value_type, hasher, comparator,          \
-                      ___do_nothing_##name, ___do_nothing_##name##1)
+    DEFINE_HASH_TABLE_MM(name, key_type, value_type, hasher, comparator,       \
+                         ___do_nothing_##name, ___do_nothing_##name##1)
 
-#define DEFINE_HASH_TABLE(name, key_type, value_type, hasher, comparator,      \
-                          key_destroyer, value_destroyer)                      \
+#define DEFINE_HASH_TABLE_MM(name, key_type, value_type, hasher, comparator,   \
+                             key_destroyer, value_destroyer)                   \
                                                                                \
     _Pragma("GCC diagnostic push")                                             \
         _Pragma("GCC diagnostic ignored \"-Wunused-function\"")                \
@@ -225,28 +225,29 @@ typedef bool comparator(void* a, void* b);
         return value;                                                          \
     }                                                                          \
                                                                                \
-    void name##_print(name* table) {                                           \
-        println("hash table {");                                               \
-        print("size = ");                                                      \
-        print_u64(table->size);                                                \
-        print("; ");                                                           \
-                                                                               \
-        for (u64 i = 0; i < table->buckets_num; i++) {                         \
-            linked_list* bucket = &table->buckets[i];                          \
-            linked_list_node* entry_node = bucket->head;                       \
-            while (entry_node != NULL) {                                       \
-                name##_entry* entry = (name##_entry*) entry_node->value;       \
-                print("key = ");                                           \
-                print_u64((u64) entry->key);                                   \
-                print(", value = ");                                           \
-                print_u64((u64) entry->value);                                 \
-                print("; ");                                                   \
-                entry_node = entry_node->next;                                 \
-            }                                                                  \
-        }                                                                      \
-                                                                               \
-        print("}");                                                          \
-    }                                                                          \
     _Pragma("GCC diagnostic pop")
+
+//void name##_print(name* table) {                                           \
+//println("hash table {");                                               \
+//print("size = ");                                                      \
+//print_u64(table->size);                                                \
+//print("; ");                                                           \
+//\
+//for (u64 i = 0; i < table->buckets_num; i++) {                         \
+//linked_list* bucket = &table->buckets[i];                          \
+//linked_list_node* entry_node = bucket->head;                       \
+//while (entry_node != NULL) {                                       \
+//name##_entry* entry = (name##_entry*) entry_node->value;       \
+//print("key = ");                                               \
+//print_u64((u64) entry->key);                                   \
+//print(", value = ");                                           \
+//print_u64((u64) entry->value);                                 \
+//print("; ");                                                   \
+//entry_node = entry_node->next;                                 \
+//}                                                                  \
+//}                                                                      \
+//\
+//print("}");                                                            \
+//}
 
 #endif // SOS_HASH_TABLE_H

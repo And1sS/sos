@@ -10,7 +10,7 @@
 
 static u64 key_hash(u64 key) { return key; }
 static bool key_equals(u64 a, u64 b) { return a == b; }
-DEFINE_HASH_TABLE_NO_MM(ptable, u64, process*, key_hash, key_equals)
+DEFINE_HASH_TABLE(ptable, u64, process*, key_hash, key_equals)
 
 process kernel_process;
 process init_process;

@@ -3,6 +3,7 @@
 #include "../../lib/container/array_list/array_list.h"
 #include "../../lib/string.h"
 #include "../../memory/heap/kheap.h"
+#include "../icache.h"
 #include "../inode.h"
 #include "../vfs.h"
 
@@ -59,7 +60,7 @@ static vfs_type type = {.name = "ramfs", .ops = &ops};
 static vfs* this;
 
 struct vfs_inode* to_inode(tree_node* node) {
-    vfs_inode* inode = kmalloc(sizeof(vfs_inode));
+    vfs_inode* inode = icache_get(this, 0);
     inode->private_data = node;
     inode->id = node->id;
     inode->ops = &inode_ops;

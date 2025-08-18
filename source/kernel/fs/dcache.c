@@ -10,8 +10,8 @@ static bool inode_equals(vfs_inode* a, vfs_inode* b) {
 static u64 inode_hash(vfs_inode* inode) {
     return ((inode->fs->id << 5) + inode->id) << 5;
 }
-DEFINE_HASH_TABLE_NO_MM(dirtable, string, vfs_inode*, strhash, streq)
-DEFINE_HASH_TABLE_NO_MM(dcache_table, vfs_inode*, dirtable*, inode_hash,
+DEFINE_HASH_TABLE(dirtable, string, vfs_inode*, strhash, streq)
+DEFINE_HASH_TABLE(dcache_table, vfs_inode*, dirtable*, inode_hash,
                         inode_equals)
 
 static u64 dcache_entries;
