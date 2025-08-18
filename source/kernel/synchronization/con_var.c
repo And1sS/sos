@@ -1,5 +1,6 @@
 #include "con_var.h"
 #include "../threading/scheduler.h"
+#include "barriers.h"
 #include "spin_lock.h"
 
 void con_var_init(con_var* var) {
@@ -11,6 +12,7 @@ void con_var_wait(con_var* var, lock* lock) {
     queue_node waiter_node = QUEUE_NODE_OF(current);
     queue_push(&var->wait_queue, &waiter_node);
     current->state = BLOCKED;
+    smp_mb(); // to ensure that state change is seen by scheduler
 
     spin_unlock(lock);
     schedule();
@@ -26,6 +28,7 @@ bool con_var_wait_irq_save(con_var* var, lock* lock, bool interrupts_enabled) {
     queue_node waiter_node = QUEUE_NODE_OF(current);
     queue_push(&var->wait_queue, &waiter_node);
     current->state = BLOCKED;
+    smp_mb(); // to ensure that state change is seen by scheduler
 
     spin_unlock_irq_restore(lock, interrupts_enabled);
     schedule();

@@ -1,4 +1,4 @@
-#include "../../synchronization/atomics.h"
+#include "../../../synchronization/atomics.h"
 
 u64 atomic_exchange(volatile u64* addr, volatile u64 new_value) {
     u32 old_value;
