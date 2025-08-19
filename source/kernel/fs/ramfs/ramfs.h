@@ -5,6 +5,6 @@
 #include "../vfs.h"
 
 void ramfs_init();
-struct vfs_inode* ramfs_mount(struct vfs* fs, device* dev);
+struct vfs_inode* ramfs_mount(struct vfs_super_block* fs, device* dev);
 
 #endif // SOS_RAMFS_H

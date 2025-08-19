@@ -59,7 +59,7 @@ void set_up_init_process(module init_module) {
     //    vm_space_print(init_process.vm);
 
     ramfs_init();
-    dcache_init();
+    vfs_dcache_init();
     struct vfs_inode* root = ramfs_mount(NULL, NULL);
     struct vfs_inode* res;
     walk(root, "a/../b/./e", &res);

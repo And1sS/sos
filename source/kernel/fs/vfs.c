@@ -1,13 +1,7 @@
 #include "vfs.h"
-#include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/string.h"
 #include "dcache.h"
-#include "inode.h"
-#include "vfs_entry_registry.h"
-
-//static vfs root_fs;
-//static lock vfs_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 u64 split_length(string path) {
     u64 len = 0;
@@ -30,43 +24,38 @@ void next_split(string path, u8 buffer[256], u8* result_length) {
     *result_length += len;
 }
 
-u64 walk(struct vfs_inode* start, string path, struct vfs_inode** result) {
+struct vfs_dentry* walk(struct vfs_dentry* start, string path) {
     u64 full_length = strlen(path);
     u64 walked_length = 0;
 
     u8 split_buffer[256];
     string path_iter = path;
-    vfs_inode* iter = (vfs_inode*) start;
+    struct vfs_dentry* iter = start;
 
     while (iter) {
-        if (walked_length == full_length) {
-            *result = (struct vfs_inode*) iter;
-            return 0;
-        }
+        if (walked_length == full_length)
+            return iter;
 
         u8 length;
         next_split(path_iter, split_buffer, &length);
         walked_length += length;
         path_iter += length;
 
+        string path_element = (string) split_buffer;
         if (streq((string) split_buffer, "."))
             continue;
 
-        if (iter->type != DIRECTORY)
-            return -ENOTDIR;
-
-        vfs_inode* parent = iter;
-        iter = dcache_get(parent, (string) split_buffer);
+        struct vfs_dentry* parent = iter;
+        iter = vfs_dcache_get(parent, path_element);
         if (!iter) {
-            u64 lookup_result = parent->ops->lookup(
-                (struct vfs_inode*) parent, (string) split_buffer, (struct vfs_inode**) &iter);
+            iter = parent->inode->ops->lookup(parent, path_element);
 
-            if (IS_ERROR(lookup_result))
-                return lookup_result;
-
-            dcache_put(parent, (string) split_buffer, iter);
+            if (IS_ERROR(iter)) {
+                vfs_dentry_release(parent);
+                return iter;
+            }
         }
-        vfs_inode_release(parent);
+        vfs_dentry_release(parent);
     }
 
     __builtin_unreachable();

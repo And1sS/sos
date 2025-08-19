@@ -4,7 +4,7 @@
 #include "../lib/hash.h"
 
 typedef struct {
-    vfs* fs;
+    vfs_super_block* fs;
     u64 inode_id;
 } icache_key;
 
@@ -26,12 +26,12 @@ static inode_cache icache;
 static volatile u64 inodes_cached = 0;
 static u64 max_cached;
 
-bool icache_init(u64 max_inodes) {
+bool vfs_icache_init(u64 max_inodes) {
     max_cached = max_inodes;
     return inode_cache_init(&icache);
 }
 
-vfs_inode* inode_create(vfs* fs, u64 id) {
+static vfs_inode* inode_create(vfs_super_block* fs, u64 id) {
     vfs_inode* inode = kmalloc(sizeof(vfs_inode));
     if (!inode)
         return (vfs_inode*) -ENOMEM;
@@ -39,21 +39,21 @@ vfs_inode* inode_create(vfs* fs, u64 id) {
     return inode;
 }
 
-vfs_inode* icache_get(vfs* fs, u64 id) {
-    icache_key key = {.fs = fs, .inode_id = id};
+vfs_inode* vfs_icache_get(vfs_super_block* sb, u64 id) {
+    icache_key key = {.fs = sb, .inode_id = id};
 
     // TODO: this one should not disable irq, but only preemption
     bool interrupts_enabled = spin_lock_irq_save(&icache_lock);
     vfs_inode* inode = inode_cache_get(&icache, key);
     if (!inode) {
-        inode = inode_create(fs, id);
+        inode = inode_create(sb, id);
     }
 
     if (IS_ERROR(inode)) {
         goto out;
     }
 
-    // TODO: acquire fs reference
+    // TODO: acquire sb reference
     vfs_inode_acquire(inode);
 
 out:

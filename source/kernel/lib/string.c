@@ -14,10 +14,15 @@ string strcpy(string str) {
     u64 len = strlen(str);
 
     string copy = kmalloc(sizeof(char) * len);
+    if (!copy)
+        return NULL;
+
     memcpy((void*) copy, (void*) str, len);
 
     return copy;
 }
+
+void strfree(string str) { kfree((void*) str); }
 
 u64 strcmp(string a, string b) {
     const unsigned char* p1 = (const unsigned char*) a;

@@ -11,8 +11,8 @@
 
 #define VFS_PARENT_NAME ".."
 
-struct vfs_entry;
 struct vfs_inode;
+struct vfs_dentry;
 struct vfs;
 
 typedef struct {
@@ -23,8 +23,7 @@ typedef struct {
     u64 (*write)(struct vfs_inode* vn, u64 off, u8* buffer);
 
     // directory operations
-    u64 (*lookup)(struct vfs_inode* dir, string name,
-                  struct vfs_inode** result);
+    struct vfs_dentry* (*lookup)(struct vfs_dentry* parent, string name);
     //
     //    u64 (*create)(struct vfs_inode* dir, string name, struct vattr* vattr,
     //                  struct vfs_entry** result);
@@ -65,10 +64,11 @@ typedef enum {
 } vfs_inode_type;
 
 typedef struct {
-    struct vfs_inode* (*mount)(struct vfs* vfs, device* device);
-    u64 (*unmount)(struct vfs* vfs);
-    u64 (*sync)(struct vfs* vfs);
-    //    u64 (*stat)(struct vfs* vfs, struct vfs_stat* stat);
+    struct vfs_inode* (*mount)(struct vfs_super_block* vfs, device* device);
+    u64 (*unmount)(struct vfs_super_block* vfs);
+    u64 (*sync)(struct vfs_super_block* vfs);
+    //    u64 (*stat)(struct vfs_super_block* vfs_super_block, struct vfs_stat*
+    //    stat);
 } vfs_ops;
 
 typedef struct {
@@ -83,10 +83,9 @@ typedef struct {
 
     device* device;
 
-    struct vfs_inode* mount_point;
-    struct vfs_inode* root;
-} vfs;
+    struct vfs_dentry* root;
+} vfs_super_block;
 
-u64 walk(struct vfs_inode* start, string path, struct vfs_inode** result);
+struct vfs_dentry* walk(struct vfs_dentry* start, string path);
 
 #endif // SOS_VFS_H

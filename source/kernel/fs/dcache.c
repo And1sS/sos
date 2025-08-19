@@ -1,107 +1,145 @@
 #include "dcache.h"
+#include "../error/error.h"
+#include "../lib/hash.h"
 #include "../lib/string.h"
 #include "../memory/heap/kheap.h"
-#include "inode.h"
 
-static bool inode_equals(vfs_inode* a, vfs_inode* b) {
-    return a->id == b->id && a->fs->id == b->fs->id;
+typedef struct {
+    struct vfs_dentry* parent;
+    string name;
+} dcache_key;
+
+static u64 dcache_hash(dcache_key key) {
+    return hash2((u64) key.parent, strhash(key.name));
 }
 
-static u64 inode_hash(vfs_inode* inode) {
-    return ((inode->fs->id << 5) + inode->id) << 5;
+static bool dcache_equals(dcache_key a, dcache_key b) {
+    return a.parent == b.parent && streq(a.name, b.name);
 }
-DEFINE_HASH_TABLE(dirtable, string, vfs_inode*, strhash, streq)
-DEFINE_HASH_TABLE(dcache_table, vfs_inode*, dirtable*, inode_hash,
-                        inode_equals)
 
-static u64 dcache_entries;
-static dcache_table dcache;
+DEFINE_HASH_TABLE(dentry_cache, dcache_key, struct vfs_dentry*, dcache_hash,
+                  dcache_equals)
+
+static u64 dcache_entries = 0;
+
+/*
+ * Dcache locking order:
+ * 1) dcache_lock
+ * 2) parent dentry lock
+ * 3) child dentry lock
+ */
 static lock dcache_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
-void dcache_init() { dcache_table_init(&dcache); }
+static dentry_cache dcache;
 
-vfs_inode* dcache_get(vfs_inode* dir, string name) {
-    vfs_inode* result = NULL;
+static void dcache_remove_unsafe(vfs_dentry* dentry);
+
+static vfs_dentry* vfs_dentry_allocate(vfs_dentry* parent, vfs_inode* inode,
+                                       string name) {
+
+    string name_copy = strcpy(name);
+    if (!name_copy)
+        return NULL;
+
+    vfs_dentry* new = kmalloc(sizeof(vfs_dentry));
+    if (!new) {
+        strfree(name_copy);
+        return new;
+    }
+
+    new->parent = parent ? (struct dentry*) parent : (struct dentry*) new;
+    new->inode = inode;
+    new->name = parent ? name_copy : "/";
+    new->lock = SPIN_LOCK_STATIC_INITIALIZER;
+    new->refc = REF_COUNT_STATIC_INITIALIZER;
+
+    if (parent) {
+        vfs_dentry_acquire(parent);
+    }
+    vfs_inode_acquire(inode);
+    vfs_dentry_acquire(new);
+    return new;
+}
+
+struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
+                                     vfs_inode* inode, string name) {
+
+    struct vfs_dentry* new = vfs_dentry_allocate(parent, inode, name);
+    if (!new)
+        return NULL;
 
     bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
-    dirtable* entry = dcache_table_get(&dcache, dir);
-    if (!entry)
-        goto out;
 
-    result = dirtable_get(entry, name);
-    if (result)
-        vfs_inode_acquire(result);
-
-out:
+    dcache_key key = {.parent = parent, .name = name};
+    struct vfs_dentry* old = dentry_cache_get(&dcache, key);
+    bool added = !old && dentry_cache_put(&dcache, key, new, NULL);
     spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
 
-    return result;
+    if (!added) {
+        vfs_dentry_destroy(new);
+        return old;
+    }
+    return new;
 }
 
-static bool dcache_put_exactly(vfs_inode* dir, string name, vfs_inode* child) {
-    bool result = false;
-    dirtable* entry = dcache_table_get(&dcache, dir);
-    if (!entry) {
-        entry = dirtable_create();
-        if (!entry || !dcache_table_put(&dcache, dir, entry, NULL)) {
-            dirtable_destroy(entry);
-            return false;
-        }
-    }
+struct vfs_dentry* vfs_make_root(vfs_inode* root) {}
 
-    if (!dirtable_get(entry, name)) {
-        // TODO: handle string copying properly
-        result = dirtable_put(entry, strcpy(name), child, NULL);
-    }
+void vfs_dentry_destroy(struct vfs_dentry* dentry) {
+    if (dentry == dentry->parent)
+        panic("Trying to destroy fs root");
 
-    if (!entry->size) {
-        dcache_table_remove(&dcache, dir);
-        dirtable_destroy(entry);
-    }
-    return result;
+    vfs_dentry_release(dentry->parent);
+    vfs_inode_release(dentry->inode);
+    strfree(dentry->name);
+    kfree(dentry);
 }
 
-static void dcache_remove_exactly(vfs_inode* dir, string name) {
-    dirtable* entry = dcache_table_get(&dcache, dir);
-    dirtable_remove(entry, name);
-    kfree((void*) name);
-
-    if (!entry->size) {
-        dcache_table_remove(&dcache, dir);
-        dirtable_destroy(entry);
-    }
+void vfs_dentry_acquire(struct vfs_dentry* dentry) {
+    bool interrupts_enabled = spin_lock_irq_save(&dentry->lock);
+    ref_acquire(&dentry->refc);
+    spin_unlock_irq_restore(&dentry->lock, interrupts_enabled);
 }
 
-bool dcache_put(vfs_inode* dir, string name, vfs_inode* child) {
-    bool result = false;
+void vfs_dentry_release(struct vfs_dentry* dentry) {
+    bool interrupts_enabled = spin_lock_irq_save(&dentry->lock);
+    ref_release(&dentry->refc);
+    u64 count = dentry->refc.count;
+    spin_unlock_irq_restore(&dentry->lock, interrupts_enabled);
+    if (count != 0)
+        return;
 
-    bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
-
-    if (!dcache_put_exactly(dir, name, child))
-        goto out;
-
-    if (!dcache_put_exactly(child, VFS_PARENT_NAME, dir)) {
-        dcache_remove_exactly(dir, name);
-        goto out;
-    }
-
-    result = true;
-
-out:
+    interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+    spin_lock(&dentry->lock);
+    count = dentry->refc.count;
+    if (count == 0)
+        dcache_remove_unsafe(dentry);
     spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
-    return result;
+
+    vfs_dentry_destroy(dentry);
 }
 
-void dcache_remove(vfs_inode* dir, string name) {
+void vfs_dcache_init() { dentry_cache_init(&dcache); }
+
+struct vfs_dentry* vfs_dcache_get(struct vfs_dentry* parent, string name) {
+    dcache_key key = {.parent = parent, .name = name};
+
     bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+    struct vfs_dentry* dentry = dentry_cache_get(&dcache, key);
+    if (dentry)
+        vfs_dentry_acquire(dentry);
+    spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
 
-    vfs_inode* subdir = dcache_get(dir, name);
-    if (!subdir)
-        panic("Removing NULL subdir");
+    return dentry;
+}
 
-    dcache_remove_exactly(dir, name);
-    dcache_remove_exactly(subdir, VFS_PARENT_NAME);
+void dcache_remove_unsafe(struct vfs_dentry* dentry) {
+    dcache_key key = {.parent = dentry->parent, .name = dentry->name};
+    dentry_cache_remove(&dcache, key);
+}
 
+void dcache_remove(struct vfs_dentry* dentry) {
+    bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+    dcache_remove_unsafe(dentry);
     spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
 }
 

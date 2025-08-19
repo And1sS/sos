@@ -7,6 +7,8 @@ u64 strlen(string str);
 
 string strcpy(string str);
 
+void strfree(string str);
+
 u64 strcmp(string left, string right);
 
 bool streq(string left, string right);

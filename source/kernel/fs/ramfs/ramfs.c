@@ -3,12 +3,13 @@
 #include "../../lib/container/array_list/array_list.h"
 #include "../../lib/string.h"
 #include "../../memory/heap/kheap.h"
+#include "../dcache.h"
 #include "../icache.h"
 #include "../inode.h"
 #include "../vfs.h"
 
-struct vfs_inode* ramfs_mount(struct vfs* fs, device* dev);
-u64 lookup(struct vfs_inode* dir, string name, struct vfs_inode** result);
+struct vfs_inode* ramfs_mount(struct vfs_super_block* fs, device* dev);
+struct vfs_dentry* lookup(struct vfs_dentry* parent, string name);
 
 typedef struct _tree_node {
     string name;
@@ -57,10 +58,10 @@ static tree_node root = {.id = 0, .name = "[root]"};
 static vfs_ops ops = {.mount = ramfs_mount, .sync = NULL, .unmount = NULL};
 static vfs_inode_ops inode_ops = {.lookup = lookup};
 static vfs_type type = {.name = "ramfs", .ops = &ops};
-static vfs* this;
+static vfs_super_block* this;
 
-struct vfs_inode* to_inode(tree_node* node) {
-    vfs_inode* inode = icache_get(this, 0);
+vfs_inode* to_inode(tree_node* node) {
+    vfs_inode* inode = vfs_icache_get(this, 0);
     inode->private_data = node;
     inode->id = node->id;
     inode->ops = &inode_ops;
@@ -70,7 +71,7 @@ struct vfs_inode* to_inode(tree_node* node) {
     inode->refc = REF_COUNT_STATIC_INITIALIZER;
     ref_acquire(&inode->refc);
 
-    return (struct vfs_inode*) inode;
+    return inode;
 }
 
 void ramfs_init() {
@@ -89,26 +90,25 @@ void ramfs_init() {
     link_nodes(b, e);
     link_nodes(b, f);
 
-    this = kmalloc(sizeof(vfs));
+    this = kmalloc(sizeof(vfs_super_block));
     this->root = to_inode(&root);
     this->id = 0;
     this->type = &type;
 }
 
-struct vfs_inode* ramfs_mount(struct vfs* fs, device* dev) {
+struct vfs_inode* ramfs_mount(struct vfs_super_block* fs, device* dev) {
     UNUSED(fs);
     UNUSED(dev);
 
     return to_inode(&root);
 }
 
-u64 lookup(struct vfs_inode* dir, string name, struct vfs_inode** result) {
-    *result = NULL;
-    tree_node* node = ((vfs_inode*) dir)->private_data;
+struct vfs_dentry* lookup(struct vfs_dentry* parent, string name) {
+    tree_node* node = ((vfs_dentry*) parent)->inode->private_data;
     tree_node* res = find_subnode(node, name);
     if (!res)
-        return -ENOENT;
+        return (struct vfs_dentry*) -ENOENT;
 
-    *result = to_inode(res);
-    return 0;
+    vfs_inode* inode = to_inode(res);
+    return (struct vfs_dentry*) vfs_dentry_create((vfs_dentry*) parent, inode, name);
 }
