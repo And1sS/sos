@@ -1,14 +1,10 @@
 #include "ramfs.h"
 #include "../../error/errno.h"
-#include "../../lib/container/array_list/array_list.h"
+#include "../../error/error.h"
 #include "../../lib/string.h"
-#include "../../memory/heap/kheap.h"
 #include "../dcache.h"
-#include "../icache.h"
-#include "../inode.h"
-#include "../vfs.h"
 
-struct vfs_inode* ramfs_mount(struct vfs_super_block* fs, device* dev);
+struct vfs_dentry* ramfs_mount(struct vfs_super_block* sb, device* dev);
 struct vfs_dentry* lookup(struct vfs_dentry* parent, string name);
 
 typedef struct _tree_node {
@@ -55,21 +51,24 @@ tree_node* find_subnode(tree_node* node, string name) {
  *         c     d       e      f
  */
 static tree_node root = {.id = 0, .name = "[root]"};
-static vfs_ops ops = {.mount = ramfs_mount, .sync = NULL, .unmount = NULL};
+static vfs_type_ops ops = {.mount = ramfs_mount, .sync = NULL, .unmount = NULL};
 static vfs_inode_ops inode_ops = {.lookup = lookup};
 static vfs_type type = {.name = "ramfs", .ops = &ops};
-static vfs_super_block* this;
 
-vfs_inode* to_inode(tree_node* node) {
-    vfs_inode* inode = vfs_icache_get(this, 0);
+vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
+    vfs_inode* inode = vfs_icache_get(sb, 0);
+
+    spin_lock(&inode->lock);
+    if (inode->initialised)
+        goto out;
+
+    inode->initialised = true;
     inode->private_data = node;
-    inode->id = node->id;
     inode->ops = &inode_ops;
     inode->type = DIRECTORY;
-    inode->fs = this;
-    inode->lock = SPIN_LOCK_STATIC_INITIALIZER;
-    inode->refc = REF_COUNT_STATIC_INITIALIZER;
-    ref_acquire(&inode->refc);
+
+out:
+    spin_unlock(&inode->lock);
 
     return inode;
 }
@@ -89,26 +88,26 @@ void ramfs_init() {
     link_nodes(a, d);
     link_nodes(b, e);
     link_nodes(b, f);
-
-    this = kmalloc(sizeof(vfs_super_block));
-    this->root = to_inode(&root);
-    this->id = 0;
-    this->type = &type;
 }
 
-struct vfs_inode* ramfs_mount(struct vfs_super_block* fs, device* dev) {
-    UNUSED(fs);
+struct vfs_dentry* ramfs_mount(struct vfs_super_block* sb, device* dev) {
     UNUSED(dev);
 
-    return to_inode(&root);
+    vfs_inode* root_inode = to_inode(&root, sb);
+    struct vfs_dentry* root_dentry = vfs_dentry_create_root(root_inode);
+    vfs_inode_release(root_inode);
+
+    return root_dentry;
 }
 
 struct vfs_dentry* lookup(struct vfs_dentry* parent, string name) {
-    tree_node* node = ((vfs_dentry*) parent)->inode->private_data;
-    tree_node* res = find_subnode(node, name);
+    tree_node* res = find_subnode(parent->inode->private_data, name);
     if (!res)
-        return (struct vfs_dentry*) -ENOENT;
+        return ERROR_PTR(-ENOENT);
 
-    vfs_inode* inode = to_inode(res);
-    return (struct vfs_dentry*) vfs_dentry_create((vfs_dentry*) parent, inode, name);
+    vfs_inode* inode = to_inode(res, parent->inode->sb);
+    struct vfs_dentry* dentry = vfs_dentry_create(parent, inode, name);
+    vfs_inode_release(inode);
+
+    return dentry;
 }

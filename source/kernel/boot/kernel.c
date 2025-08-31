@@ -60,9 +60,8 @@ void set_up_init_process(module init_module) {
 
     ramfs_init();
     vfs_dcache_init();
-    struct vfs_inode* root = ramfs_mount(NULL, NULL);
-    struct vfs_inode* res;
-    walk(root, "a/../b/./e", &res);
+    struct vfs_dentry* root = ramfs_mount(NULL, NULL);
+    struct vfs_dentry* res = walk(root, "a/../b/./e");
     print_u64_hex((u64) res);
 }
 

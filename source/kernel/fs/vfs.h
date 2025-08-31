@@ -9,11 +9,10 @@
 #include "../lib/types.h"
 #include "../synchronization/spin_lock.h"
 
-#define VFS_PARENT_NAME ".."
-
+struct vfs_type;
+struct vfs_super_block;
 struct vfs_inode;
 struct vfs_dentry;
-struct vfs;
 
 typedef struct {
     // file operations
@@ -63,28 +62,26 @@ typedef enum {
     MOUNTPOINT
 } vfs_inode_type;
 
+#define INODE_NEW_FLAG 1 << 0
+
 typedef struct {
-    struct vfs_inode* (*mount)(struct vfs_super_block* vfs, device* device);
+    bool (*fill_super)(struct vfs_super_block* vfs);
+    struct vfs_dentry* (*mount)(struct vfs_super_block* vfs, device* device);
     u64 (*unmount)(struct vfs_super_block* vfs);
     u64 (*sync)(struct vfs_super_block* vfs);
-    //    u64 (*stat)(struct vfs_super_block* vfs_super_block, struct vfs_stat*
-    //    stat);
-} vfs_ops;
+} vfs_type_ops;
 
 typedef struct {
     string name;
 
-    vfs_ops* ops;
+    vfs_type_ops* ops;
+
+    lock lock; // guards all fields below
+    ref_count refc;
 } vfs_type;
 
-typedef struct {
-    u64 id;
-    vfs_type* type;
-
-    device* device;
-
-    struct vfs_dentry* root;
-} vfs_super_block;
+bool register_vfs_type(vfs_type* type);
+void deregister_vfs_type(vfs_type* type);
 
 struct vfs_dentry* walk(struct vfs_dentry* start, string path);
 

@@ -3,6 +3,64 @@
 #include "../lib/string.h"
 #include "dcache.h"
 
+DEFINE_HASH_TABLE(vfs_registry, string, vfs_type*, strhash, streq)
+
+static vfs_registry type_registry;
+
+static lock type_registry_lock = SPIN_LOCK_STATIC_INITIALIZER;
+
+bool vfs_init() { return vfs_registry_init(&type_registry); }
+
+vfs_type* vfs_type_create(string name) {
+    string name_copy = strcpy(name);
+    if (!name_copy)
+        return NULL;
+
+    vfs_type* new = (vfs_type*) kmalloc(sizeof(vfs_type));
+    if (!new) {
+        strfree(name_copy);
+        return NULL;
+    }
+
+    memset(new, 0, sizeof(vfs_type));
+    new->name = name_copy;
+    new->refc = REF_COUNT_STATIC_INITIALIZER;
+    return new;
+}
+
+void vfs_type_destroy(vfs_type* type) {
+    strfree(type->name);
+    kfree(type);
+}
+
+bool register_vfs_type(vfs_type* type) {
+    bool interrupts_enabled = spin_lock_irq_save(&type_registry_lock);
+
+    bool registered =
+        !vfs_registry_get(&type_registry, type->name)
+        && vfs_registry_put(&type_registry, type->name, type, NULL);
+
+    spin_unlock_irq_restore(&type_registry_lock, interrupts_enabled);
+
+    return registered;
+}
+
+void deregister_vfs_type(vfs_type* type) {
+    bool interrupts_enabled = spin_lock_irq_save(&type_registry_lock);
+    vfs_registry_remove(&type_registry, type->name);
+    spin_unlock_irq_restore(&type_registry_lock, interrupts_enabled);
+}
+
+struct vfs_dentry* vfs_mount(vfs_type* type, device* dev) {
+    vfs_super_block* sb = vfs_scache_get(type);
+    if (IS_ERROR(sb))
+        return sb;
+
+    struct vfs_dentry* dentry = type->ops->mount(sb, dev);
+    vfs_super_release(sb);
+    return dentry;
+}
+
 u64 split_length(string path) {
     u64 len = 0;
     for (; path[len] != '/' && path[len] != '\0'; len++)

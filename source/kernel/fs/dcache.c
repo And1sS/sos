@@ -1,8 +1,8 @@
 #include "dcache.h"
+#include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/hash.h"
 #include "../lib/string.h"
-#include "../memory/heap/kheap.h"
 
 typedef struct {
     struct vfs_dentry* parent;
@@ -32,22 +32,25 @@ static lock dcache_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 static dentry_cache dcache;
 
-static void dcache_remove_unsafe(vfs_dentry* dentry);
+static void dcache_remove_unsafe(struct vfs_dentry* dentry);
+static void vfs_dentry_destroy(struct vfs_dentry* dentry);
 
-static vfs_dentry* vfs_dentry_allocate(vfs_dentry* parent, vfs_inode* inode,
-                                       string name) {
+static struct vfs_dentry* vfs_dentry_allocate(struct vfs_dentry* parent,
+                                              vfs_inode* inode, string name) {
 
     string name_copy = strcpy(name);
     if (!name_copy)
         return NULL;
 
-    vfs_dentry* new = kmalloc(sizeof(vfs_dentry));
+    struct vfs_dentry* new = kmalloc(sizeof(struct vfs_dentry));
     if (!new) {
         strfree(name_copy);
         return new;
     }
 
-    new->parent = parent ? (struct dentry*) parent : (struct dentry*) new;
+    memset(new, NULL, sizeof(struct vfs_dentry));
+
+    new->parent = (struct vfs_dentry*) (parent ? parent : new);
     new->inode = inode;
     new->name = parent ? name_copy : "/";
     new->lock = SPIN_LOCK_STATIC_INITIALIZER;
@@ -61,16 +64,36 @@ static vfs_dentry* vfs_dentry_allocate(vfs_dentry* parent, vfs_inode* inode,
     return new;
 }
 
+struct vfs_dentry* vfs_dentry_create_root(vfs_inode* inode) {
+    struct vfs_dentry* root = vfs_dentry_allocate(NULL, inode, "/");
+    if (!root)
+        return ERROR_PTR(-ENOMEM);
+
+    root->parent = root;
+
+    bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+
+    dcache_key key = {.parent = root, .name = root->name};
+    bool added = dentry_cache_put(&dcache, key, root, NULL);
+    spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
+
+    if (!added) {
+        vfs_dentry_destroy(root);
+        return ERROR_PTR(-ENOMEM);
+    }
+
+    return root;
+}
+
 struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
                                      vfs_inode* inode, string name) {
 
     struct vfs_dentry* new = vfs_dentry_allocate(parent, inode, name);
     if (!new)
-        return NULL;
+        return ERROR_PTR(-ENOMEM);
 
     bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
-
-    dcache_key key = {.parent = parent, .name = name};
+    dcache_key key = {.parent = parent, .name = new->name};
     struct vfs_dentry* old = dentry_cache_get(&dcache, key);
     bool added = !old && dentry_cache_put(&dcache, key, new, NULL);
     spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
@@ -79,16 +102,17 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
         vfs_dentry_destroy(new);
         return old;
     }
+
     return new;
 }
 
-struct vfs_dentry* vfs_make_root(vfs_inode* root) {}
-
 void vfs_dentry_destroy(struct vfs_dentry* dentry) {
     if (dentry == dentry->parent)
-        panic("Trying to destroy fs root");
+        panic("Trying to destroy sb root");
 
-    vfs_dentry_release(dentry->parent);
+    if (dentry->parent != dentry)
+        vfs_dentry_release(dentry->parent);
+
     vfs_inode_release(dentry->inode);
     strfree(dentry->name);
     kfree(dentry);
@@ -142,49 +166,3 @@ void dcache_remove(struct vfs_dentry* dentry) {
     dcache_remove_unsafe(dentry);
     spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
 }
-
-// typedef struct _tree_node {
-//     string name;
-//     u64 id;
-//
-//     struct _tree_node* parent;
-//     array_list subnodes;
-// } tree_node;
-//
-// void dirtable_print1(dirtable* table) {
-//     print("dirtable { ");
-//     for (unsigned long i = 0; i < table->buckets_num; i++) {
-//         linked_list* bucket = &table->buckets[i];
-//         linked_list_node* entry_node = bucket->head;
-//         while (entry_node != 0) {
-//             dirtable_entry* entry = (dirtable_entry*) entry_node->value;
-//             print("path = \"");
-//             print( entry->key);
-//             print("\", node = \"");
-//             print(((tree_node*) entry->value->private_data)->name);
-//             print("\"; ");
-//             entry_node = entry_node->next;
-//         }
-//     }
-//     print("}");
-// }
-//
-// void dcache_table_print1(dcache_table* table) {
-//     println("hash table {");
-//     print("size = ");
-//     print_u64(table->size);
-//     println("");
-//     for (unsigned long i = 0; i < table->buckets_num; i++) {
-//         linked_list* bucket = &table->buckets[i];
-//         linked_list_node* entry_node = bucket->head;
-//         while (entry_node != 0) {
-//             dcache_table_entry* entry = (dcache_table_entry*)
-//             entry_node->value; print("    key = \""); print( ((tree_node*)
-//             entry->key->private_data)->name); print("\", value = ");
-//             dirtable_print1(entry->value);
-//             println("");
-//             entry_node = entry_node->next;
-//         }
-//     }
-//     println("}");
-// }
