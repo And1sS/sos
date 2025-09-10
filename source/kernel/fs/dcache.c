@@ -96,6 +96,7 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
     dcache_key key = {.parent = parent, .name = new->name};
     struct vfs_dentry* old = dentry_cache_get(&dcache, key);
     bool added = !old && dentry_cache_put(&dcache, key, new, NULL);
+    // TODO: acquire old dentry reference
     spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
 
     if (!added) {
@@ -104,6 +105,15 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
     }
 
     return new;
+}
+
+struct vfs_dentry* vfs_dentry_acquire_parent(struct vfs_dentry* dentry) {
+    bool interrupts_enabled = spin_lock_irq_save(&dentry->lock);
+    struct vfs_dentry* parent = dentry->parent;
+    ref_acquire(&parent->refc);
+    spin_unlock_irq_restore(&parent->lock, interrupts_enabled);
+
+    return parent;
 }
 
 void vfs_dentry_destroy(struct vfs_dentry* dentry) {

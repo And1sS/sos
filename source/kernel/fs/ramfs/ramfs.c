@@ -56,7 +56,7 @@ static vfs_inode_ops inode_ops = {.lookup = lookup};
 static vfs_type type = {.name = "ramfs", .ops = &ops};
 
 vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
-    vfs_inode* inode = vfs_icache_get(sb, 0);
+    vfs_inode* inode = vfs_icache_get(sb, node->id);
 
     spin_lock(&inode->lock);
     if (inode->initialised)
