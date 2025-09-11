@@ -7,8 +7,7 @@ void ref_release(ref_count* refc) {
         panic("ref_count is less than 0");
     }
 
-    refc->count--;
-    if (refc->count == 0) {
+    if (atomic_decrement_and_get(&refc->count) == 0) {
         con_var_broadcast(&refc->empty_cvar);
     }
 }
