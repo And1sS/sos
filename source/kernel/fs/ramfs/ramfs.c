@@ -53,7 +53,7 @@ tree_node* find_subnode(tree_node* node, string name) {
 static tree_node root = {.id = 0, .name = "[root]"};
 static vfs_type_ops ops = {.mount = ramfs_mount, .sync = NULL, .unmount = NULL};
 static vfs_inode_ops inode_ops = {.lookup = lookup};
-static vfs_type type = {.name = "ramfs", .ops = &ops};
+vfs_type ramfs_type = {.name = "ramfs", .ops = &ops};
 
 vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);
@@ -74,6 +74,8 @@ out:
 }
 
 void ramfs_init() {
+    register_vfs_type(&ramfs_type);
+
     array_list_init(&root.subnodes, 8);
     tree_node* a = alloc_tree_node(1, "a");
     tree_node* b = alloc_tree_node(2, "b");

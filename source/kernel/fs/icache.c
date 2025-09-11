@@ -27,9 +27,10 @@ static inode_cache icache;
 static volatile u64 inodes_cached = 0;
 static u64 max_cached;
 
-bool vfs_icache_init(u64 max_inodes) {
+void vfs_icache_init(u64 max_inodes) {
     max_cached = max_inodes;
-    return inode_cache_init(&icache);
+    if (!inode_cache_init(&icache))
+        panic("Can't init inode cache");
 }
 
 static vfs_inode* vfs_inode_create(u64 id, struct vfs_super_block* sb) {

@@ -20,7 +20,7 @@ static bool dcache_equals(dcache_key a, dcache_key b) {
 DEFINE_HASH_TABLE(dentry_cache, dcache_key, struct vfs_dentry*, dcache_hash,
                   dcache_equals)
 
-static u64 dcache_entries = 0;
+// static u64 dcache_entries = 0;
 
 /*
  * Dcache locking order:
@@ -107,11 +107,11 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
     return new;
 }
 
-struct vfs_dentry* vfs_dentry_acquire_parent(struct vfs_dentry* dentry) {
+struct vfs_dentry* vfs_dentry_get_parent(struct vfs_dentry* dentry) {
     bool interrupts_enabled = spin_lock_irq_save(&dentry->lock);
     struct vfs_dentry* parent = dentry->parent;
     ref_acquire(&parent->refc);
-    spin_unlock_irq_restore(&parent->lock, interrupts_enabled);
+    spin_unlock_irq_restore(&dentry->lock, interrupts_enabled);
 
     return parent;
 }
@@ -152,7 +152,10 @@ void vfs_dentry_release(struct vfs_dentry* dentry) {
     vfs_dentry_destroy(dentry);
 }
 
-void vfs_dcache_init() { dentry_cache_init(&dcache); }
+void vfs_dcache_init() {
+    if (!dentry_cache_init(&dcache))
+        panic("Can't init dentry cache");
+}
 
 struct vfs_dentry* vfs_dcache_get(struct vfs_dentry* parent, string name) {
     dcache_key key = {.parent = parent, .name = name};

@@ -25,7 +25,7 @@ typedef struct {
 void vfs_inode_acquire(vfs_inode* inode);
 void vfs_inode_release(vfs_inode* inode);
 
-bool vfs_icache_init(u64 max_inodes);
+void vfs_icache_init(u64 max_inodes);
 
 vfs_inode* vfs_icache_get(struct vfs_super_block* sb, u64 id);
 vfs_inode* vfs_icache_release(vfs_inode* inode);

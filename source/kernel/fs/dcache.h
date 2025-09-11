@@ -20,6 +20,7 @@ struct vfs_dentry* vfs_dentry_create_root(vfs_inode* inode);
 
 void vfs_dentry_acquire(struct vfs_dentry* dentry);
 void vfs_dentry_release(struct vfs_dentry* dentry);
+struct vfs_dentry* vfs_dentry_get_parent(struct vfs_dentry* dentry);
 
 void vfs_dcache_init();
 // parent reference should be held during this routine

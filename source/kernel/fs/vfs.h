@@ -80,6 +80,8 @@ typedef struct {
     ref_count refc;
 } vfs_type;
 
+void vfs_init();
+
 bool register_vfs_type(vfs_type* type);
 void deregister_vfs_type(vfs_type* type);
 

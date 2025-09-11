@@ -37,6 +37,9 @@ void set_up(const multiboot_info* mboot_info) {
 
     print_multiboot_info(mboot_info);
     println("Finished initialization!");
+
+    vfs_init();
+    println("Finished vfs initialization");
 }
 
 void set_up_init_process(module init_module) {
@@ -59,10 +62,20 @@ void set_up_init_process(module init_module) {
     //    vm_space_print(init_process.vm);
 
     ramfs_init();
-    vfs_dcache_init();
-    struct vfs_dentry* root = ramfs_mount(NULL, NULL);
+
+    /*
+ *                root
+ *            /           \
+ *            a             b
+ *          /   \         /   \
+ *         c     d       e      f
+     */
+
+    extern vfs_type ramfs_type;
+    struct vfs_super_block* sb = vfs_super_get(&ramfs_type);
+    struct vfs_dentry* root = ramfs_mount(sb, NULL);
     struct vfs_dentry* res = walk(root, "a/../b/./e");
-    print_u64_hex((u64) res);
+    println(res->name);
 }
 
 _Noreturn void kernel_main(paddr multiboot_structure) {

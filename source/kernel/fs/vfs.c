@@ -9,7 +9,13 @@ static vfs_registry type_registry;
 
 static lock type_registry_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
-bool vfs_init() { return vfs_registry_init(&type_registry); }
+void vfs_init() {
+    if (!vfs_registry_init(&type_registry))
+        panic("Can't init vfs type registry");
+
+    vfs_dcache_init();
+    vfs_icache_init(0);
+}
 
 vfs_type* vfs_type_create(string name) {
     string name_copy = strcpy(name);
@@ -52,9 +58,9 @@ void deregister_vfs_type(vfs_type* type) {
 }
 
 struct vfs_dentry* vfs_mount(vfs_type* type, device* dev) {
-    vfs_super_block* sb = vfs_scache_get(type);
+    struct vfs_super_block* sb = vfs_super_get(type);
     if (IS_ERROR(sb))
-        return sb;
+        return ERROR_PTR(sb);
 
     struct vfs_dentry* dentry = type->ops->mount(sb, dev);
     vfs_super_release(sb);
@@ -96,14 +102,26 @@ struct vfs_dentry* walk(struct vfs_dentry* start, string path) {
 
         u8 length;
         next_split(path_iter, split_buffer, &length);
+        string path_element = (string) split_buffer;
+
         walked_length += length;
         path_iter += length;
 
-        string path_element = (string) split_buffer;
-        if (streq((string) split_buffer, "."))
+        // TODO: resolve mountpoints
+
+        if (streq(path_element, "."))
             continue;
 
-        struct vfs_dentry* parent = iter;
+        struct vfs_dentry* parent;
+
+        if (streq(path_element, "..")) {
+            parent = vfs_dentry_get_parent(iter);
+            vfs_dentry_release(iter);
+            iter = parent;
+            continue;
+        }
+
+        parent = iter;
         iter = vfs_dcache_get(parent, path_element);
         if (!iter) {
             iter = parent->inode->ops->lookup(parent, path_element);

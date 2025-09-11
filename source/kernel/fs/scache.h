@@ -16,11 +16,9 @@ struct vfs_super_block {
     ref_count refc;
 };
 
+struct vfs_super_block* vfs_super_get(vfs_type* type);
+
 void vfs_super_acquire(struct vfs_super_block* sb);
 void vfs_super_release(struct vfs_super_block* sb);
-
-bool vfs_scache_init(u64 max_sbs);
-
-struct vfs_super_block* vfs_super_get(vfs_type* type);
 
 #endif // SOS_SCACHE_H
