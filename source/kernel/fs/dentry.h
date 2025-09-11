@@ -11,6 +11,7 @@ struct vfs_dentry {
     // End of immutable data
 
     lock lock; // guards all fields below
+    bool dying;
     struct vfs_dentry* parent;
     ref_count refc;
 };

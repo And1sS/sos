@@ -1,8 +1,8 @@
+#include "dentry.h"
 #include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/hash.h"
 #include "../lib/string.h"
-#include "dentry.h"
 
 typedef struct {
     struct vfs_dentry* parent;
@@ -65,24 +65,22 @@ static struct vfs_dentry* vfs_dentry_allocate(struct vfs_dentry* parent,
 }
 
 struct vfs_dentry* vfs_dentry_create_root(vfs_inode* inode) {
-    struct vfs_dentry* root = vfs_dentry_allocate(NULL, inode, "/");
-    if (!root)
+    struct vfs_dentry* new = vfs_dentry_allocate(NULL, inode, "/");
+    if (!new)
         return ERROR_PTR(-ENOMEM);
 
-    root->parent = root;
+    new->parent = new;
 
-    bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+    spin_lock(&dcache_lock);
+    dcache_key key = {.parent = new, .name = new->name};
+    bool added = dentry_cache_put(&dcache, key, new, NULL);
+    spin_unlock(&dcache_lock);
 
-    dcache_key key = {.parent = root, .name = root->name};
-    bool added = dentry_cache_put(&dcache, key, root, NULL);
-    spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
+    if (added)
+        return new;
 
-    if (!added) {
-        vfs_dentry_destroy(root);
-        return ERROR_PTR(-ENOMEM);
-    }
-
-    return root;
+    vfs_dentry_destroy(new);
+    return ERROR_PTR(-ENOMEM);
 }
 
 struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
@@ -92,34 +90,31 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
     if (!new)
         return ERROR_PTR(-ENOMEM);
 
-    bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+    spin_lock(&dcache_lock);
     dcache_key key = {.parent = parent, .name = new->name};
     struct vfs_dentry* old = dentry_cache_get(&dcache, key);
     bool added = !old && dentry_cache_put(&dcache, key, new, NULL);
     // TODO: acquire old dentry reference
-    spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
+    spin_unlock(&dcache_lock);
 
-    if (!added) {
-        vfs_dentry_destroy(new);
-        return old;
-    }
+    if (added)
+        return new;
 
-    return new;
+    vfs_dentry_destroy(new);
+    return old;
 }
 
 struct vfs_dentry* vfs_dentry_get_parent(struct vfs_dentry* dentry) {
-    bool interrupts_enabled = spin_lock_irq_save(&dentry->lock);
+    spin_lock(&dentry->lock);
     struct vfs_dentry* parent = dentry->parent;
     ref_acquire(&parent->refc);
-    spin_unlock_irq_restore(&dentry->lock, interrupts_enabled);
+    spin_unlock(&dentry->lock);
 
     return parent;
 }
 
 void vfs_dentry_destroy(struct vfs_dentry* dentry) {
-    if (dentry == dentry->parent)
-        panic("Trying to destroy sb root");
-
+    spin_lock(&dentry->lock); // at this point dentry is unreachable for others
     if (dentry->parent != dentry)
         vfs_dentry_release(dentry->parent);
 
@@ -135,19 +130,23 @@ void vfs_dentry_acquire(struct vfs_dentry* dentry) {
 }
 
 void vfs_dentry_release(struct vfs_dentry* dentry) {
-    bool interrupts_enabled = spin_lock_irq_save(&dentry->lock);
+    spin_lock(&dentry->lock);
     ref_release(&dentry->refc);
     u64 count = dentry->refc.count;
-    spin_unlock_irq_restore(&dentry->lock, interrupts_enabled);
+    if (count == 0)           // for now - no references mean free the struct
+        dentry->dying = true; // TODO: make cache smarter and free only when
+                              // some limit of cached dentries is reached
+    spin_unlock(&dentry->lock);
     if (count != 0)
         return;
 
-    interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+    spin_lock(&dcache_lock);
     spin_lock(&dentry->lock);
-    count = dentry->refc.count;
-    if (count == 0)
+    if ((count = dentry->refc.count) == 0)
         dcache_remove_unsafe(dentry);
-    spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
+    spin_unlock(&dcache_lock);
+    if (count != 0)
+        return;
 
     vfs_dentry_destroy(dentry);
 }
@@ -160,22 +159,24 @@ void vfs_dcache_init() {
 struct vfs_dentry* vfs_dcache_get(struct vfs_dentry* parent, string name) {
     dcache_key key = {.parent = parent, .name = name};
 
-    bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+    spin_lock(&dcache_lock);
     struct vfs_dentry* dentry = dentry_cache_get(&dcache, key);
     if (dentry)
         vfs_dentry_acquire(dentry);
-    spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
+    spin_unlock(&dcache_lock);
 
     return dentry;
 }
 
-void dcache_remove_unsafe(struct vfs_dentry* dentry) {
+static void dcache_remove_unsafe(struct vfs_dentry* dentry) {
+    spin_lock(&dentry->lock); // This is to stabilize parent pointer
     dcache_key key = {.parent = dentry->parent, .name = dentry->name};
     dentry_cache_remove(&dcache, key);
+    spin_unlock(&dentry->lock);
 }
 
 void dcache_remove(struct vfs_dentry* dentry) {
-    bool interrupts_enabled = spin_lock_irq_save(&dcache_lock);
+    spin_lock(&dcache_lock);
     dcache_remove_unsafe(dentry);
-    spin_unlock_irq_restore(&dcache_lock, interrupts_enabled);
+    spin_unlock(&dcache_lock);
 }
