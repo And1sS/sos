@@ -1,8 +1,8 @@
-#include "icache.h"
 #include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/hash.h"
-#include "scache.h"
+#include "inode.h"
+#include "super_block.h"
 
 typedef struct {
     struct vfs_super_block* sb;

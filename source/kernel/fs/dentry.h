@@ -1,15 +1,17 @@
-#ifndef SOS_DCACHE_H
-#define SOS_DCACHE_H
+#ifndef SOS_DENTRY_H
+#define SOS_DENTRY_H
 
-#include "icache.h"
+#include "inode.h"
 #include "vfs.h"
 
 struct vfs_dentry {
-    struct vfs_dentry* parent;
+    // Immutable data
     string name;
     vfs_inode* inode;
+    // End of immutable data
 
     lock lock; // guards all fields below
+    struct vfs_dentry* parent;
     ref_count refc;
 };
 
@@ -26,4 +28,4 @@ void vfs_dcache_init();
 // parent reference should be held during this routine
 struct vfs_dentry* vfs_dcache_get(struct vfs_dentry* parent, string name);
 
-#endif // SOS_DCACHE_H
+#endif // SOS_DENTRY_H

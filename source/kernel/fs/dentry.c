@@ -1,8 +1,8 @@
-#include "dcache.h"
 #include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/hash.h"
 #include "../lib/string.h"
+#include "dentry.h"
 
 typedef struct {
     struct vfs_dentry* parent;

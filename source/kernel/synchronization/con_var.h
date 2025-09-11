@@ -17,8 +17,7 @@ typedef struct {
     queue wait_queue;
 } con_var;
 
-#define CON_VAR_STATIC_INITIALIZER                                             \
-    { .wait_queue = QUEUE_STATIC_INITIALIZER }
+#define CON_VAR_STATIC_INITIALIZER {.wait_queue = QUEUE_STATIC_INITIALIZER}
 
 #define DECLARE_CON_VAR(name) con_var name = CON_VAR_STATIC_INITIALIZER;
 
@@ -31,9 +30,8 @@ typedef struct {
 
 #define CON_VAR_WAIT_FOR(cvar, lock, cond)                                     \
     do {                                                                       \
-        while (!(cond)) {                                                      \
-            (flags) = con_var_wait((cvar), (lock));                            \
-        }                                                                      \
+        while (!(cond))                                                        \
+            con_var_wait((cvar), (lock));                                      \
     } while (0)
 
 void con_var_init(con_var* var);

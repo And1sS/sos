@@ -1,16 +1,18 @@
-#ifndef SOS_ICACHE_H
-#define SOS_ICACHE_H
+#ifndef SOS_INODE_H
+#define SOS_INODE_H
 
 #include "../lib/types.h"
-#include "scache.h"
+#include "super_block.h"
 #include "vfs.h"
 
 typedef struct {
+    // Immutable data
     u64 id;
 
     struct vfs_super_block* sb;
     vfs_inode_type type;
     vfs_inode_ops* ops;
+    // End of immutable data
 
     lock lock; // guards all fields below
 
@@ -30,4 +32,4 @@ void vfs_icache_init(u64 max_inodes);
 vfs_inode* vfs_icache_get(struct vfs_super_block* sb, u64 id);
 vfs_inode* vfs_icache_release(vfs_inode* inode);
 
-#endif // SOS_ICACHE_H
+#endif // SOS_INODE_H

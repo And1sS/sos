@@ -4,7 +4,7 @@
 #include "spin_lock.h"
 
 void con_var_init(con_var* var) {
-    var->wait_queue = (queue) QUEUE_STATIC_INITIALIZER;
+    var->wait_queue = QUEUE_STATIC_INITIALIZER;
 }
 
 void con_var_wait(con_var* var, lock* lock) {

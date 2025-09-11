@@ -2,7 +2,7 @@
 #include "../../error/errno.h"
 #include "../../error/error.h"
 #include "../../lib/string.h"
-#include "../dcache.h"
+#include "../dentry.h"
 
 struct vfs_dentry* ramfs_mount(struct vfs_super_block* sb, device* dev);
 struct vfs_dentry* lookup(struct vfs_dentry* parent, string name);

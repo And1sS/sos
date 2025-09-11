@@ -1,18 +1,21 @@
-#ifndef SOS_SCACHE_H
-#define SOS_SCACHE_H
+#ifndef SOS_SUPER_BLOCK_H
+#define SOS_SUPER_BLOCK_H
 
 #include "../lib/types.h"
 #include "vfs.h"
 
 struct vfs_super_block {
+    // Immutable data
     u64 id;
     vfs_type* type;
-
     device* device;
-
     struct vfs_dentry* root;
+    // End of immutable data
 
-    lock lock;
+    linked_list_node self_node; // node that will be used in vfs_type list
+
+    lock lock; // guards all fields below
+    bool dying;
     ref_count refc;
 };
 
@@ -21,4 +24,4 @@ struct vfs_super_block* vfs_super_get(vfs_type* type);
 void vfs_super_acquire(struct vfs_super_block* sb);
 void vfs_super_release(struct vfs_super_block* sb);
 
-#endif // SOS_SCACHE_H
+#endif // SOS_SUPER_BLOCK_H

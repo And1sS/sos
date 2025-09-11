@@ -77,6 +77,7 @@ typedef struct {
     vfs_type_ops* ops;
 
     lock lock; // guards all fields below
+    linked_list super_blocks;
     ref_count refc;
 } vfs_type;
 

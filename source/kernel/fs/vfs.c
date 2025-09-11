@@ -1,7 +1,7 @@
 #include "vfs.h"
 #include "../error/error.h"
 #include "../lib/string.h"
-#include "dcache.h"
+#include "dentry.h"
 
 DEFINE_HASH_TABLE(vfs_registry, string, vfs_type*, strhash, streq)
 
@@ -40,6 +40,10 @@ void vfs_type_destroy(vfs_type* type) {
 }
 
 bool register_vfs_type(vfs_type* type) {
+    type->lock = SPIN_LOCK_STATIC_INITIALIZER;
+    type->super_blocks = LINKED_LIST_STATIC_INITIALIZER;
+    type->refc = REF_COUNT_STATIC_INITIALIZER;
+
     bool interrupts_enabled = spin_lock_irq_save(&type_registry_lock);
 
     bool registered =

@@ -1,6 +1,6 @@
 #include "../arch/common/init.h"
 #include "../arch/common/vmm.h"
-#include "../fs/dcache.h"
+#include "../fs/dentry.h"
 #include "../fs/ramfs/ramfs.h"
 #include "../fs/vfs.h"
 #include "../interrupts/irq.h"
@@ -64,11 +64,11 @@ void set_up_init_process(module init_module) {
     ramfs_init();
 
     /*
- *                root
- *            /           \
- *            a             b
- *          /   \         /   \
- *         c     d       e      f
+     *                root
+     *            /           \
+     *            a             b
+     *          /   \         /   \
+     *         c     d       e      f
      */
 
     extern vfs_type ramfs_type;
