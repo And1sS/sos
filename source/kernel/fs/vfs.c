@@ -1,4 +1,5 @@
 #include "vfs.h"
+#include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/string.h"
 #include "dentry.h"
@@ -20,12 +21,12 @@ void vfs_init() {
 vfs_type* vfs_type_create(string name) {
     string name_copy = strcpy(name);
     if (!name_copy)
-        return NULL;
+        return ERROR_PTR(-ENOMEM);
 
     vfs_type* new = (vfs_type*) kmalloc(sizeof(vfs_type));
     if (!new) {
         strfree(name_copy);
-        return NULL;
+        return ERROR_PTR(-ENOMEM);
     }
 
     memset(new, 0, sizeof(vfs_type));

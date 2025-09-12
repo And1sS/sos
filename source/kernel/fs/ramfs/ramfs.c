@@ -30,12 +30,6 @@ void link_nodes(tree_node* parent, tree_node* child) {
 }
 
 tree_node* find_subnode(tree_node* node, string name) {
-    if (streq(name, "."))
-        return node;
-
-    if (streq(name, ".."))
-        return node->parent;
-
     ARRAY_LIST_FOR_EACH(&node->subnodes, tree_node * subnode) {
         if (streq(subnode->name, name))
             return subnode;

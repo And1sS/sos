@@ -20,6 +20,7 @@ struct vfs_super_block {
 };
 
 struct vfs_super_block* vfs_super_get(vfs_type* type);
+u64 vfs_super_destroy(struct vfs_super_block* sb);
 
 void vfs_super_acquire(struct vfs_super_block* sb);
 void vfs_super_release(struct vfs_super_block* sb);

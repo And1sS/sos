@@ -1,19 +1,33 @@
 #include "super_block.h"
+#include "../error/errno.h"
+#include "../error/error.h"
 
 // Lock order -> type -> superblock;
 
 void vfs_super_acquire(struct vfs_super_block* sb) { ref_acquire(&sb->refc); }
 
-void vfs_super_destroy(struct vfs_super_block* sb) {
+void vfs_super_release(struct vfs_super_block* sb) {
+    spin_lock(&sb->lock);
+    ref_release(&sb->refc);
+    spin_unlock(&sb->lock);
+}
+
+u64 vfs_super_destroy(struct vfs_super_block* sb) {
     vfs_type* type = sb->type;
 
     spin_lock(&type->lock);
     spin_lock(&sb->lock);
+    if (sb->refc.count != 0) {
+        spin_unlock(&sb->lock);
+        spin_unlock(&type->lock);
+        return -EBUSY;
+    }
+
     bool free = !sb->dying;
     if (!free) {
         spin_unlock(&sb->lock);
         spin_unlock(&type->lock);
-        return;
+        return -EALREADY;
     }
 
     sb->dying = true;
@@ -33,16 +47,14 @@ retry:
     spin_unlock(&type->lock);
 
     kfree(sb);
+    return 0;
 }
 
-void vfs_super_release(struct vfs_super_block* sb) {
-    spin_lock(&sb->lock);
-    ref_release(&sb->refc);
-    spin_unlock(&sb->lock);
-}
-
-struct vfs_super_block* vfs_super_get(vfs_type* type) {
+static struct vfs_super_block* vfs_super_allocate(vfs_type* type) {
     struct vfs_super_block* sb = kmalloc(sizeof(struct vfs_super_block));
+    if (!sb)
+        return ERROR_PTR(-ENOMEM);
+
     memset(sb, 0, sizeof(struct vfs_super_block));
 
     sb->id = 0; // TODO: add id generation
@@ -52,6 +64,16 @@ struct vfs_super_block* vfs_super_get(vfs_type* type) {
     sb->lock = SPIN_LOCK_STATIC_INITIALIZER;
     sb->dying = false;
     sb->refc = REF_COUNT_STATIC_INITIALIZER;
+
+    return sb;
+}
+
+struct vfs_super_block* vfs_super_get(vfs_type* type) {
+    struct vfs_super_block* sb = vfs_super_allocate(type);
+    if (IS_ERROR(sb))
+        return sb;
+
+    ref_acquire(&sb->refc);
 
     spin_lock(&type->lock);
     ref_acquire(&type->refc);

@@ -1,9 +1,12 @@
+#include "inode.h"
 #include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/hash.h"
-#include "inode.h"
 #include "super_block.h"
 
+// for now - no references mean free the struct
+// TODO: make cache smarter and free only when
+// some limit of cached dentries is reached
 typedef struct {
     struct vfs_super_block* sb;
     u64 inode_id;
@@ -33,7 +36,13 @@ void vfs_icache_init(u64 max_inodes) {
         panic("Can't init inode cache");
 }
 
-static vfs_inode* vfs_inode_create(u64 id, struct vfs_super_block* sb) {
+static void vfs_inode_destroy(vfs_inode* inode) {
+    // at this point inode is unreachable for others
+    vfs_super_release(inode->sb);
+    kfree(inode);
+}
+
+static vfs_inode* vfs_inode_allocate(u64 id, struct vfs_super_block* sb) {
     vfs_inode* inode = kmalloc(sizeof(vfs_inode));
     if (!inode)
         return (vfs_inode*) ERROR_PTR(-ENOMEM);
@@ -47,41 +56,59 @@ static vfs_inode* vfs_inode_create(u64 id, struct vfs_super_block* sb) {
     inode->refc = REF_COUNT_STATIC_INITIALIZER;
     inode->aliasc = REF_COUNT_STATIC_INITIALIZER;
 
+    vfs_super_acquire(sb);
+    vfs_inode_acquire(inode);
+
     return inode;
 }
 
 vfs_inode* vfs_icache_get(struct vfs_super_block* sb, u64 id) {
     icache_key key = {.sb = sb, .inode_id = id};
 
-    // TODO: this one should not disable irq, but only preemption
-    bool interrupts_enabled = spin_lock_irq_save(&icache_lock);
+    spin_lock(&icache_lock);
     vfs_inode* inode = inode_cache_get(&icache, key);
-    if (!inode) {
-        inode = vfs_inode_create(id, sb);
+    if (inode) {
+        vfs_inode_acquire(inode);
+        goto out;
     }
 
+    inode = vfs_inode_allocate(id, sb);
     if (IS_ERROR(inode))
         goto out;
 
-    vfs_inode_acquire(inode);
+    if (!inode_cache_put(&icache, key, inode, NULL)) {
+        vfs_inode_destroy(inode);
+        inode = ERROR_PTR(-ENOMEM);
+    }
 
 out:
-    spin_unlock_irq_restore(&icache_lock, interrupts_enabled);
-
-    if (!IS_ERROR(inode))
-        vfs_super_acquire(sb);
+    spin_unlock(&icache_lock);
 
     return inode;
 }
 
 void vfs_inode_acquire(vfs_inode* inode) {
-    bool interrupts_enabled = spin_lock_irq_save(&inode->lock);
+    spin_lock(&inode->lock);
     ref_acquire(&inode->refc);
-    spin_unlock_irq_restore(&inode->lock, interrupts_enabled);
+    spin_unlock(&inode->lock);
 }
 
 void vfs_inode_release(vfs_inode* inode) {
-    bool interrupts_enabled = spin_lock_irq_save(&inode->lock);
+    spin_lock(&inode->lock);
     ref_release(&inode->refc);
-    spin_unlock_irq_restore(&inode->lock, interrupts_enabled);
+    bool destroy = inode->refc.count == 0;
+    spin_unlock(&inode->lock);
+    if (!destroy)
+        return;
+
+    spin_lock(&icache_lock);
+    spin_lock(&inode->lock);
+    if ((destroy = inode->refc.count == 0)) {
+        icache_key key = {.sb = inode->sb, .inode_id = inode->id};
+        inode_cache_remove(&icache, key);
+    }
+    spin_unlock(&icache_lock);
+
+    if (destroy)
+        vfs_inode_destroy(inode);
 }
