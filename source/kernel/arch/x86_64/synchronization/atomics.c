@@ -12,8 +12,10 @@ u64 atomic_exchange(volatile u64* addr, volatile u64 new_value) {
 }
 
 void atomic_set(volatile u64* addr, volatile u64 value) {
+    // x86-64 does not reorder writes -> already has write-release semantics
     *addr = value;
 
+    // this is to make changes visible immediately
     __asm__ volatile("mfence" : : : "memory");
 }
 
@@ -26,7 +28,7 @@ u64 atomic_decrement_and_get(volatile u64* addr) {
 
     __asm__ volatile("lock xaddq %0, %1"
                      : "=r"(old_value), "+m"(*addr)
-                     : "0"(-1)
+                     : "0"((u64)-1)
                      : "memory");
 
     return old_value - 1;
