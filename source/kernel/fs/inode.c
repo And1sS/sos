@@ -76,14 +76,15 @@ vfs_inode* vfs_icache_get(struct vfs_super_block* sb, u64 id) {
     if (IS_ERROR(inode))
         goto out;
 
-    if (!inode_cache_put(&icache, key, inode, NULL)) {
-        vfs_inode_destroy(inode);
-        inode = ERROR_PTR(-ENOMEM);
-    }
+    if (inode_cache_put(&icache, key, inode, NULL))
+        goto out;
+
+    spin_unlock(&icache_lock);
+    vfs_inode_destroy(inode);
+    return ERROR_PTR(-ENOMEM);
 
 out:
     spin_unlock(&icache_lock);
-
     return inode;
 }
 

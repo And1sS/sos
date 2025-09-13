@@ -101,14 +101,15 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
     if (IS_ERROR(dentry))
         goto out;
 
-    if (!dentry_cache_put(&dcache, key, dentry, NULL)) {
-        vfs_dentry_destroy(dentry);
-        dentry = ERROR_PTR(-ENOMEM);
-    }
+    if (dentry_cache_put(&dcache, key, dentry, NULL))
+        goto out;
+
+    spin_unlock(&dcache_lock);
+    vfs_dentry_destroy(dentry);
+    return ERROR_PTR(-ENOMEM);
 
 out:
     spin_unlock(&dcache_lock);
-
     return dentry;
 }
 
