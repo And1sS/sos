@@ -61,7 +61,7 @@ struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev) {
     if (IS_ERROR(sb))
         return ERROR_PTR(sb);
 
-    vfs_dentry_acquire(sb->root); // TODO: decide whether this is needed
+    vfs_dentry_acquire(sb->root);
     return sb->root;
 }
 

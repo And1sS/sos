@@ -42,12 +42,12 @@ static struct vfs_dentry* vfs_dentry_allocate(struct vfs_dentry* parent,
 
     string name_copy = strcpy(name);
     if (!name_copy)
-        return NULL;
+        return ERROR_PTR(-ENOMEM);
 
     struct vfs_dentry* dentry = kmalloc(sizeof(struct vfs_dentry));
     if (!dentry) {
         strfree(name_copy);
-        return ERROR_PTR(ENOMEM);
+        return ERROR_PTR(-ENOMEM);
     }
 
     memset(dentry, NULL, sizeof(struct vfs_dentry));
@@ -98,10 +98,7 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
     }
 
     dentry = vfs_dentry_allocate(parent, inode, name);
-    if (IS_ERROR(dentry))
-        goto out;
-
-    if (dentry_cache_put(&dcache, key, dentry, NULL))
+    if (IS_ERROR(dentry) || dentry_cache_put(&dcache, key, dentry, NULL))
         goto out;
 
     spin_unlock(&dcache_lock);
