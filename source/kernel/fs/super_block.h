@@ -7,7 +7,7 @@
 struct vfs_super_block {
     // Immutable data
     u64 id;
-    vfs_type* type;
+    struct vfs_type* type;
     device* device;
     struct vfs_dentry* root;
     // End of immutable data
@@ -19,7 +19,7 @@ struct vfs_super_block {
     ref_count refc;
 };
 
-struct vfs_super_block* vfs_super_get(vfs_type* type);
+struct vfs_super_block* vfs_super_get(struct vfs_type* type, device* dev);
 u64 vfs_super_destroy(struct vfs_super_block* sb);
 
 void vfs_super_acquire(struct vfs_super_block* sb);

@@ -17,7 +17,8 @@ typedef struct {
     queue wait_queue;
 } con_var;
 
-#define CON_VAR_STATIC_INITIALIZER {.wait_queue = QUEUE_STATIC_INITIALIZER}
+#define CON_VAR_STATIC_INITIALIZER                                             \
+    (con_var) { .wait_queue = QUEUE_STATIC_INITIALIZER }
 
 #define DECLARE_CON_VAR(name) con_var name = CON_VAR_STATIC_INITIALIZER;
 

@@ -58,20 +58,17 @@ typedef enum {
     BLOCK_DEVICE,
     PIPE,
     SYMLINK,
-    SOCKET,
-    MOUNTPOINT
+    SOCKET
 } vfs_inode_type;
 
-#define INODE_NEW_FLAG 1 << 0
-
 typedef struct {
-    bool (*fill_super)(struct vfs_super_block* vfs);
-    struct vfs_dentry* (*mount)(struct vfs_super_block* vfs, device* device);
-    u64 (*unmount)(struct vfs_super_block* vfs);
-    u64 (*sync)(struct vfs_super_block* vfs);
+    u64 (*fill_super)(struct vfs_super_block* sb, device* dev);
+    struct vfs_dentry* (*mount)(struct vfs_type* type, device* dev);
+    u64 (*unmount)(struct vfs_super_block* sb);
+    u64 (*sync)(struct vfs_super_block* sb);
 } vfs_type_ops;
 
-typedef struct {
+struct vfs_type {
     string name;
 
     vfs_type_ops* ops;
@@ -79,13 +76,11 @@ typedef struct {
     lock lock; // guards all fields below
     linked_list super_blocks;
     ref_count refc;
-} vfs_type;
+};
 
 void vfs_init();
 
-bool register_vfs_type(vfs_type* type);
-void deregister_vfs_type(vfs_type* type);
-
-struct vfs_dentry* walk(struct vfs_dentry* start, string path);
+bool register_vfs_type(struct vfs_type* type);
+void deregister_vfs_type(struct vfs_type* type);
 
 #endif // SOS_VFS_H

@@ -1,6 +1,8 @@
 #include "../arch/common/init.h"
 #include "../arch/common/vmm.h"
 #include "../fs/dentry.h"
+#include "../fs/mount.h"
+#include "../fs/path.h"
 #include "../fs/ramfs/ramfs.h"
 #include "../fs/vfs.h"
 #include "../interrupts/irq.h"
@@ -61,8 +63,6 @@ void set_up_init_process(module init_module) {
     //
     //    vm_space_print(init_process.vm);
 
-    ramfs_init();
-
     /*
      *                root
      *            /           \
@@ -70,12 +70,11 @@ void set_up_init_process(module init_module) {
      *          /   \         /   \
      *         c     d       e      f
      */
-
-    extern vfs_type ramfs_type;
-    struct vfs_super_block* sb = vfs_super_get(&ramfs_type);
-    struct vfs_dentry* root = ramfs_mount(sb, NULL);
-    struct vfs_dentry* res = walk(root, "a/../b/./e");
-    println(res->name);
+    vfs_mount* mnt = vfs_mount_get_root();
+    vfs_path res;
+    vfs_path start = {.mount = mnt, .dentry = mnt->mount_root};
+    walk(start, "a/../b/./e", &res);
+    println(res.dentry->name);
 }
 
 _Noreturn void kernel_main(paddr multiboot_structure) {

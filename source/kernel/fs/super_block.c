@@ -1,6 +1,7 @@
 #include "super_block.h"
 #include "../error/errno.h"
 #include "../error/error.h"
+#include "dentry.h"
 
 // Lock order -> type -> superblock;
 
@@ -13,7 +14,7 @@ void vfs_super_release(struct vfs_super_block* sb) {
 }
 
 u64 vfs_super_destroy(struct vfs_super_block* sb) {
-    vfs_type* type = sb->type;
+    struct vfs_type* type = sb->type;
 
     spin_lock(&type->lock);
     spin_lock(&sb->lock);
@@ -50,7 +51,7 @@ retry:
     return 0;
 }
 
-static struct vfs_super_block* vfs_super_allocate(vfs_type* type) {
+static struct vfs_super_block* vfs_super_allocate(struct vfs_type* type) {
     struct vfs_super_block* sb = kmalloc(sizeof(struct vfs_super_block));
     if (!sb)
         return ERROR_PTR(-ENOMEM);
@@ -68,17 +69,20 @@ static struct vfs_super_block* vfs_super_allocate(vfs_type* type) {
     return sb;
 }
 
-struct vfs_super_block* vfs_super_get(vfs_type* type) {
+struct vfs_super_block* vfs_super_get(struct vfs_type* type, device* dev) {
     struct vfs_super_block* sb = vfs_super_allocate(type);
     if (IS_ERROR(sb))
         return sb;
 
+    if (type->ops->fill_super)
+        type->ops->fill_super(sb, dev);
+
     ref_acquire(&sb->refc);
+    ref_acquire(&sb->root->refc);
 
     spin_lock(&type->lock);
     ref_acquire(&type->refc);
     linked_list_add_last_node(&type->super_blocks, &sb->self_node);
     spin_unlock(&type->lock);
-
     return sb;
 }

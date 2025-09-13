@@ -4,7 +4,9 @@
 #include "../../device/device.h"
 #include "../vfs.h"
 
+#define RAMFS_NAME "ramfs"
+
 void ramfs_init();
-struct vfs_dentry* ramfs_mount(struct vfs_super_block* sb, device* dev);
+struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
 
 #endif // SOS_RAMFS_H

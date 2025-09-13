@@ -4,8 +4,9 @@
 #include "../../lib/string.h"
 #include "../dentry.h"
 
-struct vfs_dentry* ramfs_mount(struct vfs_super_block* sb, device* dev);
-struct vfs_dentry* lookup(struct vfs_dentry* parent, string name);
+u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev);
+struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
+struct vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
 
 typedef struct _tree_node {
     string name;
@@ -45,12 +46,17 @@ tree_node* find_subnode(tree_node* node, string name) {
  *         c     d       e      f
  */
 static tree_node root = {.id = 0, .name = "[root]"};
-static vfs_type_ops ops = {.mount = ramfs_mount, .sync = NULL, .unmount = NULL};
-static vfs_inode_ops inode_ops = {.lookup = lookup};
-vfs_type ramfs_type = {.name = "ramfs", .ops = &ops};
+static vfs_type_ops ops = {.fill_super = ramfs_fill_super,
+                           .mount = ramfs_mount,
+                           .sync = NULL,
+                           .unmount = NULL};
+static vfs_inode_ops inode_ops = {.lookup = ramfs_lookup};
+static struct vfs_type ramfs_type = {.name = RAMFS_NAME, .ops = &ops};
 
 vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);
+    if (IS_ERROR(inode))
+        return inode;
 
     spin_lock(&inode->lock);
     if (inode->initialised)
@@ -86,17 +92,32 @@ void ramfs_init() {
     link_nodes(b, f);
 }
 
-struct vfs_dentry* ramfs_mount(struct vfs_super_block* sb, device* dev) {
-    UNUSED(dev);
-
+u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev) {
     vfs_inode* root_inode = to_inode(&root, sb);
+    if (IS_ERROR(root_inode))
+        return PTR_ERROR(root_inode);
+
     struct vfs_dentry* root_dentry = vfs_dentry_create_root(root_inode);
     vfs_inode_release(root_inode);
+    if (IS_ERROR(root_dentry))
+        return PTR_ERROR(root_dentry);
 
-    return root_dentry;
+    sb->root = root_dentry;
+    sb->device = dev;
+
+    return 0;
 }
 
-struct vfs_dentry* lookup(struct vfs_dentry* parent, string name) {
+struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev) {
+    struct vfs_super_block* sb = vfs_super_get(type, dev);
+    if (IS_ERROR(sb))
+        return ERROR_PTR(sb);
+
+    vfs_dentry_acquire(sb->root); // TODO: decide whether this is needed
+    return sb->root;
+}
+
+struct vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name) {
     tree_node* res = find_subnode(parent->inode->private_data, name);
     if (!res)
         return ERROR_PTR(-ENOENT);
