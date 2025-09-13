@@ -1,51 +1,13 @@
 #include "ramfs.h"
 #include "../../error/errno.h"
 #include "../../error/error.h"
-#include "../../lib/string.h"
 #include "../dentry.h"
+#include "internal_tree.h"
 
-u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev);
-struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
-struct vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
+static u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev);
+static struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
+static struct vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
 
-typedef struct _tree_node {
-    string name;
-    u64 id;
-
-    struct _tree_node* parent;
-    array_list subnodes;
-} tree_node;
-
-tree_node* alloc_tree_node(u64 id, string name) {
-    tree_node* node = kmalloc(sizeof(tree_node));
-    array_list_init(&node->subnodes, 8);
-    node->id = id;
-    node->name = strcpy(name);
-
-    return node;
-}
-
-void link_nodes(tree_node* parent, tree_node* child) {
-    child->parent = parent;
-    array_list_add_last(&parent->subnodes, child);
-}
-
-tree_node* find_subnode(tree_node* node, string name) {
-    ARRAY_LIST_FOR_EACH(&node->subnodes, tree_node * subnode) {
-        if (streq(subnode->name, name))
-            return subnode;
-    }
-    return NULL;
-}
-
-/*
- *                root
- *            /           \
- *            a             b
- *          /   \         /   \
- *         c     d       e      f
- */
-static tree_node root = {.id = 0, .name = "[root]"};
 static vfs_type_ops ops = {.fill_super = ramfs_fill_super,
                            .mount = ramfs_mount,
                            .sync = NULL,
@@ -53,7 +15,12 @@ static vfs_type_ops ops = {.fill_super = ramfs_fill_super,
 static vfs_inode_ops inode_ops = {.lookup = ramfs_lookup};
 static struct vfs_type ramfs_type = {.name = RAMFS_NAME, .ops = &ops};
 
-vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
+void ramfs_init() {
+    register_vfs_type(&ramfs_type);
+    internal_tree_init();
+}
+
+static vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);
     if (IS_ERROR(inode))
         return inode;
@@ -73,27 +40,8 @@ out:
     return inode;
 }
 
-void ramfs_init() {
-    register_vfs_type(&ramfs_type);
-
-    array_list_init(&root.subnodes, 8);
-    tree_node* a = alloc_tree_node(1, "a");
-    tree_node* b = alloc_tree_node(2, "b");
-    tree_node* c = alloc_tree_node(3, "c");
-    tree_node* d = alloc_tree_node(4, "d");
-    tree_node* e = alloc_tree_node(5, "e");
-    tree_node* f = alloc_tree_node(6, "f");
-
-    link_nodes(&root, a);
-    link_nodes(&root, b);
-    link_nodes(a, c);
-    link_nodes(a, d);
-    link_nodes(b, e);
-    link_nodes(b, f);
-}
-
 u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev) {
-    vfs_inode* root_inode = to_inode(&root, sb);
+    vfs_inode* root_inode = to_inode(get_root(), sb);
     if (IS_ERROR(root_inode))
         return PTR_ERROR(root_inode);
 

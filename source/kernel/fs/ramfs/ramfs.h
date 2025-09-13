@@ -7,6 +7,5 @@
 #define RAMFS_NAME "ramfs"
 
 void ramfs_init();
-struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
 
 #endif // SOS_RAMFS_H
