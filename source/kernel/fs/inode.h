@@ -29,7 +29,8 @@ void vfs_inode_release(vfs_inode* inode);
 
 void vfs_icache_init(u64 max_inodes);
 
+// Safe to use inside fill_super, since fill_super is called on unpublished
+// superblock without superblock lock held
 vfs_inode* vfs_icache_get(struct vfs_super_block* sb, u64 id);
-vfs_inode* vfs_icache_release(vfs_inode* inode);
 
 #endif // SOS_INODE_H

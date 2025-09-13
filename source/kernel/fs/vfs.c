@@ -8,9 +8,9 @@
 
 DEFINE_HASH_TABLE(vfs_registry, string, struct vfs_type*, strhash, streq)
 
-static vfs_registry type_registry;
-
 static lock type_registry_lock = SPIN_LOCK_STATIC_INITIALIZER;
+
+static vfs_registry type_registry;
 
 void vfs_init() {
     if (!vfs_registry_init(&type_registry))

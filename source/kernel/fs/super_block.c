@@ -3,8 +3,6 @@
 #include "../error/error.h"
 #include "dentry.h"
 
-// Lock order -> type -> superblock;
-
 void vfs_super_acquire(struct vfs_super_block* sb) { ref_acquire(&sb->refc); }
 
 void vfs_super_release(struct vfs_super_block* sb) {

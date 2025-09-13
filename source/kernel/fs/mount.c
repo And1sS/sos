@@ -1,7 +1,7 @@
 #include "mount.h"
 
-static vfs_mount* root_mount = NULL;
 static lock mounts_lock = SPIN_LOCK_STATIC_INITIALIZER;
+static vfs_mount* root_mount = NULL;
 
 void vfs_mount_root(struct vfs_dentry* root) {
     spin_lock(&mounts_lock);

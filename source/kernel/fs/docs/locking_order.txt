@@ -1,0 +1,19 @@
+Locking protocol for mounts, fs types, superblocks, dentries and inodes that ensures that
+deadlocks won't occur implies strict locking order. Since in some scenarios it is hard to
+keep locking order it is okto take locks in other order if user code knows that there is
+no way that locks may be taken in other order - for example:
+- vfs_inode_release breaks locking order by taking its superblocks lock, but it takes this
+lock only when inode itself is not reachable and there will be no deadlock when used carefully.
+- vfs_dentry_release breaks locking order by calling vfs_inode_release, but it calls release
+only when dentry is not reachable.
+Locking is tied to ownership. Since strictly follow locking order is sometimes impossible,
+code that breaks it should be carefully inspected.
+
+Order:
+1) Fs type lock, Mount lock - Those are mutually exclusive and should not be taken at the same time
+2) Superblock lock
+3) Dentry cache lock
+4) Parent dentry lock
+5) dentry lock
+6) Inode cache lock
+7) Inode lock

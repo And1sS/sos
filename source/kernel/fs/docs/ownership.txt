@@ -1,0 +1,4 @@
+All public functions in the fs folder must be called with ownership of each
+argument as required by the function. This means the caller must hold
+a valid reference to every argument for the entire duration of the function call.
+Violation of this rule will lead to memory corruption or deadlock.

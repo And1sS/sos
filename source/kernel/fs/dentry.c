@@ -23,14 +23,6 @@ static bool dcache_equals(dcache_key a, dcache_key b) {
 DEFINE_HASH_TABLE(dentry_cache, dcache_key, struct vfs_dentry*, dcache_hash,
                   dcache_equals)
 
-// static u64 dcache_entries = 0;
-
-/*
- * Dcache locking order:
- * 1) dcache_lock
- * 2) parent dentry lock
- * 3) child dentry lock
- */
 static lock dcache_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 static dentry_cache dcache;
@@ -130,9 +122,7 @@ struct vfs_dentry* vfs_dentry_get_parent(struct vfs_dentry* dentry) {
 }
 
 void vfs_dentry_acquire(struct vfs_dentry* dentry) {
-    bool interrupts_enabled = spin_lock_irq_save(&dentry->lock);
     ref_acquire(&dentry->refc);
-    spin_unlock_irq_restore(&dentry->lock, interrupts_enabled);
 }
 
 void vfs_dentry_release(struct vfs_dentry* dentry) {
