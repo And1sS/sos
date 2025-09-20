@@ -132,6 +132,8 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
     if (IS_ERROR(dentry))
         goto out;
 
+    // we have allocated new dentry and must save it with copied name
+    key.name = dentry->name;
     if (dentry_cache_put(&dcache, key, dentry, NULL)) {
         vfs_dentry_add_child(parent, dentry);
         goto out;

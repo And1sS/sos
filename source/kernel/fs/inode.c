@@ -116,3 +116,15 @@ void vfs_inode_release(vfs_inode* inode) {
     if (destroy)
         vfs_inode_destroy(inode);
 }
+
+void vfs_inode_lock_shared(vfs_inode* inode) {
+    rw_mutex_lock_read(&inode->mut);
+}
+
+void vfs_inode_unlock_shared(vfs_inode* inode) {
+    rw_mutex_unlock_read(&inode->mut);
+}
+
+void vfs_inode_lock(vfs_inode* inode) { rw_mutex_lock_write(&inode->mut); }
+
+void vfs_inode_unlock(vfs_inode* inode) { rw_mutex_unlock_write(&inode->mut); }

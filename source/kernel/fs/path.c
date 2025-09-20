@@ -3,46 +3,60 @@
 #include "../error/error.h"
 #include "../lib/string.h"
 
-u64 split_length(string path) {
+#define MAX_PATH_LENGTH 512
+
+typedef struct {
+    char part[MAX_PATH_LENGTH];
+    string path;
+} path_parts;
+
+static bool parts_left(path_parts* parts) { return parts->path[0] != '\0'; }
+
+static u64 part_length(string path) {
     u64 len = 0;
-    for (; path[len] != '/' && path[len] != '\0'; len++)
+    for (; path[len] != '/' && path[len] != '\0' && len < MAX_PATH_LENGTH - 1;
+         len++)
         ;
 
     return len;
 }
 
-void next_split(string path, u8 buffer[256], u8* result_length) {
-    u64 len = 0;
-    while (*path == '/') {
-        path++;
-        len++;
-    }
+static void walk_next_part(path_parts* parts) {
+    while (*parts->path == '/')
+        parts->path++;
 
-    *result_length = split_length(path);
-    memcpy(buffer, (void*) path, *result_length);
-    buffer[*result_length] = '\0';
-    *result_length += len;
+    u64 part_len = part_length(parts->path);
+    memcpy(parts->part, (void*) parts->path, part_len);
+    parts->part[part_len] = '\0';
+    parts->path = parts->path + part_len;
 }
 
-void vfs_path_release(vfs_path* path) {
-    vfs_dentry_release(path->dentry);
-    vfs_mount_release(path->mount);
+static struct vfs_dentry* lookup(struct vfs_dentry* parent, string path) {
+    if (streq(path, ".")) {
+        vfs_dentry_acquire(parent);
+        return parent;
+    }
+
+    if (streq(path, ".."))
+        return vfs_dentry_get_parent(parent);
+
+    vfs_inode_lock_shared(parent->inode);
+    struct vfs_dentry* child = vfs_dcache_get(parent, path);
+    child = child ? child : parent->inode->ops->lookup(parent, path);
+    vfs_inode_unlock_shared(parent->inode);
+    return child;
 }
 
 u64 walk(vfs_path start, string path, vfs_path* res) {
-    u64 full_length = strlen(path);
-    u64 walked_length = 0;
-
-    u8 split_buffer[256];
-    string path_iter = path;
-
-    vfs_mount* iter_mnt = start.mount;
+    path_parts parts = {.path = path};
+    vfs_mount* mnt = start.mount;
     struct vfs_dentry* iter = start.dentry;
+    // upstream already holds the reference, but we need different one for walk
+    vfs_dentry_acquire(iter);
 
     while (iter) {
-        if (walked_length == full_length) {
-            res->mount = iter_mnt;
-            res->dentry = iter;
+        if (!parts_left(&parts)) {
+            *res = (vfs_path) {.mount = mnt, .dentry = iter};
             return 0;
         }
 
@@ -51,38 +65,14 @@ u64 walk(vfs_path start, string path, vfs_path* res) {
             return -ENOTDIR;
         }
 
-        u8 length;
-        next_split(path_iter, split_buffer, &length);
-        string path_element = (string) split_buffer;
-
-        walked_length += length;
-        path_iter += length;
-
         // TODO: resolve mountpoints
-
-        if (streq(path_element, "."))
-            continue;
-
-        struct vfs_dentry* parent;
-
-        if (streq(path_element, "..")) {
-            parent = vfs_dentry_get_parent(iter);
-            vfs_dentry_release(iter);
-            iter = parent;
-            continue;
-        }
-
-        parent = iter;
-        iter = vfs_dcache_get(parent, path_element);
-        if (!iter) {
-            iter = parent->inode->ops->lookup(parent, path_element);
-
-            if (IS_ERROR(iter)) {
-                vfs_dentry_release(parent);
-                return PTR_ERROR(iter);
-            }
-        }
+        struct vfs_dentry* parent = iter;
+        walk_next_part(&parts);
+        iter = lookup(parent, parts.part);
         vfs_dentry_release(parent);
+
+        if (IS_ERROR(iter))
+            return PTR_ERROR(iter);
     }
 
     __builtin_unreachable();
