@@ -37,6 +37,36 @@ static void vfs_dentry_destroy(struct vfs_dentry* dentry) {
     kfree(dentry);
 }
 
+static void vfs_dentry_add_child(struct vfs_dentry* parent,
+                                 struct vfs_dentry* child) {
+
+    vfs_dentry_acquire(parent);
+    vfs_dentry_acquire(child);
+
+    spin_lock(&parent->lock);
+    spin_lock(&child->lock);
+    linked_list_add_last_node(&parent->children, &child->dentry_node);
+    child->parent = parent;
+    spin_unlock(&child->lock);
+    spin_unlock(&parent->lock);
+}
+
+static void vfs_dentry_remove_child(struct vfs_dentry* parent,
+                                    struct vfs_dentry* child) {
+
+    spin_lock(&parent->lock);
+    spin_lock(&child->lock);
+    linked_list_remove_node(&parent->children, &child->dentry_node);
+    child->parent = child;
+    spin_unlock(&parent->lock);
+    spin_unlock(&child->lock);
+
+    // it is safe to break atomicity here, since both parent and child are
+    // pinned by each other reference until this point
+    vfs_dentry_release(parent);
+    vfs_dentry_release(child);
+}
+
 static struct vfs_dentry* vfs_dentry_allocate(struct vfs_dentry* parent,
                                               vfs_inode* inode, string name) {
 
@@ -52,16 +82,17 @@ static struct vfs_dentry* vfs_dentry_allocate(struct vfs_dentry* parent,
 
     memset(dentry, NULL, sizeof(struct vfs_dentry));
 
-    dentry->parent = (struct vfs_dentry*) (parent ? parent : dentry);
-    dentry->inode = inode;
     dentry->name = parent ? name_copy : "/";
+    dentry->inode = inode;
+    vfs_inode_acquire(inode);
+
     dentry->lock = SPIN_LOCK_STATIC_INITIALIZER;
+
+    dentry->dentry_node = LINKED_LIST_NODE_OF(dentry);
+    dentry->children = LINKED_LIST_STATIC_INITIALIZER;
+
     dentry->refc = REF_COUNT_STATIC_INITIALIZER;
 
-    if (parent)
-        vfs_dentry_acquire(parent);
-
-    vfs_inode_acquire(inode);
     vfs_dentry_acquire(dentry);
     return dentry;
 }
@@ -98,8 +129,13 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
     }
 
     dentry = vfs_dentry_allocate(parent, inode, name);
-    if (IS_ERROR(dentry) || dentry_cache_put(&dcache, key, dentry, NULL))
+    if (IS_ERROR(dentry))
         goto out;
+
+    if (dentry_cache_put(&dcache, key, dentry, NULL)) {
+        vfs_dentry_add_child(parent, dentry);
+        goto out;
+    }
 
     spin_unlock(&dcache_lock);
     vfs_dentry_destroy(dentry);

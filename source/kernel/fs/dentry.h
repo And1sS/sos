@@ -12,7 +12,11 @@ struct vfs_dentry {
 
     lock lock; // guards all fields below
     bool dying;
+
     struct vfs_dentry* parent;
+    linked_list_node dentry_node; // used in parents 'children' list
+    linked_list children;
+
     ref_count refc;
 };
 
