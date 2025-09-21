@@ -7,12 +7,14 @@
 static u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev);
 static struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
 static struct vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
+static u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child);
 
 static vfs_type_ops ops = {.fill_super = ramfs_fill_super,
                            .mount = ramfs_mount,
                            .sync = NULL,
                            .unmount = NULL};
-static vfs_inode_ops inode_ops = {.lookup = ramfs_lookup};
+static vfs_inode_ops inode_ops = {.lookup = ramfs_lookup,
+                                  .unlink = ramfs_unlink};
 static struct vfs_type ramfs_type = {.name = RAMFS_NAME, .ops = &ops};
 
 void ramfs_init() {
@@ -33,7 +35,7 @@ static vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
     inode->links = 1;
     inode->private_data = node;
     inode->ops = &inode_ops;
-    inode->type = DIRECTORY;
+    inode->type = node->type;
 
 out:
     spin_unlock(&inode->lock);
@@ -76,4 +78,9 @@ struct vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name) {
     vfs_inode_release(inode);
 
     return dentry;
+}
+
+u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child) {
+    unlink_nodes(dir->private_data, child->inode->private_data);
+    return 0;
 }

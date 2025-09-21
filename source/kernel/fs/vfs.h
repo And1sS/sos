@@ -13,6 +13,7 @@ struct vfs_type;
 struct vfs_super_block;
 struct vfs_inode;
 struct vfs_dentry;
+struct vfs_path;
 
 typedef struct {
     // file operations
@@ -69,7 +70,7 @@ typedef struct {
     u64 (*sync)(struct vfs_super_block* sb);
 } vfs_type_ops;
 
-struct vfs_type {
+typedef struct vfs_type {
     string name;
 
     vfs_type_ops* ops;
@@ -77,11 +78,13 @@ struct vfs_type {
     lock lock; // guards all fields below
     linked_list super_blocks;
     ref_count refc;
-};
+} vfs_type;
 
 void vfs_init();
 
-bool register_vfs_type(struct vfs_type* type);
-void deregister_vfs_type(struct vfs_type* type);
+bool register_vfs_type(vfs_type* type);
+void deregister_vfs_type(vfs_type* type);
+
+u64 vfs_unlink(struct vfs_path start, string path);
 
 #endif // SOS_VFS_H

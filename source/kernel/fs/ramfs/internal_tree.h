@@ -3,17 +3,13 @@
 
 #include "../../lib/container/array_list/array_list.h"
 #include "../../lib/types.h"
+#include "../vfs.h"
 
-/*
- *                root
- *            /           \
- *            a             b
- *          /   \         /   \
- *         c     d       e      f
- */
 typedef struct _tree_node {
     string name;
     u64 id;
+
+    vfs_inode_type type;
 
     struct _tree_node* parent;
     array_list subnodes;
@@ -23,5 +19,7 @@ void internal_tree_init();
 
 tree_node* get_root();
 tree_node* find_subnode(tree_node* node, string name);
+
+void unlink_nodes(tree_node* parent, tree_node* child);
 
 #endif // SOS_INTERNAL_TREE_H

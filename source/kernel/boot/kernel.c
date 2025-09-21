@@ -73,8 +73,11 @@ void set_up_init_process(module init_module) {
     vfs_mount* mnt = vfs_mount_get_root();
     vfs_path res;
     vfs_path start = {.mount = mnt, .dentry = mnt->mount_root};
-    walk(start, "a/../b/./e", &res);
+    path_parts parts = path_parts_from_path("a/../b/./e");
+    walk(start, &res, &parts);
     println(res.dentry->name);
+    print_u64(vfs_unlink(start, "a/c"));
+    while (true) {}
 }
 
 _Noreturn void kernel_main(paddr multiboot_structure) {

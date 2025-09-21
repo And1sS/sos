@@ -70,29 +70,42 @@ void deregister_vfs_type(struct vfs_type* type) {
 }
 
 u64 vfs_unlink(vfs_path start, string path) {
-    vfs_path dst;
-    u64 res = walk(start, path, &dst);
-    if (IS_ERROR(res))
-        return res;
+    vfs_path res;
+    path_parts parts = path_parts_from_path(path);
 
-    struct vfs_dentry* dentry = dst.dentry;
+    u64 error = walk_parent(start, &res, &parts);
+    if (IS_ERROR(error))
+        return error;
 
-    // this is invalid and should be done properly by stopping lookup before
-    // last path part is resolved
-    vfs_inode* dir = dentry->parent->inode;
+    vfs_dentry* parent = res.dentry;
+    vfs_inode* dir = parent->inode;
 
     vfs_inode_lock(dir);
-    if (dir->type == DIRECTORY)
-        res = -EISDIR;
-    else if (!dir->ops->unlink)
-        res = -EPERM;
+    error = walk_one(res, &res, &parts);
+    if (IS_ERROR(error))
+        goto out;
 
-    if (!IS_ERROR(res))
-        res = dir->ops->unlink(dir, dentry);
+    vfs_dentry* child = res.dentry;
+    if (child->inode->type == DIRECTORY) {
+        error = -EISDIR;
+        goto failed_to_unlink;
+    } else if (!dir->ops->unlink) {
+        error = -EPERM;
+        goto failed_to_unlink;
+    }
 
-    if (!IS_ERROR(res))
-        vfs_dentry_delete(dentry);
+    if (!IS_ERROR(error))
+        error = dir->ops->unlink(dir, child);
 
-    vfs_inode_unlock(dentry->inode);
-    return res;
+    if (!IS_ERROR(error))
+        vfs_dentry_delete(child);
+
+failed_to_unlink:
+    vfs_dentry_release(child);
+
+out:
+    vfs_inode_unlock(dir);
+
+    vfs_dentry_release(parent);
+    return error;
 }

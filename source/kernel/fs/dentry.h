@@ -4,7 +4,7 @@
 #include "inode.h"
 #include "vfs.h"
 
-struct vfs_dentry {
+typedef struct vfs_dentry {
     // Immutable data
     string name;
     vfs_inode* inode;
@@ -18,7 +18,7 @@ struct vfs_dentry {
     linked_list children;
 
     ref_count refc;
-};
+} vfs_dentry;
 
 // parent reference should be held during this routine
 struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,

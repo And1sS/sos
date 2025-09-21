@@ -38,29 +38,28 @@ static void vfs_dentry_destroy(struct vfs_dentry* dentry) {
 }
 
 // this function should be called with dcache_lock held
-static u64 vfs_dentry_add_child(struct vfs_dentry* parent,
-                                struct vfs_dentry* child) {
+static bool vfs_dentry_add_child(struct vfs_dentry* parent,
+                                 struct vfs_dentry* child) {
 
-    u64 res = 0;
+    bool added = false;
 
     vfs_dentry_acquire(parent);
     vfs_dentry_acquire(child);
 
     dcache_key key = {.parent = parent, .name = child->name};
-    if (!dentry_cache_put(&dcache, key, child, NULL)) {
-        res = -ENOMEM;
+    if (!dentry_cache_put(&dcache, key, child, NULL))
         goto out;
-    }
 
     spin_lock(&parent->lock);
     spin_lock(&child->lock);
     linked_list_add_last_node(&parent->children, &child->dentry_node);
     child->parent = parent;
+    added = true;
 
 out:
     spin_unlock(&child->lock);
     spin_unlock(&parent->lock);
-    return res;
+    return added;
 }
 
 static void vfs_dentry_remove_child(struct vfs_dentry* parent,
