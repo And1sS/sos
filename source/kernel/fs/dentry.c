@@ -37,34 +37,61 @@ static void vfs_dentry_destroy(struct vfs_dentry* dentry) {
     kfree(dentry);
 }
 
-static void vfs_dentry_add_child(struct vfs_dentry* parent,
-                                 struct vfs_dentry* child) {
+// this function should be called with dcache_lock held
+static u64 vfs_dentry_add_child(struct vfs_dentry* parent,
+                                struct vfs_dentry* child) {
+
+    u64 res = 0;
 
     vfs_dentry_acquire(parent);
     vfs_dentry_acquire(child);
+
+    dcache_key key = {.parent = parent, .name = child->name};
+    if (!dentry_cache_put(&dcache, key, child, NULL)) {
+        res = -ENOMEM;
+        goto out;
+    }
 
     spin_lock(&parent->lock);
     spin_lock(&child->lock);
     linked_list_add_last_node(&parent->children, &child->dentry_node);
     child->parent = parent;
+
+out:
     spin_unlock(&child->lock);
     spin_unlock(&parent->lock);
+    return res;
 }
 
 static void vfs_dentry_remove_child(struct vfs_dentry* parent,
                                     struct vfs_dentry* child) {
 
+    spin_lock(&dcache_lock);
     spin_lock(&parent->lock);
     spin_lock(&child->lock);
+
     linked_list_remove_node(&parent->children, &child->dentry_node);
     child->parent = child;
+    dcache_key key = {.parent = parent, .name = child->name};
+    dentry_cache_remove(&dcache, key);
+
     spin_unlock(&parent->lock);
     spin_unlock(&child->lock);
+    spin_unlock(&dcache_lock);
 
     // it is safe to break atomicity here, since both parent and child are
     // pinned by each other reference until this point
-    vfs_dentry_release(parent);
     vfs_dentry_release(child);
+    vfs_dentry_release(parent);
+}
+
+void vfs_dentry_delete(struct vfs_dentry* dentry) {
+    spin_lock(&dentry->lock);
+    struct vfs_dentry* parent = dentry->parent;
+    spin_unlock(&dentry->lock);
+
+    // it is safe to use parent since caller is holding inode->mut
+    vfs_dentry_remove_child(parent, dentry);
 }
 
 static struct vfs_dentry* vfs_dentry_allocate(struct vfs_dentry* parent,
@@ -133,11 +160,8 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
         goto out;
 
     // we have allocated new dentry and must save it with copied name
-    key.name = dentry->name;
-    if (dentry_cache_put(&dcache, key, dentry, NULL)) {
-        vfs_dentry_add_child(parent, dentry);
+    if (vfs_dentry_add_child(parent, dentry))
         goto out;
-    }
 
     spin_unlock(&dcache_lock);
     vfs_dentry_destroy(dentry);

@@ -25,6 +25,9 @@ struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
                                      vfs_inode* inode, string name);
 struct vfs_dentry* vfs_dentry_create_root(vfs_inode* inode);
 
+// inode mutex should be held for write during this operation
+void vfs_dentry_delete(struct vfs_dentry* dentry);
+
 void vfs_dentry_acquire(struct vfs_dentry* dentry);
 void vfs_dentry_release(struct vfs_dentry* dentry);
 struct vfs_dentry* vfs_dentry_get_parent(struct vfs_dentry* dentry);

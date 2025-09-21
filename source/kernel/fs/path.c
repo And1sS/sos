@@ -7,10 +7,27 @@
 
 typedef struct {
     char part[MAX_PATH_LENGTH];
+    u64 parts_left;
     string path;
 } path_parts;
 
-static bool parts_left(path_parts* parts) { return parts->path[0] != '\0'; }
+static u64 count_parts(string path) {
+    u64 count = 0;
+    u64 cur_len = 0;
+    while (*path != '\0') {
+        if (*path == '/' && cur_len > 0) {
+            cur_len = 0;
+            count++;
+        } else if (*path != '/') {
+            cur_len++;
+        }
+        path++;
+    }
+
+    return count;
+}
+
+static bool parts_left(path_parts* parts) { return parts->parts_left > 0; }
 
 static u64 part_length(string path) {
     u64 len = 0;
@@ -29,6 +46,7 @@ static void walk_next_part(path_parts* parts) {
     memcpy(parts->part, (void*) parts->path, part_len);
     parts->part[part_len] = '\0';
     parts->path = parts->path + part_len;
+    parts->parts_left--;
 }
 
 static struct vfs_dentry* lookup(struct vfs_dentry* parent, string path) {
@@ -48,7 +66,7 @@ static struct vfs_dentry* lookup(struct vfs_dentry* parent, string path) {
 }
 
 u64 walk(vfs_path start, string path, vfs_path* res) {
-    path_parts parts = {.path = path};
+    path_parts parts = {.path = path, .parts_left = count_parts(path)};
     vfs_mount* mnt = start.mount;
     struct vfs_dentry* iter = start.dentry;
     // upstream already holds the reference, but we need different one for walk

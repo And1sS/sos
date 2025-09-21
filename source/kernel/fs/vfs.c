@@ -4,6 +4,7 @@
 #include "../lib/string.h"
 #include "dentry.h"
 #include "mount.h"
+#include "path.h"
 #include "ramfs/ramfs.h"
 
 DEFINE_HASH_TABLE(vfs_registry, string, struct vfs_type*, strhash, streq)
@@ -66,4 +67,32 @@ void deregister_vfs_type(struct vfs_type* type) {
     bool interrupts_enabled = spin_lock_irq_save(&type_registry_lock);
     vfs_registry_remove(&type_registry, type->name);
     spin_unlock_irq_restore(&type_registry_lock, interrupts_enabled);
+}
+
+u64 vfs_unlink(vfs_path start, string path) {
+    vfs_path dst;
+    u64 res = walk(start, path, &dst);
+    if (IS_ERROR(res))
+        return res;
+
+    struct vfs_dentry* dentry = dst.dentry;
+
+    // this is invalid and should be done properly by stopping lookup before
+    // last path part is resolved
+    vfs_inode* dir = dentry->parent->inode;
+
+    vfs_inode_lock(dir);
+    if (dir->type == DIRECTORY)
+        res = -EISDIR;
+    else if (!dir->ops->unlink)
+        res = -EPERM;
+
+    if (!IS_ERROR(res))
+        res = dir->ops->unlink(dir, dentry);
+
+    if (!IS_ERROR(res))
+        vfs_dentry_delete(dentry);
+
+    vfs_inode_unlock(dentry->inode);
+    return res;
 }

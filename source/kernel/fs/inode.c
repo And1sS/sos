@@ -52,12 +52,12 @@ static vfs_inode* vfs_inode_allocate(u64 id, struct vfs_super_block* sb) {
     inode->id = id;
     inode->sb = sb;
     inode->initialised = false;
+    inode->dead = false;
 
     inode->mut = RW_MUTEX_STATIC_INITIALIZER;
 
     inode->lock = SPIN_LOCK_STATIC_INITIALIZER;
     inode->refc = REF_COUNT_STATIC_INITIALIZER;
-    inode->aliasc = REF_COUNT_STATIC_INITIALIZER;
 
     vfs_super_acquire(sb);
     vfs_inode_acquire(inode);

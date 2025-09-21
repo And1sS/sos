@@ -10,4 +10,7 @@ typedef struct {
 
 u64 walk(vfs_path start, string path, vfs_path* res);
 
+vfs_path vfs_path_create(vfs_mount* mnt, struct vfs_dentry* dentry);
+void vfs_path_release(vfs_path* path);
+
 #endif // SOS_PATH_H

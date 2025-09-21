@@ -6,7 +6,7 @@
 #include "super_block.h"
 #include "vfs.h"
 
-typedef struct {
+typedef struct vfs_inode {
     // Immutable data
     u64 id;
 
@@ -22,6 +22,10 @@ typedef struct {
     lock lock; // guards all fields below
 
     bool initialised;
+    bool dead;
+
+    u64 mode;
+    u64 links;
 
     ref_count refc;
     ref_count aliasc;

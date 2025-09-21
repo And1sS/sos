@@ -22,6 +22,7 @@ typedef struct {
     u64 (*write)(struct vfs_inode* vn, u64 off, u8* buffer);
 
     // directory operations
+    u64 (*unlink)(struct vfs_inode* dir, struct vfs_dentry* dentry);
     struct vfs_dentry* (*lookup)(struct vfs_dentry* parent, string name);
     //
     //    u64 (*create)(struct vfs_inode* dir, string name, struct vattr* vattr,

@@ -30,6 +30,7 @@ static vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
         goto out;
 
     inode->initialised = true;
+    inode->links = 1;
     inode->private_data = node;
     inode->ops = &inode_ops;
     inode->type = DIRECTORY;
