@@ -27,7 +27,6 @@ static lock dcache_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 static dentry_cache dcache;
 
-static void vfs_dentry_destroy(struct vfs_dentry* dentry) {
 static void vfs_dentry_destroy(vfs_dentry* dentry) {
     // at this point dentry is unreachable for others
     vfs_dentry* parent = dentry->parent;
