@@ -28,9 +28,15 @@ static lock dcache_lock = SPIN_LOCK_STATIC_INITIALIZER;
 static dentry_cache dcache;
 
 static void vfs_dentry_destroy(struct vfs_dentry* dentry) {
+static void vfs_dentry_destroy(vfs_dentry* dentry) {
     // at this point dentry is unreachable for others
-    if (dentry->parent != dentry)
-        vfs_dentry_release(dentry->parent);
+    vfs_dentry* parent = dentry->parent;
+    if (parent != dentry) {
+        spin_lock(&parent->lock);
+        linked_list_remove_node(&parent->children, &dentry->dentry_node);
+        spin_unlock(&parent->lock);
+        vfs_dentry_release(parent);
+    }
 
     vfs_inode_release(dentry->inode);
     strfree(dentry->name);
@@ -43,8 +49,8 @@ static bool vfs_dentry_add_child(struct vfs_dentry* parent,
 
     bool added = false;
 
+    // child pins parent
     vfs_dentry_acquire(parent);
-    vfs_dentry_acquire(child);
 
     dcache_key key = {.parent = parent, .name = child->name};
     if (!dentry_cache_put(&dcache, key, child, NULL))
@@ -80,7 +86,6 @@ static void vfs_dentry_remove_child(struct vfs_dentry* parent,
 
     // it is safe to break atomicity here, since both parent and child are
     // pinned by each other reference until this point
-    vfs_dentry_release(child);
     vfs_dentry_release(parent);
 }
 
