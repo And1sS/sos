@@ -4,7 +4,7 @@
 #include "../lib/types.h"
 #include "vfs.h"
 
-struct vfs_super_block {
+typedef struct vfs_super_block {
     // Immutable data
     u64 id;
     struct vfs_type* type;
@@ -17,7 +17,7 @@ struct vfs_super_block {
     lock lock; // guards all fields below
     bool dying;
     ref_count refc;
-};
+} vfs_super_block;
 
 struct vfs_super_block* vfs_super_get(struct vfs_type* type, device* dev);
 u64 vfs_super_destroy(struct vfs_super_block* sb);

@@ -21,35 +21,35 @@ void vfs_init() {
     vfs_icache_init(0);
 
     ramfs_init();
-    struct vfs_type* rootfs_type = vfs_registry_get(&type_registry, RAMFS_NAME);
+    vfs_type* rootfs_type = vfs_registry_get(&type_registry, RAMFS_NAME);
     vfs_dentry* rootfs_root = rootfs_type->ops->mount(rootfs_type, NULL);
     vfs_mount_root(rootfs_root);
     vfs_dentry_release(rootfs_root);
 }
 
-struct vfs_type* vfs_type_create(string name) {
+vfs_type* vfs_type_create(string name) {
     string name_copy = strcpy(name);
     if (!name_copy)
         return ERROR_PTR(-ENOMEM);
 
-    struct vfs_type* new = (struct vfs_type*) kmalloc(sizeof(struct vfs_type));
+    vfs_type* new = kmalloc(sizeof(vfs_type));
     if (!new) {
         strfree(name_copy);
         return ERROR_PTR(-ENOMEM);
     }
 
-    memset(new, 0, sizeof(struct vfs_type));
+    memset(new, 0, sizeof(vfs_type));
     new->name = name_copy;
     new->refc = REF_COUNT_STATIC_INITIALIZER;
     return new;
 }
 
-void vfs_type_destroy(struct vfs_type* type) {
+void vfs_type_destroy(vfs_type* type) {
     strfree(type->name);
     kfree(type);
 }
 
-bool register_vfs_type(struct vfs_type* type) {
+bool register_vfs_type(vfs_type* type) {
     type->lock = SPIN_LOCK_STATIC_INITIALIZER;
     type->super_blocks = LINKED_LIST_STATIC_INITIALIZER;
     type->refc = REF_COUNT_STATIC_INITIALIZER;
@@ -65,7 +65,7 @@ bool register_vfs_type(struct vfs_type* type) {
     return registered;
 }
 
-void deregister_vfs_type(struct vfs_type* type) {
+void deregister_vfs_type(vfs_type* type) {
     bool interrupts_enabled = spin_lock_irq_save(&type_registry_lock);
     vfs_registry_remove(&type_registry, type->name);
     spin_unlock_irq_restore(&type_registry_lock, interrupts_enabled);

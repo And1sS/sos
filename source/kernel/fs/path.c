@@ -43,7 +43,7 @@ static void walk_next_part(path_parts* parts) {
     parts->parts_left--;
 }
 
-static struct vfs_dentry* lookup(struct vfs_dentry* parent, string path) {
+static struct vfs_dentry* lookup(vfs_dentry* parent, string path) {
     if (streq(path, ".")) {
         vfs_dentry_acquire(parent);
         return parent;
@@ -52,7 +52,7 @@ static struct vfs_dentry* lookup(struct vfs_dentry* parent, string path) {
     if (streq(path, ".."))
         return vfs_dentry_get_parent(parent);
 
-    struct vfs_dentry* child = vfs_dcache_get(parent, path);
+    vfs_dentry* child = vfs_dcache_get(parent, path);
     child = child ? child : parent->inode->ops->lookup(parent, path);
     return child;
 }

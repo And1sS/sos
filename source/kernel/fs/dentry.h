@@ -11,7 +11,7 @@ typedef struct vfs_dentry {
     // End of immutable data
 
     lock lock; // guards all fields below
-    bool dying;
+    bool dead;
 
     struct vfs_dentry* parent;
     linked_list_node dentry_node; // used in parents 'children' list
@@ -21,19 +21,19 @@ typedef struct vfs_dentry {
 } vfs_dentry;
 
 // parent reference should be held during this routine
-struct vfs_dentry* vfs_dentry_create(struct vfs_dentry* parent,
+vfs_dentry* vfs_dentry_create(vfs_dentry* parent,
                                      vfs_inode* inode, string name);
-struct vfs_dentry* vfs_dentry_create_root(vfs_inode* inode);
+vfs_dentry* vfs_dentry_create_root(vfs_inode* inode);
 
 // inode mutex should be held for write during this operation
-void vfs_dentry_delete(struct vfs_dentry* dentry);
+void vfs_dentry_delete(vfs_dentry* dentry);
 
-void vfs_dentry_acquire(struct vfs_dentry* dentry);
-void vfs_dentry_release(struct vfs_dentry* dentry);
-struct vfs_dentry* vfs_dentry_get_parent(struct vfs_dentry* dentry);
+void vfs_dentry_acquire(vfs_dentry* dentry);
+void vfs_dentry_release(vfs_dentry* dentry);
+vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry);
 
 void vfs_dcache_init();
 // parent reference should be held during this routine
-struct vfs_dentry* vfs_dcache_get(struct vfs_dentry* parent, string name);
+vfs_dentry* vfs_dcache_get(vfs_dentry* parent, string name);
 
 #endif // SOS_DENTRY_H

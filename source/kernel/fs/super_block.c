@@ -3,16 +3,16 @@
 #include "../error/error.h"
 #include "dentry.h"
 
-void vfs_super_acquire(struct vfs_super_block* sb) { ref_acquire(&sb->refc); }
+void vfs_super_acquire(vfs_super_block* sb) { ref_acquire(&sb->refc); }
 
-void vfs_super_release(struct vfs_super_block* sb) {
+void vfs_super_release(vfs_super_block* sb) {
     spin_lock(&sb->lock);
     ref_release(&sb->refc);
     spin_unlock(&sb->lock);
 }
 
-u64 vfs_super_destroy(struct vfs_super_block* sb) {
-    struct vfs_type* type = sb->type;
+u64 vfs_super_destroy(vfs_super_block* sb) {
+    vfs_type* type = sb->type;
 
     spin_lock(&type->lock);
     spin_lock(&sb->lock);
@@ -49,12 +49,12 @@ retry:
     return 0;
 }
 
-static struct vfs_super_block* vfs_super_allocate(struct vfs_type* type) {
-    struct vfs_super_block* sb = kmalloc(sizeof(struct vfs_super_block));
+static vfs_super_block* vfs_super_allocate(vfs_type* type) {
+    vfs_super_block* sb = kmalloc(sizeof(vfs_super_block));
     if (!sb)
         return ERROR_PTR(-ENOMEM);
 
-    memset(sb, 0, sizeof(struct vfs_super_block));
+    memset(sb, 0, sizeof(vfs_super_block));
 
     sb->id = 0; // TODO: add id generation
     sb->type = type;
@@ -67,7 +67,7 @@ static struct vfs_super_block* vfs_super_allocate(struct vfs_type* type) {
     return sb;
 }
 
-struct vfs_super_block* vfs_super_get(struct vfs_type* type, device* dev) {
+vfs_super_block* vfs_super_get(vfs_type* type, device* dev) {
     struct vfs_super_block* sb = vfs_super_allocate(type);
     if (IS_ERROR(sb))
         return sb;

@@ -3,12 +3,12 @@
 static lock mounts_lock = SPIN_LOCK_STATIC_INITIALIZER;
 static vfs_mount* root_mount = NULL;
 
-void vfs_mount_root(struct vfs_dentry* root) {
+void vfs_mount_root(vfs_dentry* root) {
     spin_lock(&mounts_lock);
     if (root_mount)
         panic("Trying to remount root fs");
 
-    root_mount = kmalloc(sizeof(struct vfs_mount));
+    root_mount = kmalloc(sizeof(vfs_mount));
     if (!root_mount)
         panic("Can't initialize root mount");
 
