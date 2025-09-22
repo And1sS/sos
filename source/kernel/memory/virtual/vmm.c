@@ -28,7 +28,7 @@ vm_space* vmm_current_vm_space() {
 
 void vmm_set_vm_space(vm_space* space) {
     bool interrupts_enabled = spin_lock_irq_save(&vmm_lock);
-    atomic_set((u64*) &current_vm_space, (u64) space);
+    current_vm_space = space;
     arch_set_vm_space(space);
     spin_unlock_irq_restore(&vmm_lock, interrupts_enabled);
     // no need to call notify here, since arch already knows that vm space has
