@@ -58,28 +58,32 @@ static vfs_super_block* vfs_super_allocate(vfs_type* type) {
 
     sb->id = 0; // TODO: add id generation
     sb->type = type;
+    ref_acquire(&type->refc);
 
     sb->self_node = LINKED_LIST_NODE_OF(sb);
     sb->lock = SPIN_LOCK_STATIC_INITIALIZER;
     sb->dying = false;
     sb->refc = REF_COUNT_STATIC_INITIALIZER;
 
+    ref_acquire(&sb->refc);
     return sb;
 }
 
 vfs_super_block* vfs_super_get(vfs_type* type, device* dev) {
-    struct vfs_super_block* sb = vfs_super_allocate(type);
+    vfs_super_block* sb = vfs_super_allocate(type);
     if (IS_ERROR(sb))
         return sb;
 
-    if (type->ops->fill_super)
-        type->ops->fill_super(sb, dev);
+    if (type->ops->fill_super) {
+        u64 error = type->ops->fill_super(sb, dev);
 
-    ref_acquire(&sb->refc);
-    ref_acquire(&sb->root->refc);
+        if (IS_ERROR(error)) {
+            vfs_super_destroy(sb);
+            return ERROR_PTR(error);
+        }
+    }
 
     spin_lock(&type->lock);
-    ref_acquire(&type->refc);
     linked_list_add_last_node(&type->super_blocks, &sb->self_node);
     spin_unlock(&type->lock);
     return sb;

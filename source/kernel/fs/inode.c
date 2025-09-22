@@ -91,6 +91,15 @@ out:
     return inode;
 }
 
+void vfs_inode_drop(vfs_inode* inode) {
+    spin_lock(&icache_lock);
+    icache_key key = {.sb = inode->sb, .inode_id = inode->id};
+    inode_cache_remove(&icache, key);
+    spin_unlock(&icache_lock);
+
+    vfs_inode_destroy(inode);
+}
+
 void vfs_inode_acquire(vfs_inode* inode) {
     spin_lock(&inode->lock);
     ref_acquire(&inode->refc);

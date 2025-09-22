@@ -36,6 +36,11 @@ typedef struct vfs_inode {
 void vfs_inode_acquire(vfs_inode* inode);
 void vfs_inode_release(vfs_inode* inode);
 
+// agressively destroy inode caller got from vfs_icache_get,
+// should be used when creation of new superblock is failed and
+// created inode should be removed from cache and destroyed.
+void vfs_inode_drop(vfs_inode* inode);
+
 void vfs_inode_lock_shared(vfs_inode* inode);
 void vfs_inode_unlock_shared(vfs_inode* inode);
 void vfs_inode_lock(vfs_inode* inode);

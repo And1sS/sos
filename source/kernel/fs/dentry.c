@@ -99,7 +99,7 @@ void vfs_dentry_delete(vfs_dentry* dentry) {
 static vfs_dentry* vfs_dentry_allocate(vfs_dentry* parent, vfs_inode* inode,
                                        string name) {
 
-    string name_copy = strcpy(name);
+    string name_copy = strcpy(parent ? name : "/");
     if (!name_copy)
         return ERROR_PTR(-ENOMEM);
 
@@ -111,7 +111,7 @@ static vfs_dentry* vfs_dentry_allocate(vfs_dentry* parent, vfs_inode* inode,
 
     memset(dentry, NULL, sizeof(struct vfs_dentry));
 
-    dentry->name = parent ? name_copy : "/";
+    dentry->name = name_copy;
     dentry->inode = inode;
     vfs_inode_acquire(inode);
 

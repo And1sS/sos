@@ -23,6 +23,9 @@ void vfs_init() {
     ramfs_init();
     vfs_type* rootfs_type = vfs_registry_get(&type_registry, RAMFS_NAME);
     vfs_dentry* rootfs_root = rootfs_type->ops->mount(rootfs_type, NULL);
+    if (IS_ERROR(rootfs_root))
+        panic("Can't mount root filesystem");
+
     vfs_mount_root(rootfs_root);
     vfs_dentry_release(rootfs_root);
 }

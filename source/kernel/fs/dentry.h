@@ -21,8 +21,8 @@ typedef struct vfs_dentry {
 } vfs_dentry;
 
 // parent reference should be held during this routine
-vfs_dentry* vfs_dentry_create(vfs_dentry* parent,
-                                     vfs_inode* inode, string name);
+vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,
+                              string name);
 vfs_dentry* vfs_dentry_create_root(vfs_inode* inode);
 
 // inode mutex should be held for write during this operation

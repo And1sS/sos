@@ -22,7 +22,7 @@ void ramfs_init() {
     internal_tree_init();
 }
 
-static vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
+vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);
     if (IS_ERROR(inode))
         return inode;
@@ -43,15 +43,18 @@ out:
     return inode;
 }
 
-u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev) {
+u64 ramfs_fill_super(vfs_super_block* sb, device* dev) {
     vfs_inode* root_inode = to_inode(get_root(), sb);
     if (IS_ERROR(root_inode))
         return PTR_ERROR(root_inode);
 
-    struct vfs_dentry* root_dentry = vfs_dentry_create_root(root_inode);
-    vfs_inode_release(root_inode);
-    if (IS_ERROR(root_dentry))
+    vfs_dentry* root_dentry = vfs_dentry_create_root(root_inode);
+    if (IS_ERROR(root_dentry)) {
+        vfs_inode_drop(root_inode);
         return PTR_ERROR(root_dentry);
+    }
+
+    vfs_inode_release(root_inode);
 
     sb->root = root_dentry;
     sb->device = dev;
@@ -59,8 +62,8 @@ u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev) {
     return 0;
 }
 
-struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev) {
-    struct vfs_super_block* sb = vfs_super_get(type, dev);
+vfs_dentry* ramfs_mount(vfs_type* type, device* dev) {
+    vfs_super_block* sb = vfs_super_get(type, dev);
     if (IS_ERROR(sb))
         return ERROR_PTR(sb);
 
@@ -68,13 +71,13 @@ struct vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev) {
     return sb->root;
 }
 
-struct vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name) {
+vfs_dentry* ramfs_lookup(vfs_dentry* parent, string name) {
     tree_node* res = find_subnode(parent->inode->private_data, name);
     if (!res)
         return ERROR_PTR(-ENOENT);
 
     vfs_inode* inode = to_inode(res, parent->inode->sb);
-    struct vfs_dentry* dentry = vfs_dentry_create(parent, inode, name);
+    vfs_dentry* dentry = vfs_dentry_create(parent, inode, name);
     vfs_inode_release(inode);
 
     return dentry;
