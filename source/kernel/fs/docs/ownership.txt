@@ -4,4 +4,8 @@ a valid reference to every argument for the entire duration of the function call
 Violation of this rule will lead to memory corruption or deadlock.
 
 Ownership:
-1) Child dentry holds reference (pins) parent dentry, but not the other way around.
+1) Child dentry holds reference (pins) parent dentry, but not the other way
+around. So, this means that tree is always full and is destructed from leaf
+nodes to parent nodes - tree never have gaps. In other words - if you hold
+reference to child, you can safely climb up by atomically obtaining parent
+references and incrementing their reference counts.
