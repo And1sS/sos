@@ -9,25 +9,29 @@ static void link_nodes(tree_node* parent, tree_node* child);
 /*
  *                root
  *            /           \
- *            a             b
- *          /   \         /   \
- *         c     d       e      f
+ *           a             b
+ *          /             /
+ *         c             e
+ *        /
+ *       d
+ *      /
+ *     f
  */
 void internal_tree_init() {
     array_list_init(&root.subnodes, 8);
     tree_node* a = alloc_tree_node(1, "a", DIRECTORY);
     tree_node* b = alloc_tree_node(2, "b", DIRECTORY);
-    tree_node* c = alloc_tree_node(3, "c", FILE);
-    tree_node* d = alloc_tree_node(4, "d", FILE);
+    tree_node* c = alloc_tree_node(3, "c", DIRECTORY);
+    tree_node* d = alloc_tree_node(4, "d", DIRECTORY);
     tree_node* e = alloc_tree_node(5, "e", FILE);
     tree_node* f = alloc_tree_node(6, "f", FILE);
 
     link_nodes(&root, a);
     link_nodes(&root, b);
     link_nodes(a, c);
-    link_nodes(a, d);
+    link_nodes(c, d);
+    link_nodes(d, f);
     link_nodes(b, e);
-    link_nodes(b, f);
 }
 
 static tree_node* alloc_tree_node(u64 id, string name, vfs_inode_type type) {

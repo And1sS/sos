@@ -66,18 +66,28 @@ void set_up_init_process(module init_module) {
     /*
      *                root
      *            /           \
-     *            a             b
-     *          /   \         /   \
-     *         c     d       e      f
+     *           a             b
+     *          /             /
+     *         c             e
+     *        /
+     *       d
+     *      /
+     *     f
      */
     vfs_mount* mnt = vfs_mount_get_root();
     vfs_path res;
     vfs_path start = {.mount = mnt, .dentry = mnt->mount_root};
-    path_parts parts = path_parts_from_path("a/../b/./e");
-    walk(start, &res, &parts);
-    println(res.dentry->name);
-    print_u64(vfs_unlink(start, "a/c"));
-    while (true) {}
+    path_parts parts = path_parts_from_path("a/c/d/f");
+    print("Walk status code: ");
+    print_u64(walk(start, &res, &parts));
+    println("");
+    print("walked to: ");
+    print(res.dentry->name);
+    println("");
+    vfs_dentry_release(res.dentry);
+    print_u64(vfs_unlink(start, "b/e"));
+    while (true) {
+    }
 }
 
 _Noreturn void kernel_main(paddr multiboot_structure) {

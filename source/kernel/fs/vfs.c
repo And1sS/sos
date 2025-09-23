@@ -17,8 +17,9 @@ void vfs_init() {
     if (!vfs_registry_init(&type_registry))
         panic("Can't init vfs type registry");
 
-    vfs_dcache_init();
-    vfs_icache_init(0);
+    // TODO: calculate based on available ram or get from config
+    vfs_dcache_init(10000);
+    vfs_icache_init(10000);
 
     ramfs_init();
     vfs_type* rootfs_type = vfs_registry_get(&type_registry, RAMFS_NAME);
