@@ -32,7 +32,7 @@ static bool vfs_dcache_register_allocation_unsafe();
 static void vfs_dcache_deregister_allocation_unsafe();
 
 // takes parent lock and dentry lock returns parent dentry with unreleased refc
-// for reasoning see description of `_vfs_dentry_release`
+// for reasoning see description of `vfs_dentry_release_and_not_release_parent`
 static vfs_dentry* vfs_dentry_destroy_and_not_release_parent(
     vfs_dentry* dentry) {
 
