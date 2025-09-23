@@ -135,19 +135,19 @@ u64 process_fork(struct cpu_context* context) {
 
     interrupts_enabled = spin_lock_irq_save(&process_table_lock);
     bool added_to_table = hash_table_put(&process_table, proc->id, proc, NULL);
-    bool added_to_parent = added_to_table && process_add_child(created);
-    if (added_to_table && !added_to_parent)
+    bool should_start = added_to_table && process_add_child(created);
+    if (!should_start && added_to_table)
         hash_table_remove(&process_table, proc->id);
     spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
 
-    if (!added_to_table)
-        goto failed_to_add_process_to_table;
+    if (!should_start)
+        goto failed_to_publish;
 
     thread_start(start_thread);
 
     return created->id;
 
-failed_to_add_process_to_table:
+failed_to_publish:
     thread_destroy(start_thread);
 
 failed_to_create_start_process_thread:
