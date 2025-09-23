@@ -18,7 +18,7 @@ typedef struct vfs_dentry {
                    // should not stay in cache after refcount reaches 0 even if
                    // cache is not full
 
-    struct vfs_dentry* parent;
+    struct vfs_dentry* parent; // never NULL(real parent or self-reference)
     linked_list_node dentry_node; // used in parents 'children' list
     linked_list_node unused_node; // used in dcache 'unused' list
     linked_list children;

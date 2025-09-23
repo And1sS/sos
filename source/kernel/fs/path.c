@@ -43,7 +43,7 @@ static void walk_next_part(path_parts* parts) {
     parts->parts_left--;
 }
 
-static struct vfs_dentry* lookup(vfs_dentry* parent, string path) {
+static vfs_dentry* lookup(vfs_dentry* parent, string path) {
     if (streq(path, ".")) {
         vfs_dentry_acquire(parent);
         return parent;
