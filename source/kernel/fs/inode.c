@@ -127,14 +127,16 @@ void vfs_inode_acquire(vfs_inode* inode) {
 
 void vfs_inode_release(vfs_inode* inode) {
     spin_lock(&inode->lock);
-    ref_release(&inode->refc);
-    bool destroy = inode->refc.count == 0;
+    bool destroy = inode->refc.count == 1;
+    if (!destroy)
+        ref_release(&inode->refc);
     spin_unlock(&inode->lock);
     if (!destroy)
         return;
 
     spin_lock(&icache_lock);
     spin_lock(&inode->lock);
+    ref_release(&inode->refc);
     if ((destroy = inode->refc.count == 0)) {
         icache_key key = {.sb = inode->sb, .inode_id = inode->id};
         inode_cache_remove(&icache, key);

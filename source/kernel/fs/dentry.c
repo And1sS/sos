@@ -69,31 +69,6 @@ static void vfs_dentry_destroy(vfs_dentry* dentry) {
     vfs_dentry_release(vfs_dentry_destroy_and_not_release_parent(dentry));
 }
 
-static vfs_dentry* vfs_dentry_maybe_destroy_and_not_release_parent(
-    vfs_dentry* dentry) {
-
-    spin_lock(&dcache_lock);
-    spin_lock(&dentry->lock);
-    bool destroy = dentry->refc.count == 0;
-
-    if (!dentry->detached && destroy && alive_dentries <= max_dentries) {
-        linked_list_add_last_node(&unused_dentries, &dentry->unused_node);
-        spin_unlock(&dentry->lock);
-        spin_unlock(&dcache_lock);
-        return NULL;
-    }
-
-    dcache_key key = {.parent = dentry->parent, .name = dentry->name};
-    dentry_cache_remove(&dcache, key);
-    dentry->dying = true;
-    spin_unlock(&dentry->lock);
-    spin_unlock(&dcache_lock);
-    if (!destroy)
-        return NULL;
-
-    return vfs_dentry_destroy_and_not_release_parent(dentry);
-}
-
 // this function should be called with dcache_lock held
 static bool vfs_dentry_add_child(vfs_dentry* parent, vfs_dentry* child) {
     bool added = false;
@@ -279,13 +254,42 @@ static vfs_dentry* vfs_dentry_release_and_not_release_parent(
     vfs_dentry* dentry) {
 
     spin_lock(&dentry->lock);
-    ref_release(&dentry->refc);
-    bool destroy = dentry->refc.count == 0;
+    bool destroy = dentry->refc.count == 1;
+
+    // fast-path, release here only if we won't destroy dentry anyway
+    if (!destroy)
+        ref_release(&dentry->refc);
     spin_unlock(&dentry->lock);
     if (!destroy)
         return NULL;
 
-    return vfs_dentry_maybe_destroy_and_not_release_parent(dentry);
+    // slow-path, release and maybe destroy
+    spin_lock(&dcache_lock);
+    spin_lock(&dentry->lock);
+
+    ref_release(&dentry->refc);
+    if (dentry->refc.count != 0) {
+        spin_unlock(&dentry->lock);
+        spin_unlock(&dcache_lock);
+
+        return NULL;
+    }
+
+    if (!dentry->detached && alive_dentries <= max_dentries) {
+        linked_list_add_last_node(&unused_dentries, &dentry->unused_node);
+        spin_unlock(&dentry->lock);
+        spin_unlock(&dcache_lock);
+        return NULL;
+    }
+
+    dcache_key key = {.parent = dentry->parent, .name = dentry->name};
+    dentry_cache_remove(&dcache, key);
+    dentry->dying = true;
+
+    spin_unlock(&dentry->lock);
+    spin_unlock(&dcache_lock);
+
+    return vfs_dentry_destroy_and_not_release_parent(dentry);
 }
 
 // this function is based on vfs_dentry_release_and_not_release_parent and
