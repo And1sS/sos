@@ -194,6 +194,10 @@ typedef bool comparator(void* a, void* b);
                                                                                \
         name##_entry* new_entry =                                              \
             (name##_entry*) kmalloc(sizeof(name##_entry));                     \
+                                                                               \
+        if (!new_entry)                                                        \
+            return false;                                                      \
+                                                                               \
         new_entry->key = key;                                                  \
         new_entry->value = value;                                              \
         if (!linked_list_add_last(bucket, new_entry)) {                        \
