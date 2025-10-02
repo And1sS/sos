@@ -70,15 +70,15 @@ static void vfs_dentry_destroy(vfs_dentry* dentry) {
 }
 
 // this function should be called with dcache_lock held
-static bool vfs_dentry_add_child(vfs_dentry* parent, vfs_dentry* child) {
+static bool vfs_dentry_add_child_unsafe(vfs_dentry* parent, vfs_dentry* child) {
     bool added = false;
 
+    spin_lock(&parent->lock);
+    spin_lock(&child->lock);
     dcache_key key = {.parent = parent, .name = child->name};
     if (!dentry_cache_put(&dcache, key, child, NULL))
         goto out;
 
-    spin_lock(&parent->lock);
-    spin_lock(&child->lock);
     linked_list_add_last_node(&parent->children, &child->dentry_node);
     child->parent = parent;
     // child pins parent
