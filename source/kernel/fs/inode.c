@@ -42,7 +42,7 @@ static void vfs_inode_destroy(vfs_inode* inode) {
     kfree(inode);
 }
 
-static vfs_inode* vfs_inode_allocate(u64 id, struct vfs_super_block* sb) {
+static vfs_inode* vfs_inode_allocate(u64 id, vfs_super_block* sb) {
     vfs_inode* inode = kmalloc(sizeof(vfs_inode));
     if (!inode)
         return (vfs_inode*) ERROR_PTR(-ENOMEM);
@@ -65,14 +65,17 @@ static vfs_inode* vfs_inode_allocate(u64 id, struct vfs_super_block* sb) {
     return inode;
 }
 
-vfs_inode* vfs_icache_get(struct vfs_super_block* sb, u64 id) {
+vfs_inode* vfs_icache_get(vfs_super_block* sb, u64 id) {
     icache_key key = {.sb = sb, .inode_id = id};
 
     spin_lock(&icache_lock);
     vfs_inode* inode = inode_cache_get(&icache, key);
     if (inode) {
         vfs_inode_acquire(inode);
-        goto out;
+        spin_unlock(&icache_lock);
+
+        vfs_inode_await_initialization(inode);
+        return inode;
     }
 
     inode = vfs_inode_allocate(id, sb);
@@ -98,6 +101,22 @@ void vfs_inode_drop(vfs_inode* inode) {
     spin_unlock(&icache_lock);
 
     vfs_inode_destroy(inode);
+}
+
+void vfs_inode_await_initialization(vfs_inode* inode) {
+    spin_lock(&inode->lock);
+    while (!inode->initialised) {
+        CON_VAR_WAIT_FOR(&inode->initialization_cvar, &inode->lock,
+                         inode->initialised);
+    }
+    spin_unlock(&inode->lock);
+}
+
+void vfs_inode_unlock_new(vfs_inode* inode) {
+    spin_lock(&inode->lock);
+    inode->initialised = true;
+    con_var_broadcast(&inode->initialization_cvar);
+    spin_unlock(&inode->lock);
 }
 
 void vfs_inode_acquire(vfs_inode* inode) {
@@ -137,3 +156,14 @@ void vfs_inode_unlock_shared(vfs_inode* inode) {
 void vfs_inode_lock(vfs_inode* inode) { rw_mutex_lock_write(&inode->mut); }
 
 void vfs_inode_unlock(vfs_inode* inode) { rw_mutex_unlock_write(&inode->mut); }
+
+void vfs_inodes_lock(vfs_inode* left, vfs_inode* right) {
+    vfs_inode_lock(MIN(left, right));
+    vfs_inode_lock(MAX(left, right));
+}
+
+void vfs_inodes_unlock(vfs_inode* left, vfs_inode* right) {
+    vfs_inode_unlock(MAX(left, right));
+    vfs_inode_unlock(MIN(left, right));
+}
+void vfs_inode_drop_link(vfs_inode* inode) { UNUSED(inode); }

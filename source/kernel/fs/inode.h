@@ -28,10 +28,16 @@ typedef struct vfs_inode {
     u64 links;
 
     ref_count refc;
-    ref_count aliasc;
 
     void* private_data;
+
+    con_var initialization_cvar;
 } vfs_inode;
+
+void vfs_inode_await_initialization(vfs_inode* inode);
+// unlocks uninitialised inode, serializes all updated inode data, acts as
+// store-release
+void vfs_inode_unlock_new(vfs_inode* inode);
 
 void vfs_inode_acquire(vfs_inode* inode);
 void vfs_inode_release(vfs_inode* inode);
@@ -45,6 +51,8 @@ void vfs_inode_lock_shared(vfs_inode* inode);
 void vfs_inode_unlock_shared(vfs_inode* inode);
 void vfs_inode_lock(vfs_inode* inode);
 void vfs_inode_unlock(vfs_inode* inode);
+void vfs_inodes_lock(vfs_inode* left, vfs_inode* right);
+void vfs_inodes_unlock(vfs_inode* left, vfs_inode* right);
 
 void vfs_icache_init(u64 max_inodes);
 

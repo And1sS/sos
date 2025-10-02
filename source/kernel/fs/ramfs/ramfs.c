@@ -22,24 +22,25 @@ void ramfs_init() {
     internal_tree_init();
 }
 
-vfs_inode* to_inode(tree_node* node, struct vfs_super_block* sb) {
+vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);
     if (IS_ERROR(inode))
         return inode;
 
     spin_lock(&inode->lock);
-    if (inode->initialised)
+    if (inode->initialised) {
+        spin_unlock(&inode->lock);
         goto out;
+    }
 
-    inode->initialised = true;
-    inode->links = 1;
+    inode->links = 1 + node->subnodes.size;
     inode->private_data = node;
     inode->ops = &inode_ops;
     inode->type = node->type;
 
-out:
-    spin_unlock(&inode->lock);
+    vfs_inode_unlock_new(inode);
 
+out:
     return inode;
 }
 
