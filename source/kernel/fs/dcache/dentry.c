@@ -1,24 +1,8 @@
 #include "dentry.h"
-#include "../error/errno.h"
-#include "../error/error.h"
-#include "../lib/hash.h"
-#include "../lib/string.h"
-
-typedef struct {
-    vfs_dentry* parent;
-    string name;
-} dcache_key;
-
-static u64 dcache_hash(dcache_key key) {
-    return hash2((u64) key.parent, strhash(key.name));
-}
-
-static bool dcache_equals(dcache_key a, dcache_key b) {
-    return a.parent == b.parent && streq(a.name, b.name);
-}
-
-DEFINE_HASH_TABLE(dentry_cache, dcache_key, vfs_dentry*, dcache_hash,
-                  dcache_equals)
+#include "../../error/errno.h"
+#include "../../error/error.h"
+#include "../../lib/hash.h"
+#include "../../lib/string.h"
 
 static lock dcache_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
@@ -36,12 +20,13 @@ static void vfs_dcache_deregister_allocation_unsafe();
 static vfs_dentry* vfs_dentry_destroy_and_not_release_parent(
     vfs_dentry* dentry) {
 
-    // at this point dentry is unreachable for others through hash table or
-    // unused list, but it is still reachable via parent->children list, so each
-    // time parent walks via children list its lock should be held
-    spin_lock(&dentry->lock);
+    // At this point dentry is unreachable for others through hash table or
+    // unused list, but it is still reachable via parent->children list.
+    // Safe to use parent without lock here since parent modification is done
+    // under the lock, which release has been synchronized with lock acquiring
+    // when last reference has been released. And even if this has been on other
+    // cpu - then visibility is carried by scheduler.
     vfs_dentry* parent = dentry->parent;
-    spin_unlock(&dentry->lock);
 
     // if destroy is called on initialisation failure - parent may be null
     if (parent && parent != dentry) {
@@ -66,58 +51,8 @@ static vfs_dentry* vfs_dentry_destroy_and_not_release_parent(
 // functions or while holding dcache_lock, should be used when passed dentry is
 // not in cache
 static void vfs_dentry_destroy(vfs_dentry* dentry) {
-    vfs_dentry_release(vfs_dentry_destroy_and_not_release_parent(dentry));
-}
-
-// this function should be called with dcache_lock held
-static bool vfs_dentry_add_child_unsafe(vfs_dentry* parent, vfs_dentry* child) {
-    bool added = false;
-
-    spin_lock(&parent->lock);
-    spin_lock(&child->lock);
-    dcache_key key = {.parent = parent, .name = child->name};
-    if (!dentry_cache_put(&dcache, key, child, NULL))
-        goto out;
-
-    linked_list_add_last_node(&parent->children, &child->dentry_node);
-    child->parent = parent;
-    // child pins parent
-    vfs_dentry_acquire(parent);
-    added = true;
-
-out:
-    spin_unlock(&child->lock);
-    spin_unlock(&parent->lock);
-    return added;
-}
-
-static void vfs_dentry_remove_child(vfs_dentry* parent, vfs_dentry* child) {
-    spin_lock(&dcache_lock);
-    spin_lock(&parent->lock);
-    spin_lock(&child->lock);
-
-    child->detached = true;
-    linked_list_remove_node(&parent->children, &child->dentry_node);
-    child->parent = child;
-    dcache_key key = {.parent = parent, .name = child->name};
-    dentry_cache_remove(&dcache, key);
-
-    spin_unlock(&child->lock);
-    spin_unlock(&parent->lock);
-    spin_unlock(&dcache_lock);
-
-    // it is safe to break atomicity here, since both parent and child are
-    // pinned by each other reference until this point
+    vfs_dentry* parent = vfs_dentry_destroy_and_not_release_parent(dentry);
     vfs_dentry_release(parent);
-}
-
-void vfs_dentry_delete(vfs_dentry* dentry) {
-    spin_lock(&dentry->lock);
-    vfs_dentry* parent = dentry->parent;
-    spin_unlock(&dentry->lock);
-
-    // it is safe to use parent since caller is holding inode->mut
-    vfs_dentry_remove_child(parent, dentry);
 }
 
 static vfs_dentry* vfs_dentry_allocate(vfs_inode* inode, string name) {
@@ -141,10 +76,12 @@ static vfs_dentry* vfs_dentry_allocate(vfs_inode* inode, string name) {
 
     dentry->dying = false;
     dentry->detached = false;
+    dentry->hashed = false;
 
     dentry->dentry_node = LINKED_LIST_NODE_OF(dentry);
-    dentry->unused_node = LINKED_LIST_NODE_OF(dentry);
     dentry->children = LINKED_LIST_STATIC_INITIALIZER;
+
+    dentry->unused_node = LINKED_LIST_NODE_OF(dentry);
 
     dentry->refc = REF_COUNT_STATIC_INITIALIZER;
 
@@ -154,26 +91,19 @@ static vfs_dentry* vfs_dentry_allocate(vfs_inode* inode, string name) {
 
 vfs_dentry* vfs_dentry_create_root(vfs_inode* inode) {
     spin_lock(&dcache_lock);
-    if (!vfs_dcache_register_allocation_unsafe()) {
-        spin_unlock(&dcache_lock);
-        return ERROR_PTR(-ENOMEM);
-    }
+    vfs_dentry* dentry = ERROR_PTR(-ENOMEM);
+    if (!vfs_dcache_register_allocation_unsafe())
+        goto out;
 
-    vfs_dentry* dentry = vfs_dentry_allocate(inode, "/");
+    dentry = vfs_dentry_allocate(inode, "/");
     if (IS_ERROR(dentry)) {
         vfs_dcache_deregister_allocation_unsafe();
         goto out;
     }
 
     dentry->parent = dentry;
-
-    dcache_key key = {.parent = dentry, .name = dentry->name};
-    if (dentry_cache_put(&dcache, key, dentry, NULL))
-        goto out;
-
+    vfs_dcache_rehash(dentry);
     spin_unlock(&dcache_lock);
-    vfs_dentry_destroy(dentry);
-    return ERROR_PTR(-ENOMEM);
 
 out:
     spin_unlock(&dcache_lock);
@@ -183,10 +113,8 @@ out:
 vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,
                               string name) {
 
-    dcache_key key = {.parent = parent, .name = name};
-
     spin_lock(&dcache_lock);
-    vfs_dentry* dentry = dentry_cache_get(&dcache, key);
+    vfs_dentry* dentry = vfs_dcache_lookup(parent, name);
     if (dentry) {
         linked_list_remove_node(&unused_dentries, &dentry->unused_node);
         vfs_dentry_acquire(dentry);
@@ -194,10 +122,10 @@ vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,
     }
 
     bool allocate = vfs_dcache_register_allocation_unsafe();
+
     // need to recheck if dentry has not been added, since registration breaks
     // atomicity
-    dentry = dentry_cache_get(&dcache, key);
-    if (dentry) {
+    if ((dentry = vfs_dcache_lookup(parent, name))) {
         if (allocate)
             vfs_dcache_deregister_allocation_unsafe();
         linked_list_remove_node(&unused_dentries, &dentry->unused_node);
@@ -211,18 +139,87 @@ vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,
         goto out;
     }
 
-    // we have allocated new dentry and must save it with copied name
-    if (vfs_dentry_add_child(parent, dentry))
-        goto out;
+    vfs_dentry_acquire(parent);
+    dentry->parent = parent;
+    vfs_dcache_put(dentry);
 
-    vfs_dcache_deregister_allocation_unsafe();
-    spin_unlock(&dcache_lock);
-    vfs_dentry_destroy(dentry);
-    return ERROR_PTR(-ENOMEM);
+    vfs_dentry_acquire(parent);
+
+    spin_lock(&parent->lock);
+    linked_list_add_last_node(&parent->children, &dentry->dentry_node);
+    spin_unlock(&parent->lock);
 
 out:
     spin_unlock(&dcache_lock);
     return dentry;
+}
+
+u64 vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name) {
+    // Safe to do plain read of parent since caller already holds old parents
+    // rw_mutex so no concurrent moves can be done and visibility was carried
+    // either via dcache when lookup occurred or later via scheduler if after
+    // lookup cpu has been changed
+    vfs_dentry* old_parent = child->parent;
+
+    // remove old link and point child towards new parent
+    spin_lock(&old_parent->lock);
+    linked_list_remove_node(&old_parent->children, &child->dentry_node);
+    spin_unlock(&old_parent->lock);
+
+    // replace parent reference and rehash child
+    spin_lock(&dcache_lock);
+    vfs_dentry* existing_child = vfs_dcache_lookup(new_parent, name);
+    spin_lock(&existing_child->lock);
+    if (existing_child)
+        vfs_dcache_unhash(existing_child);
+    spin_unlock(&existing_child->lock);
+
+    spin_lock(&child->lock);
+    vfs_dcache_unhash(child);
+    child->name = name;
+    child->parent = new_parent;
+    vfs_dcache_put(child);
+    if (!existing_child)
+        vfs_dentry_acquire(new_parent);
+    spin_unlock(&child->lock);
+    spin_unlock(&dcache_lock);
+
+    if (existing_child) {
+        // remove dentry we have replaced from parent
+        spin_lock(&new_parent->lock);
+        linked_list_remove_node(&new_parent->children,
+                                &existing_child->dentry_node);
+        spin_unlock(&new_parent->lock);
+
+        // detach replaced dentry from its old parent
+        spin_lock(&existing_child->lock);
+        existing_child->parent = existing_child;
+        existing_child->detached = true;
+        spin_unlock(&existing_child->lock);
+    }
+
+    vfs_dentry_release(old_parent);
+    // no need to release new_parent since if we replaced some dentry then
+    // parent reference just been moved to new child;
+
+    return 0;
+}
+
+void vfs_dentry_delete(vfs_dentry* dentry) {
+    vfs_dentry* parent = vfs_dentry_get_parent(dentry);
+
+    // it is safe to use parent since caller is holding inode->mut
+    spin_lock(&dcache_lock);
+    spin_lock(&dentry->lock);
+
+    vfs_dcache_unhash(dentry);
+    dentry->detached = true;
+    dentry->parent = dentry;
+
+    spin_unlock(&dentry->lock);
+    spin_unlock(&dcache_lock);
+
+    vfs_dentry_release(parent);
 }
 
 vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry) {
@@ -253,10 +250,9 @@ void vfs_dentry_acquire(vfs_dentry* dentry) { ref_acquire(&dentry->refc); }
 static vfs_dentry* vfs_dentry_release_and_not_release_parent(
     vfs_dentry* dentry) {
 
+    // fast-path, release here only if we won't destroy dentry anyway
     spin_lock(&dentry->lock);
     bool destroy = dentry->refc.count == 1;
-
-    // fast-path, release here only if we won't destroy dentry anyway
     if (!destroy)
         ref_release(&dentry->refc);
     spin_unlock(&dentry->lock);
@@ -267,29 +263,29 @@ static vfs_dentry* vfs_dentry_release_and_not_release_parent(
     spin_lock(&dcache_lock);
     spin_lock(&dentry->lock);
 
+    vfs_dentry* parent = NULL;
     ref_release(&dentry->refc);
-    if (dentry->refc.count != 0) {
-        spin_unlock(&dentry->lock);
-        spin_unlock(&dcache_lock);
-
-        return NULL;
-    }
+    if (dentry->refc.count != 0)
+        goto out;
 
     if (!dentry->detached && alive_dentries <= max_dentries) {
         linked_list_add_last_node(&unused_dentries, &dentry->unused_node);
-        spin_unlock(&dentry->lock);
-        spin_unlock(&dcache_lock);
-        return NULL;
+        goto out;
     }
 
-    dcache_key key = {.parent = dentry->parent, .name = dentry->name};
-    dentry_cache_remove(&dcache, key);
     dentry->dying = true;
+    vfs_dcache_unhash(dentry);
 
     spin_unlock(&dentry->lock);
     spin_unlock(&dcache_lock);
 
     return vfs_dentry_destroy_and_not_release_parent(dentry);
+
+out:
+    spin_unlock(&dentry->lock);
+    spin_unlock(&dcache_lock);
+
+    return parent;
 }
 
 // this function is based on vfs_dentry_release_and_not_release_parent and
@@ -320,10 +316,7 @@ static void vfs_dcache_maybe_shrink_unsafe() {
 
         spin_lock(&unused_dentry->lock);
         unused_dentry->dying = true;
-        vfs_dentry* parent = unused_dentry->parent;
-
-        dcache_key key = {.parent = parent, .name = unused_dentry->name};
-        dentry_cache_remove(&dcache, key);
+        vfs_dcache_unhash(unused_dentry);
         spin_unlock(&unused_dentry->lock);
         spin_unlock(&dcache_lock);
 
@@ -350,10 +343,8 @@ static bool vfs_dcache_register_allocation_unsafe() {
 static void vfs_dcache_deregister_allocation_unsafe() { alive_dentries--; }
 
 vfs_dentry* vfs_dcache_get(vfs_dentry* parent, string name) {
-    dcache_key key = {.parent = parent, .name = name};
-
     spin_lock(&dcache_lock);
-    vfs_dentry* dentry = dentry_cache_get(&dcache, key);
+    vfs_dentry* dentry = vfs_dcache_lookup(parent, name);
     if (dentry) {
         vfs_dentry_acquire(dentry);
         linked_list_remove_node(&unused_dentries, &dentry->unused_node);
