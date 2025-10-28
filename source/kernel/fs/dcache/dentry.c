@@ -215,7 +215,9 @@ void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name) {
 }
 
 void vfs_dentry_delete(vfs_dentry* dentry) {
-    // it is safe to use parent since caller is holding inode->mut
+    // it is safe to use parent since caller is holding inode->mut, so no
+    // namespace changes can occur and visibility is carried by same mut since
+    // last lookup/move/etc
     vfs_dentry* parent = vfs_dentry_get_parent(dentry);
     dcache_bucket* bucket = dentry->hash_bucket;
 

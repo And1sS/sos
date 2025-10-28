@@ -10,10 +10,13 @@ Locking is tied to ownership. Since strictly follow locking order is sometimes i
 code that breaks it should be carefully inspected.
 
 Order:
-1) Fs type lock, Mount lock - Those are mutually exclusive and should not be taken at the same time
-2) Superblock lock
-3) Dentry cache bucket lock
-4) Parent dentry lock
-5) dentry lock
-6) Inode cache lock
-7) Inode lock
+1) Superblock rename mutex
+2) Inode rw-mutex (In inode address order)
+
+3) Fs type lock, Mount lock - Those are mutually exclusive and should not be taken at the same time
+4) Superblock lock
+5) Dentry cache bucket lock (In bucket address order)
+6) Parent dentry lock
+7) dentry lock
+8) Inode cache lock
+9) Inode lock
