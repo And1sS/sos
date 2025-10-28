@@ -1,10 +1,12 @@
 #include "internal_tree.h"
 #include "../../lib/string.h"
 
-static tree_node root = {.id = 0, .type = DIRECTORY};
+static tree_node root = {.name = "[root]",
+                         .id = 0,
+                         .type = DIRECTORY,
+                         .subnodes = LINKED_LIST_STATIC_INITIALIZER};
 
 static tree_node* alloc_tree_node(u64 id, string name, vfs_inode_type type);
-static void link_nodes(tree_node* parent, tree_node* child);
 
 /*
  *                root
@@ -18,7 +20,6 @@ static void link_nodes(tree_node* parent, tree_node* child);
  *     f
  */
 void internal_tree_init() {
-    array_list_init(&root.subnodes, 8);
     tree_node* a = alloc_tree_node(1, "a", DIRECTORY);
     tree_node* b = alloc_tree_node(2, "b", DIRECTORY);
     tree_node* c = alloc_tree_node(3, "c", DIRECTORY);
@@ -36,30 +37,49 @@ void internal_tree_init() {
 
 static tree_node* alloc_tree_node(u64 id, string name, vfs_inode_type type) {
     tree_node* node = kmalloc(sizeof(tree_node));
-    array_list_init(&node->subnodes, 8);
     node->id = id;
     node->name = strcpy(name);
     node->type = type;
+    node->subnodes = LINKED_LIST_STATIC_INITIALIZER;
+    node->self_node = LINKED_LIST_NODE_OF(node);
 
     return node;
 }
 
-static void link_nodes(tree_node* parent, tree_node* child) {
+void link_nodes(tree_node* parent, tree_node* child) {
     child->parent = parent;
-    array_list_add_last(&parent->subnodes, child);
+    linked_list_add_last_node(&parent->subnodes, &child->self_node);
 }
 
 void unlink_nodes(tree_node* parent, tree_node* child) {
-    array_list_remove(&parent->subnodes, child);
+    linked_list_remove_node(&parent->subnodes, &child->self_node);
     child->parent = NULL;
 }
 
 tree_node* get_root() { return &root; }
 
 tree_node* find_subnode(tree_node* node, string name) {
-    ARRAY_LIST_FOR_EACH(&node->subnodes, tree_node * subnode) {
-        if (streq(subnode->name, name))
-            return subnode;
+    linked_list_node* result =
+        LINKED_LIST_FIND(&node->subnodes, subnode,
+                         streq(((tree_node*) subnode->value)->name, name));
+
+    return result ? result->value : NULL;
+}
+
+static void _pt(tree_node* node) {
+    LINKED_LIST_FOR_EACH(&node->subnodes, iter) {
+        print(node->name);
+        print(" -> ");
+        print(((tree_node*) iter->value)->name);
+        print("; ");
+        _pt(iter->value);
     }
-    return NULL;
+}
+
+void print_tree() {
+    println("");
+    println("-------------- ramfs --------------");
+    _pt(&root);
+    println("");
+    println("-----------------------------------");
 }

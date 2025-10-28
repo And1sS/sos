@@ -21,7 +21,7 @@ typedef struct vfs_inode {
 
     lock lock; // guards all fields below
 
-    bool initialised;
+    bool initialised; // safe to read without lock if obtained via cache
     bool dead;
 
     u64 mode;
@@ -46,6 +46,9 @@ void vfs_inode_release(vfs_inode* inode);
 // should be used when creation of new superblock is failed and
 // created inode should be removed from cache and destroyed.
 void vfs_inode_drop(vfs_inode* inode);
+
+void vfs_inode_drop_link(vfs_inode* inode);
+u64 vfs_inode_add_link(vfs_inode* inode);
 
 void vfs_inode_lock_shared(vfs_inode* inode);
 void vfs_inode_unlock_shared(vfs_inode* inode);

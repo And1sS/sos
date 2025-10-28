@@ -12,7 +12,7 @@ code that breaks it should be carefully inspected.
 Order:
 1) Fs type lock, Mount lock - Those are mutually exclusive and should not be taken at the same time
 2) Superblock lock
-3) Dentry cache lock
+3) Dentry cache bucket lock
 4) Parent dentry lock
 5) dentry lock
 6) Inode cache lock

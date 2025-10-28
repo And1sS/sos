@@ -2,6 +2,7 @@
 #include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/hash.h"
+#include "../lib/math.h"
 #include "super_block.h"
 
 // for now - no references mean free the struct
@@ -168,4 +169,10 @@ void vfs_inodes_unlock(vfs_inode* left, vfs_inode* right) {
     vfs_inode_unlock(MAX(left, right));
     vfs_inode_unlock(MIN(left, right));
 }
+
 void vfs_inode_drop_link(vfs_inode* inode) { UNUSED(inode); }
+
+u64 vfs_inode_add_link(vfs_inode* inode) {
+    UNUSED(inode);
+    return true;
+}

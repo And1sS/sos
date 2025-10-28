@@ -1,8 +1,9 @@
 #include "../arch/common/init.h"
 #include "../arch/common/vmm.h"
-#include "../fs/dentry.h"
+#include "../fs/dcache/dentry.h"
 #include "../fs/mount.h"
 #include "../fs/path.h"
+#include "../fs/ramfs/internal_tree.h"
 #include "../fs/ramfs/ramfs.h"
 #include "../fs/vfs.h"
 #include "../interrupts/irq.h"
@@ -85,7 +86,23 @@ void set_up_init_process(module init_module) {
     print(res.dentry->name);
     println("");
     vfs_dentry_release(res.dentry);
-    print_u64(vfs_unlink(start, "b/e"));
+
+    vfs_path c;
+    path_parts c_path = path_parts_from_path("a/c");
+    walk(start, &c, &c_path);
+
+    vfs_path d;
+    path_parts d_path = path_parts_from_path("a/c/d");
+    walk(start, &d, &d_path);
+
+    vfs_path b;
+    path_parts b_path = path_parts_from_path("b");
+    walk(start, &b, &b_path);
+
+    print_tree();
+    print_u64(vfs_rename(c, d.dentry, b, "e"));
+    println("-----------------");
+    print_tree();
     while (true) {
     }
 }

@@ -2,7 +2,8 @@
 #include "../error/errno.h"
 #include "../error/error.h"
 #include "../lib/string.h"
-#include "dentry.h"
+#include "dcache/dcache.h"
+#include "dcache/dentry.h"
 #include "mount.h"
 #include "path.h"
 #include "ramfs/ramfs.h"
@@ -18,7 +19,7 @@ void vfs_init() {
         panic("Can't init vfs type registry");
 
     // TODO: calculate based on available ram or get from config
-    vfs_dcache_init(10000);
+    dcache_init(4, 10000);
     vfs_icache_init(10000);
 
     ramfs_init();
@@ -76,6 +77,9 @@ void deregister_vfs_type(vfs_type* type) {
 }
 
 u64 vfs_unlink(vfs_path start, string path) {
+    if (path_ends_with_dot(path) || path_ends_with_dotdot(path))
+        return -EPERM;
+
     vfs_path res;
     path_parts parts = path_parts_from_path(path);
 
@@ -92,17 +96,15 @@ u64 vfs_unlink(vfs_path start, string path) {
         goto out;
 
     vfs_dentry* child = res.dentry;
-    if (child->inode->type == DIRECTORY) {
-        error = -EISDIR;
+    error = -EISDIR;
+    if (child->inode->type == DIRECTORY)
         goto failed_to_unlink;
-    } else if (!dir->ops->unlink) {
-        error = -EPERM;
+
+    error = -EPERM;
+    if (!dir->ops->unlink)
         goto failed_to_unlink;
-    }
 
-    if (!IS_ERROR(error))
-        error = dir->ops->unlink(dir, child);
-
+    error = dir->ops->unlink(dir, child);
     if (!IS_ERROR(error))
         vfs_dentry_delete(child);
 
@@ -113,5 +115,65 @@ out:
     vfs_inode_unlock(dir);
 
     vfs_dentry_release(parent);
+    return error;
+}
+
+static void vfs_rename_lock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
+    // TODO: lock sb->rename_mut
+    if (old_parent == new_parent)
+        vfs_inode_lock(old_parent->inode);
+    else
+        vfs_inodes_lock(old_parent->inode, new_parent->inode);
+}
+
+static void vfs_rename_unlock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
+    if (old_parent == new_parent)
+        vfs_inode_unlock(old_parent->inode);
+    else
+        vfs_inodes_unlock(old_parent->inode, new_parent->inode);
+    // TODO: lock sb->rename_mut
+}
+
+u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
+               string new_name) {
+
+    string new_name_copy = strcpy(new_name);
+    if (!new_name_copy)
+        return -ENOMEM;
+
+    u64 error = 0;
+    vfs_dentry* old_parent_dentry = old_parent.dentry;
+    vfs_dentry* new_parent_dentry = new_parent.dentry;
+
+    if (old_parent_dentry->inode->sb != new_parent_dentry->inode->sb)
+        return -EPERM;
+
+    error = -ENOENT;
+    vfs_rename_lock(old_parent_dentry, new_parent_dentry);
+    if (vfs_dentry_get_parent(old_dentry) != old_parent_dentry)
+        goto out;
+
+    vfs_dentry* new_dentry = lookup(new_parent_dentry, new_name);
+    error = IS_ERROR(new_dentry) ? PTR_ERROR(new_dentry) : 0;
+    new_dentry = IS_ERROR(new_dentry) ? NULL : new_dentry;
+    if (error && error != (u64) -ENOENT) {
+        goto out;
+    }
+
+    error = -EPERM;
+    if (!old_dentry->inode->ops->rename)
+        goto out;
+
+    // TODO: add check for mountpoints
+    // TODO: add check that new_dentry is not child of old_dentry
+
+    error = old_dentry->inode->ops->rename(
+        old_parent_dentry, old_dentry, new_parent_dentry, new_dentry, new_name);
+
+    vfs_dentry_move(new_parent_dentry, old_dentry, new_name_copy);
+
+out:
+    vfs_rename_unlock(old_parent_dentry, new_parent_dentry);
+
     return error;
 }

@@ -1,7 +1,7 @@
 #include "super_block.h"
 #include "../error/errno.h"
 #include "../error/error.h"
-#include "dentry.h"
+#include "dcache/dentry.h"
 
 void vfs_super_acquire(vfs_super_block* sb) { ref_acquire(&sb->refc); }
 

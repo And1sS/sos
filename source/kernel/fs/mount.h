@@ -1,7 +1,7 @@
 #ifndef SOS_MOUNT_H
 #define SOS_MOUNT_H
 
-#include "dentry.h"
+#include "dcache/dentry.h"
 
 typedef struct vfs_mount {
     struct vfs_mount* parent_mount;

@@ -10,7 +10,9 @@ typedef struct vfs_dentry {
     vfs_inode* inode;
     // End of immutable data
 
-    dcache_hash_entry hash_entry; // used in dcache, guarded by its lock
+    // Dcache data. Dentry stays in dcache during whole lifetime unless it is
+    // detached.
+    dcache_hash_entry hash_entry; // used in dcache, guarded by its bucket lock
     linked_list_node unused_node; // used in dcaches 'unused' list
 
     // used in parent 'children' list, needed for fail-safe
@@ -28,11 +30,14 @@ typedef struct vfs_dentry {
     bool detached; // set when dentry is detached (from rmdir or unlink) and
                    // should not stay in cache after refcount reaches 0 even if
                    // cache is not full
-    bool hashed;
 
-    // these two are closely tied to hash_entry, should be changed under both
-    // dcache and dentry locks, each time any of these fields changes - dentry
-    // should be unhashed or rehashed
+    dcache_bucket* hash_bucket; // dcache hash table bucket where dentry
+                                // resides, NULL if not hashed
+
+    // these two are closely tied to hash_entry, can be changed only during
+    // creation or namespace changes. Should be changed under both dcache and
+    // dentry locks, and parent inode->mut locked for write. Each time any of
+    // these fields changes - dentry should be unhashed or rehashed.
     string name;
     struct vfs_dentry* parent; // never NULL(real parent or self-reference)
 
@@ -49,13 +54,15 @@ vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,
                               string name);
 vfs_dentry* vfs_dentry_create_root(vfs_inode* inode);
 
+vfs_dentry* vfs_dentry_lookup(vfs_dentry* parent, string name);
+
 // parent inode mutex should be held for write during this operation
 void vfs_dentry_delete(vfs_dentry* dentry);
 
 // atomically replaces name in `new_parent` with `child` of `old parent` and
 // unlinks existing name both old parent and new parent inode mutexes should be
 // held during this operation
-u64 vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name);
+void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name);
 
 void vfs_dentry_acquire(vfs_dentry* dentry);
 void vfs_dentry_release(vfs_dentry* dentry);

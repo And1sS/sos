@@ -19,6 +19,29 @@ static u64 count_parts(string path) {
     return cur_len > 0 ? count + 1 : count;
 }
 
+bool path_ends_with_dot(string path) {
+    u64 len = strlen(path);
+    if (len < 1)
+        return false;
+
+    if (streq(path, "."))
+        return true;
+
+    return len >= 2 && path[len - 2] == '/' && path[len - 1] == '.';
+}
+
+bool path_ends_with_dotdot(string path) {
+    u64 len = strlen(path);
+    if (len < 2)
+        return false;
+
+    if (streq(path, ".."))
+        return true;
+
+    return len >= 3 && path[len - 3] == '/' && path[len - 2] == '.'
+           && path[len - 1] == '.';
+}
+
 path_parts path_parts_from_path(string path) {
     return (path_parts) {.path = path, .parts_left = count_parts(path)};
 }
@@ -43,7 +66,7 @@ static void walk_next_part(path_parts* parts) {
     parts->parts_left--;
 }
 
-static vfs_dentry* lookup(vfs_dentry* parent, string path) {
+vfs_dentry* lookup(vfs_dentry* parent, string path) {
     if (streq(path, ".")) {
         vfs_dentry_acquire(parent);
         return parent;
@@ -52,9 +75,8 @@ static vfs_dentry* lookup(vfs_dentry* parent, string path) {
     if (streq(path, ".."))
         return vfs_dentry_get_parent(parent);
 
-    vfs_dentry* child = vfs_dcache_get(parent, path);
-    child = child ? child : parent->inode->ops->lookup(parent, path);
-    return child;
+    vfs_dentry* child = vfs_dentry_lookup(parent, path);
+    return child ? child : parent->inode->ops->lookup(parent, path);
 }
 
 u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
@@ -78,6 +100,8 @@ u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
 u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts) {
     vfs_path iter = start;
     vfs_dentry* dentry = iter.dentry;
+
+    *res = start;
 
     vfs_dentry_acquire(dentry);
     while (true) {

@@ -25,6 +25,11 @@ typedef struct {
     // directory operations
     u64 (*unlink)(struct vfs_inode* dir, struct vfs_dentry* dentry);
     struct vfs_dentry* (*lookup)(struct vfs_dentry* parent, string name);
+    u64 (*rename)(struct vfs_dentry* old_parent_dentry,
+                  struct vfs_dentry* old_dentry,
+                  struct vfs_dentry* new_parent_dentry,
+                  struct vfs_dentry* new_dentry, string name);
+
     //
     //    u64 (*create)(struct vfs_inode* dir, string name, struct vattr* vattr,
     //                  struct vfs_entry** result);
@@ -49,8 +54,6 @@ typedef struct {
     //    u64 (*rmdir)(struct vfs_inode* dir, struct vnode* vn, struct
     //    vfs_entry* ve);
 
-    // int (*v_rename)(struct vnode *dir, struct vnode *vn, struct ventry
-    // *old_ve, struct vnode *new_dir, cstr_t new_name);
 } vfs_inode_ops;
 
 typedef enum {
@@ -86,5 +89,7 @@ bool register_vfs_type(vfs_type* type);
 void deregister_vfs_type(vfs_type* type);
 
 u64 vfs_unlink(struct vfs_path start, string path);
+u64 vfs_rename(struct vfs_path old_parent, struct vfs_dentry* old_dentry,
+               struct vfs_path new_parent, string new_name);
 
 #endif // SOS_VFS_H
