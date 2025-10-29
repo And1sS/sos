@@ -39,7 +39,11 @@ u64 atomic_decrement_and_get(volatile u64* addr) {
     __asm__ volatile("lock xaddq %0, %1"
                      : "=r"(old_value), "+m"(*addr)
                      : "0"((u64) -1)
-                     : "memory");
+                     : "memory", "cc");
 
     return old_value - 1;
+}
+
+void atomic_decrement(volatile u64* addr) {
+    __asm__ volatile("lock decq (%0)" : : "r"(addr) : "memory", "cc");
 }

@@ -2,6 +2,7 @@
 #define SOS_SUPER_BLOCK_H
 
 #include "../lib/types.h"
+#include "../synchronization/mutex.h"
 #include "vfs.h"
 
 typedef struct vfs_super_block {
