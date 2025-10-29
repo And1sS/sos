@@ -60,6 +60,8 @@ static vfs_super_block* vfs_super_allocate(vfs_type* type) {
     sb->type = type;
     ref_acquire(&type->refc);
 
+    sb->rename_mut = RW_MUTEX_STATIC_INITIALIZER;
+
     sb->self_node = LINKED_LIST_NODE_OF(sb);
     sb->lock = SPIN_LOCK_STATIC_INITIALIZER;
     sb->dying = false;

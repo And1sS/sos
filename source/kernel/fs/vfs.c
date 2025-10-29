@@ -119,7 +119,8 @@ out:
 }
 
 static void vfs_rename_lock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
-    // TODO: lock sb->rename_mut
+    mutex_lock(&old_parent->inode->sb->rename_mut);
+
     if (old_parent == new_parent)
         vfs_inode_lock(old_parent->inode);
     else
@@ -131,7 +132,8 @@ static void vfs_rename_unlock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
         vfs_inode_unlock(old_parent->inode);
     else
         vfs_inodes_unlock(old_parent->inode, new_parent->inode);
-    // TODO: lock sb->rename_mut
+
+    mutex_unlock(&old_parent->inode->sb->rename_mut);
 }
 
 u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
@@ -141,14 +143,15 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
     if (!new_name_copy)
         return -ENOMEM;
 
-    u64 error = 0;
     vfs_dentry* old_parent_dentry = old_parent.dentry;
     vfs_dentry* new_parent_dentry = new_parent.dentry;
 
-    if (old_parent_dentry->inode->sb != new_parent_dentry->inode->sb)
+    if (old_parent_dentry->inode->sb != new_parent_dentry->inode->sb) {
+        strfree(new_name_copy);
         return -EPERM;
+    }
 
-    error = -ENOENT;
+    u64 error = -ENOENT;
     vfs_rename_lock(old_parent_dentry, new_parent_dentry);
     if (vfs_dentry_get_parent(old_dentry) != old_parent_dentry)
         goto out;

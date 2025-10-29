@@ -12,6 +12,8 @@ typedef struct vfs_super_block {
     struct vfs_dentry* root;
     // End of immutable data
 
+    mutex rename_mut;
+
     linked_list_node self_node; // node that will be used in vfs_type list
 
     lock lock; // guards all fields below
