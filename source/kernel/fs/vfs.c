@@ -176,6 +176,9 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
     vfs_dentry_move(new_parent_dentry, old_dentry, new_name_copy);
 
 out:
+    if (error)
+        strfree(new_name_copy);
+
     vfs_rename_unlock(old_parent_dentry, new_parent_dentry);
 
     return error;
