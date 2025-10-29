@@ -4,8 +4,8 @@
 
 static dcache cache;
 
-static i64 alive_dentries;
-static i64 max_dentries;
+static u64 alive_dentries = 0;
+static u64 max_dentries = 0;
 
 void dcache_init(u64 buckets, u64 max_entries) {
     if (!array_list_init(&cache.buckets, buckets))
@@ -21,15 +21,26 @@ void dcache_init(u64 buckets, u64 max_entries) {
         array_list_add_last(&cache.buckets, bucket);
     }
 
-    alive_dentries = 0;
     max_dentries = max_entries;
 }
 
-bool dcache_reserve() { return true; }
+bool dcache_reserve() {
+    if (atomic_increment_and_get(&alive_dentries) < atomic_get(&max_dentries))
+        return true;
 
-void dcache_unreserve() {}
+    if (!dcache_shrink()) {
+        dcache_unreserve();
+        return false;
+    }
 
-bool dcache_has_space() { return true; }
+    return true;
+}
+
+void dcache_unreserve() { atomic_decrement(&alive_dentries); }
+
+bool dcache_has_space() {
+    return atomic_get(&alive_dentries) < atomic_get(&max_dentries);
+}
 
 dcache_bucket* dcache_bucket_get(u64 hash) {
     return array_list_get(&cache.buckets, hash % cache.buckets.size);
@@ -169,24 +180,21 @@ vfs_dentry* dcache_lookup(dcache_bucket* bucket, vfs_dentry* parent,
 
 extern void vfs_dentry_destroy(vfs_dentry* dentry);
 
-bool dcache_evict() {
-    bool evicted = false;
-
+bool dcache_shrink() {
     for (u64 i = 0; i < cache.buckets.size; i++) {
         dcache_bucket* bucket = dcache_bucket_get(i);
-        dcache_bucket_lock(bucket);
 
+        dcache_bucket_lock(bucket);
         while (bucket->unused_list.size != 0) {
-            evicted = true;
             vfs_dentry* unused_dentry = dcache_pop_unused(bucket);
             dcache_bucket_unlock(bucket);
 
             vfs_dentry_destroy(unused_dentry);
 
-            dcache_bucket_lock(bucket);
+            return true;
         }
         dcache_bucket_unlock(bucket);
     }
 
-    return evicted;
+    return false;
 }

@@ -48,7 +48,7 @@ struct vfs_dentry* dcache_pop_unused(dcache_bucket* bucket);
 struct vfs_dentry* dcache_lookup(dcache_bucket* bucket,
                                  struct vfs_dentry* parent, string name);
 
-bool dcache_evict();
+bool dcache_shrink();
 bool dcache_has_space();
 
 #endif // SOS_DCACHE_H

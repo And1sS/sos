@@ -109,14 +109,13 @@ vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,
                               string name) {
 
     dcache_bucket* bucket = dcache_bucket_get(dentry_hash(parent, name));
-    dcache_bucket_lock(bucket);
 
+    dcache_bucket_lock(bucket);
     vfs_dentry* dentry = dcache_lookup(bucket, parent, name);
     if (dentry) {
         vfs_dentry_acquire(dentry);
         goto out;
     }
-
     dcache_bucket_unlock(bucket);
 
     bool allocate = dcache_reserve();
