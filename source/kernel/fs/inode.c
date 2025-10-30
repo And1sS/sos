@@ -177,8 +177,8 @@ void vfs_inodes_lock(vfs_inode* left, vfs_inode* right) {
 }
 
 void vfs_inodes_unlock(vfs_inode* left, vfs_inode* right) {
-    vfs_inode_unlock(MAX(left, right));
-    vfs_inode_unlock(MIN(left, right));
+    vfs_inode_unlock(left);
+    vfs_inode_unlock(right);
 }
 
 void vfs_inode_drop_link(vfs_inode* inode) { atomic_decrement(&inode->links); }

@@ -123,14 +123,20 @@ static void vfs_rename_lock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
 
     if (old_parent == new_parent)
         vfs_inode_lock(old_parent->inode);
-    else
+    else if (vfs_dentry_is_ancestor(old_parent, new_parent)) {
+        vfs_inode_lock(old_parent->inode);
+        vfs_inode_lock(new_parent->inode);
+    } else if (vfs_dentry_is_ancestor(new_parent, old_parent)) {
+        vfs_inode_lock(new_parent->inode);
+        vfs_inode_lock(old_parent->inode);
+    } else
         vfs_inodes_lock(old_parent->inode, new_parent->inode);
 }
 
 static void vfs_rename_unlock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
     if (old_parent == new_parent)
         vfs_inode_unlock(old_parent->inode);
-    else
+    else // unlock order doesn't matter
         vfs_inodes_unlock(old_parent->inode, new_parent->inode);
 
     mutex_unlock(&old_parent->inode->sb->rename_mut);
@@ -146,35 +152,46 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
     vfs_dentry* old_parent_dentry = old_parent.dentry;
     vfs_dentry* new_parent_dentry = new_parent.dentry;
 
+    // check that parents are in same superblock
     if (old_parent_dentry->inode->sb != new_parent_dentry->inode->sb) {
         strfree(new_name_copy);
         return -EPERM;
     }
 
-    u64 error = -ENOENT;
     vfs_rename_lock(old_parent_dentry, new_parent_dentry);
-    if (vfs_dentry_get_parent(old_dentry) != old_parent_dentry)
-        goto out;
 
-    vfs_dentry* new_dentry = lookup(new_parent_dentry, new_name);
-    error = IS_ERROR(new_dentry) ? PTR_ERROR(new_dentry) : 0;
-    new_dentry = IS_ERROR(new_dentry) ? NULL : new_dentry;
-    if (error && error != (u64) -ENOENT) {
-        goto out;
-    }
+    // recheck that parents are still alive
+    u64 error = -ENOENT;
+    // TODO: recheck that parents are alive
 
     error = -EPERM;
     if (!old_dentry->inode->ops->rename)
         goto out;
 
+    // recheck that old_dentry hasn't been moved while we weren't holding lock
+    vfs_dentry* _old_parent_dentry = vfs_dentry_get_parent(old_dentry);
+    error = _old_parent_dentry != old_parent_dentry ? -ENOENT : 0;
+    vfs_dentry_release(_old_parent_dentry);
+    if (error)
+        goto out;
+
+    // lookup victim that will be replaced
+    vfs_dentry* victim_dentry = lookup(new_parent_dentry, new_name);
+    error = IS_ERROR(victim_dentry) ? PTR_ERROR(victim_dentry) : 0;
+    victim_dentry = IS_ERROR(victim_dentry) ? NULL : victim_dentry;
+    if (error && error != (u64) -ENOENT)
+        goto out;
+
     // TODO: add check for mountpoints
-    // TODO: add check that new_dentry is not child of old_dentry
+    // TODO: add check that victim_dentry is not child of old_dentry
 
     error = old_dentry->inode->ops->rename(old_parent_dentry, old_dentry,
-                                           new_parent_dentry, new_dentry,
+                                           new_parent_dentry, victim_dentry,
                                            new_name_copy);
 
     vfs_dentry_move(new_parent_dentry, old_dentry, new_name_copy);
+    if (victim_dentry)
+        vfs_dentry_release(victim_dentry);
 
 out:
     if (error)

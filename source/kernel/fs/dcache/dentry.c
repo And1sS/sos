@@ -170,7 +170,6 @@ void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name) {
         dcache_bucket_get(dentry_hash(new_parent, name));
 
     dcache_buckets_lock(old_bucket, new_bucket);
-    // TODO: Add assert that old_bucket = child->hash_bucket
 
     // remove existing child
     vfs_dentry* existing_child = dcache_lookup(new_bucket, new_parent, name);
@@ -330,4 +329,39 @@ vfs_dentry* vfs_dentry_lookup(vfs_dentry* parent, string name) {
     dcache_bucket_unlock(bucket);
 
     return dentry;
+}
+
+bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
+    vfs_dentry* iter = dentry;
+    vfs_dentry_acquire(iter);
+
+    bool result = false;
+    vfs_dentry* parent;
+
+    while (true) {
+        parent = vfs_dentry_get_parent(iter);
+
+        if (parent == ancestor) {
+            result = true;
+            break;
+        }
+
+        if (parent == iter) { // detached node or root
+            result = false;
+            break;
+        }
+
+        vfs_dentry_release(iter);
+        iter = parent;
+    }
+
+    vfs_dentry_release(parent);
+    vfs_dentry_release(iter);
+
+    return result;
+}
+
+bool vfs_dentry_ancestors(vfs_dentry* left, vfs_dentry* right) {
+    return vfs_dentry_is_ancestor(left, right)
+           || vfs_dentry_is_ancestor(right, left);
 }
