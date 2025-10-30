@@ -84,12 +84,12 @@ static vfs_dentry* vfs_dentry_allocate(vfs_inode* inode, string name) {
 vfs_dentry* vfs_dentry_create_root(vfs_inode* inode) {
     vfs_dentry* dentry = ERROR_PTR(-ENOMEM);
     if (!dcache_reserve())
-        goto out;
+        return dentry;
 
     dentry = vfs_dentry_allocate(inode, "/");
     if (IS_ERROR(dentry)) {
         dcache_unreserve();
-        goto out;
+        return dentry;
     }
 
     dentry->parent = dentry;
@@ -100,7 +100,6 @@ vfs_dentry* vfs_dentry_create_root(vfs_inode* inode) {
     dcache_put(bucket, dentry);
     dcache_bucket_unlock(bucket);
 
-out:
     return dentry;
 }
 
