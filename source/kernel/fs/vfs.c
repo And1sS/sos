@@ -124,11 +124,11 @@ static void vfs_rename_lock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
     if (old_parent == new_parent)
         vfs_inode_lock(old_parent->inode);
     else if (vfs_dentry_is_ancestor(old_parent, new_parent)) {
-        vfs_inode_lock(old_parent->inode);
         vfs_inode_lock(new_parent->inode);
+        vfs_inode_lock(old_parent->inode);
     } else if (vfs_dentry_is_ancestor(new_parent, old_parent)) {
-        vfs_inode_lock(new_parent->inode);
         vfs_inode_lock(old_parent->inode);
+        vfs_inode_lock(new_parent->inode);
     } else
         vfs_inodes_lock(old_parent->inode, new_parent->inode);
 }
