@@ -18,6 +18,13 @@ void atomic_set(volatile u64* addr, volatile u64 value) {
 
 u64 atomic_get(volatile u64* addr) { return *addr; }
 
+void atomic_or(volatile u64* addr, u64 mask) {
+    __asm__ volatile("lock orq %1, %0"
+                     : "+m"(*addr)
+                     : "r"(mask)
+                     : "memory", "cc");
+}
+
 void atomic_increment(volatile u64* addr) {
     __asm__ volatile("lock incq (%0)" : : "r"(addr) : "memory");
 }
@@ -33,6 +40,10 @@ u64 atomic_increment_and_get(volatile u64* addr) {
     return old_value + 1;
 }
 
+void atomic_decrement(volatile u64* addr) {
+    __asm__ volatile("lock decq (%0)" : : "r"(addr) : "memory", "cc");
+}
+
 u64 atomic_decrement_and_get(volatile u64* addr) {
     u64 old_value;
 
@@ -42,8 +53,4 @@ u64 atomic_decrement_and_get(volatile u64* addr) {
                      : "memory", "cc");
 
     return old_value - 1;
-}
-
-void atomic_decrement(volatile u64* addr) {
-    __asm__ volatile("lock decq (%0)" : : "r"(addr) : "memory", "cc");
 }
