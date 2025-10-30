@@ -101,7 +101,6 @@ void set_up_init_process(module init_module) {
 
     print_tree();
     print_u64(vfs_rename(c, d.dentry, b, "e"));
-    println("-----------------");
     print_tree();
     while (true) {
     }

@@ -42,6 +42,27 @@ bool dcache_has_space() {
     return atomic_get(&alive_dentries) < atomic_get(&max_dentries);
 }
 
+bool dcache_shrink() {
+    extern void vfs_dentry_destroy(vfs_dentry * dentry);
+
+    for (u64 i = 0; i < cache.buckets.size; i++) {
+        dcache_bucket* bucket = dcache_bucket_get(i);
+
+        dcache_bucket_lock(bucket);
+        while (bucket->unused_list.size != 0) {
+            vfs_dentry* unused_dentry = dcache_pop_unused(bucket);
+            dcache_bucket_unlock(bucket);
+
+            vfs_dentry_destroy(unused_dentry);
+
+            return true;
+        }
+        dcache_bucket_unlock(bucket);
+    }
+
+    return false;
+}
+
 dcache_bucket* dcache_bucket_get(u64 hash) {
     return array_list_get(&cache.buckets, hash % cache.buckets.size);
 }
@@ -176,25 +197,4 @@ vfs_dentry* dcache_lookup(dcache_bucket* bucket, vfs_dentry* parent,
     }
 
     return NULL;
-}
-
-extern void vfs_dentry_destroy(vfs_dentry* dentry);
-
-bool dcache_shrink() {
-    for (u64 i = 0; i < cache.buckets.size; i++) {
-        dcache_bucket* bucket = dcache_bucket_get(i);
-
-        dcache_bucket_lock(bucket);
-        while (bucket->unused_list.size != 0) {
-            vfs_dentry* unused_dentry = dcache_pop_unused(bucket);
-            dcache_bucket_unlock(bucket);
-
-            vfs_dentry_destroy(unused_dentry);
-
-            return true;
-        }
-        dcache_bucket_unlock(bucket);
-    }
-
-    return false;
 }

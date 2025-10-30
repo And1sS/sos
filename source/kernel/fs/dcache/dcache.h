@@ -29,6 +29,9 @@ void dcache_init(u64 buckets, u64 max_entries);
 bool dcache_reserve();
 void dcache_unreserve();
 
+bool dcache_has_space();
+bool dcache_shrink();
+
 dcache_bucket* dcache_bucket_get(u64 hash);
 
 void dcache_bucket_lock(dcache_bucket* bucket);
@@ -47,8 +50,5 @@ struct vfs_dentry* dcache_pop_unused(dcache_bucket* bucket);
 
 struct vfs_dentry* dcache_lookup(dcache_bucket* bucket,
                                  struct vfs_dentry* parent, string name);
-
-bool dcache_shrink();
-bool dcache_has_space();
 
 #endif // SOS_DCACHE_H
