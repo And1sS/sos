@@ -52,7 +52,6 @@ typedef struct vfs_dentry {
     ref_count refc;
 } vfs_dentry;
 
-// parent reference should be held during this routine
 vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,
                               string name);
 vfs_dentry* vfs_dentry_create_root(vfs_inode* inode);
@@ -63,8 +62,8 @@ vfs_dentry* vfs_dentry_lookup(vfs_dentry* parent, string name);
 void vfs_dentry_unlink(vfs_dentry* dentry);
 
 // atomically replaces name in `new_parent` with `child` of `old parent` and
-// unlinks existing name both old parent and new parent inode mutexes should be
-// held during this operation
+// unlinks existing dentry that is replaced, both old parent and new parent
+// inode mutexes should be held during this operation
 void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name);
 
 vfs_dentry* vfs_dentry_acquire(vfs_dentry* dentry);

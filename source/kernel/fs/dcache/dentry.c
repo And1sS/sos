@@ -228,8 +228,9 @@ void vfs_dentry_unlink(vfs_dentry* dentry) {
 
 vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry) {
     spin_lock(&dentry->lock);
-    vfs_dentry* parent = dentry->parent;
-    ref_acquire(&parent->refc);
+    // acquire done under lock since parent is guaranteed to be valid during
+    // whole locked scope, which might not be the case after
+    vfs_dentry* parent = vfs_dentry_acquire(dentry->parent);
     spin_unlock(&dentry->lock);
 
     return parent;
