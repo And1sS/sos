@@ -35,8 +35,6 @@ typedef struct vfs_inode {
 
     lock lock; // guards all fields below
 
-    bool dead;
-
     u64 mode;
 
     ref_count refc;

@@ -58,7 +58,6 @@ static vfs_inode* vfs_inode_allocate(u64 id, vfs_super_block* sb) {
 
     inode->id = id;
     inode->sb = sb;
-    inode->dead = false;
 
     inode->mut = RW_MUTEX_STATIC_INITIALIZER;
 
