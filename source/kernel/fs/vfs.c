@@ -96,6 +96,8 @@ u64 vfs_unlink(vfs_path start, string path) {
         goto out;
 
     vfs_dentry* child = res.dentry;
+    vfs_inode_lock(child->inode);
+
     error = -EISDIR;
     if (child->inode->type == DIRECTORY)
         goto failed_to_unlink;
@@ -110,6 +112,7 @@ u64 vfs_unlink(vfs_path start, string path) {
 
 failed_to_unlink:
     vfs_dentry_release(child);
+    vfs_inode_unlock(child->inode);
 
 out:
     vfs_inode_unlock(dir);
