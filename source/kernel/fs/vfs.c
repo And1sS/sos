@@ -169,10 +169,15 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
         goto out;
 
     // recheck that old_dentry hasn't been moved while we weren't holding lock
+    error = -ENOENT;
     vfs_dentry* _old_parent_dentry = vfs_dentry_get_parent(old_dentry);
-    error = _old_parent_dentry != old_parent_dentry ? -ENOENT : 0;
     vfs_dentry_release(_old_parent_dentry);
-    if (error)
+    if (_old_parent_dentry != old_parent_dentry)
+        goto out;
+
+    // check that we are not moving directory into its subdirectory
+    error = -EINVAL;
+    if (vfs_dentry_is_ancestor(new_parent_dentry, old_dentry))
         goto out;
 
     // lookup victim that will be replaced
@@ -183,7 +188,6 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
         goto out;
 
     // TODO: add check for mountpoints
-    // TODO: add check that victim_dentry is not child of old_dentry
 
     error = old_dentry->inode->ops->rename(old_parent_dentry, old_dentry,
                                            new_parent_dentry, victim_dentry,

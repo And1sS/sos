@@ -71,6 +71,5 @@ void vfs_dentry_release(vfs_dentry* dentry);
 vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry);
 
 bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor);
-bool vfs_dentry_ancestors(vfs_dentry* left, vfs_dentry* right);
 
 #endif // SOS_DENTRY_H

@@ -360,8 +360,3 @@ bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
 
     return result;
 }
-
-bool vfs_dentry_ancestors(vfs_dentry* left, vfs_dentry* right) {
-    return vfs_dentry_is_ancestor(left, right)
-           || vfs_dentry_is_ancestor(right, left);
-}
