@@ -71,6 +71,13 @@ vfs_dentry* vfs_dentry_acquire(vfs_dentry* dentry);
 void vfs_dentry_release(vfs_dentry* dentry);
 vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry);
 
+bool vfs_dentry_is_root(vfs_dentry* dentry);
+bool vfs_dentry_is_dir(vfs_dentry* dentry);
+
+// used for rename operation to avoid loops in tree structure, sb->rename_mut
+// should be held during this operation
 bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor);
+// inode mutex should be held during this operation
+bool vfs_dentry_is_orphaned(vfs_dentry* dentry);
 
 #endif // SOS_DENTRY_H

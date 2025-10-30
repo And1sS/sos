@@ -152,8 +152,10 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
     vfs_dentry* old_parent_dentry = old_parent.dentry;
     vfs_dentry* new_parent_dentry = new_parent.dentry;
 
-    // check that parents are in same superblock
-    if (old_parent_dentry->inode->sb != new_parent_dentry->inode->sb) {
+    // check that parents are in same superblock, and we are renaming (moving)
+    // into a directory
+    if (old_parent_dentry->inode->sb != new_parent_dentry->inode->sb
+        || !vfs_dentry_is_dir(new_parent_dentry)) {
         strfree(new_name_copy);
         return -EPERM;
     }
@@ -162,7 +164,8 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
 
     // recheck that parents are still alive
     u64 error = -ENOENT;
-    // TODO: recheck that parents are alive
+    if (vfs_dentry_is_orphaned(new_parent_dentry))
+        goto out;
 
     error = -EPERM;
     if (!old_dentry->inode->ops->rename)

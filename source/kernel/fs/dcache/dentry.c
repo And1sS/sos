@@ -327,6 +327,14 @@ vfs_dentry* vfs_dentry_lookup(vfs_dentry* parent, string name) {
     return dentry;
 }
 
+bool vfs_dentry_is_root(vfs_dentry* dentry) {
+    return dentry == dentry->inode->sb->root;
+}
+
+bool vfs_dentry_is_dir(vfs_dentry* dentry) {
+    return dentry->inode->type == DIRECTORY;
+}
+
 bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
     vfs_dentry* iter = dentry;
     vfs_dentry_acquire(iter);
@@ -355,4 +363,10 @@ bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
     vfs_dentry_release(iter);
 
     return result;
+}
+
+bool vfs_dentry_is_orphaned(vfs_dentry* dentry) {
+    // safe to do plain reads here since caller is holding inode->rw_mut which
+    // carries visibility and prevents concurrent changes
+    return dentry->parent == dentry && !vfs_dentry_is_root(dentry);
 }
