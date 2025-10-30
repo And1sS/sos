@@ -136,8 +136,7 @@ vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,
         goto out;
     }
 
-    vfs_dentry_acquire(parent);
-    dentry->parent = parent;
+    dentry->parent = vfs_dentry_acquire(parent);
     dentry->hash_bucket = bucket;
     dcache_put(bucket, dentry);
 
@@ -152,11 +151,9 @@ out:
 }
 
 void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name) {
-    // Safe to do plain reads of parent and name since caller already holds old
-    // parents rw_mutex so no concurrent namespace changes (name/parent changes)
-    // can be done concurrently and visibility was carried either via dcache
-    // when lookup occurred or later via scheduler if after lookup cpu has been
-    // changed
+    // Safe to do plain reads of parent and name since caller already holds both
+    // old and new parents inode->rw_mut which carries visibility and prevents
+    // concurrent changes
     vfs_dentry* old_parent = child->parent;
 
     // remove old link and point child towards new parent
@@ -210,11 +207,10 @@ void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name) {
     // parent reference just been moved to new child
 }
 
-void vfs_dentry_delete(vfs_dentry* dentry) {
-    // it is safe to use parent since caller is holding inode->mut, so no
-    // namespace changes can occur and visibility is carried by same mut since
-    // last lookup/move/etc
-    vfs_dentry* parent = vfs_dentry_get_parent(dentry);
+void vfs_dentry_detach(vfs_dentry* dentry) {
+    // safe to do plain reads here since caller is holding inode->rw_mut which
+    // carries visibility and prevents concurrent changes
+    vfs_dentry* parent = dentry->parent;
     dcache_bucket* bucket = dentry->hash_bucket;
 
     dcache_bucket_lock(bucket);
