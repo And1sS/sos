@@ -336,9 +336,7 @@ bool vfs_dentry_is_dir(vfs_dentry* dentry) {
 }
 
 bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
-    vfs_dentry* iter = dentry;
-    vfs_dentry_acquire(iter);
-
+    vfs_dentry* iter = vfs_dentry_acquire(dentry);
     bool result = false;
     vfs_dentry* parent;
 
@@ -348,9 +346,7 @@ bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
         if (parent == ancestor) {
             result = true;
             break;
-        }
-
-        if (parent == iter) { // detached node or root
+        } else if (parent == iter) { // detached node or root
             result = false;
             break;
         }
