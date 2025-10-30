@@ -52,18 +52,19 @@ static vfs_inode* vfs_inode_allocate(u64 id, vfs_super_block* sb) {
 
     inode->id = id;
     inode->sb = sb;
-    inode->initialised = false;
     inode->dead = false;
 
     inode->mut = RW_MUTEX_STATIC_INITIALIZER;
+
+    inode->flags = 0;
+    inode->links = 0;
 
     inode->lock = SPIN_LOCK_STATIC_INITIALIZER;
     inode->refc = REF_COUNT_STATIC_INITIALIZER;
 
     vfs_super_acquire(sb);
-    vfs_inode_acquire(inode);
 
-    return inode;
+    return vfs_inode_acquire(inode);
 }
 
 vfs_inode* vfs_icache_get(vfs_super_block* sb, u64 id) {
@@ -106,24 +107,28 @@ void vfs_inode_drop(vfs_inode* inode) {
 
 void vfs_inode_await_initialization(vfs_inode* inode) {
     spin_lock(&inode->lock);
-    while (!inode->initialised) {
+    while (!(inode->flags & INODE_INITIALISED)) {
         CON_VAR_WAIT_FOR(&inode->initialization_cvar, &inode->lock,
-                         inode->initialised);
+                         inode->flags & INODE_INITIALISED);
     }
     spin_unlock(&inode->lock);
 }
 
-void vfs_inode_unlock_new(vfs_inode* inode) {
+vfs_inode* vfs_inode_unlock_new(vfs_inode* inode) {
     spin_lock(&inode->lock);
-    inode->initialised = true;
+    inode->flags |= INODE_INITIALISED;
     con_var_broadcast(&inode->initialization_cvar);
     spin_unlock(&inode->lock);
+
+    return inode;
 }
 
-void vfs_inode_acquire(vfs_inode* inode) {
+vfs_inode* vfs_inode_acquire(vfs_inode* inode) {
     spin_lock(&inode->lock);
     ref_acquire(&inode->refc);
     spin_unlock(&inode->lock);
+
+    return inode;
 }
 
 void vfs_inode_release(vfs_inode* inode) {
@@ -170,9 +175,6 @@ void vfs_inodes_unlock(vfs_inode* left, vfs_inode* right) {
     vfs_inode_unlock(MIN(left, right));
 }
 
-void vfs_inode_drop_link(vfs_inode* inode) { UNUSED(inode); }
+void vfs_inode_drop_link(vfs_inode* inode) { atomic_decrement(&inode->links); }
 
-u64 vfs_inode_add_link(vfs_inode* inode) {
-    UNUSED(inode);
-    return true;
-}
+void vfs_inode_add_link(vfs_inode* inode) { atomic_increment(&inode->links); }

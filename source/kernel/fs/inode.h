@@ -6,6 +6,14 @@
 #include "super_block.h"
 #include "vfs.h"
 
+// set once after initialisation has finished, safe to read without atomics when
+// inode has been obtained via cache
+#define INODE_INITIALISED (1 << 0)
+
+// set when inode is dead (from rmdir or unlink) and should not be used
+// afterward
+#define INODE_DEAD (1 << 1)
+
 typedef struct vfs_inode {
     // Immutable data
     u64 id;
@@ -19,13 +27,17 @@ typedef struct vfs_inode {
                   // (lookup, readdir) from modifying operations (link, unlink,
                   // rmdir, etc.)
 
+    u64 flags; // Should be accessed atomically
+    u64 links; // Should be modified atomically and inspected only under mut
+               // (exception is inspection before freeing, since noone can
+               // modify links at that point and visibility will be carried
+               // through refcount
+
     lock lock; // guards all fields below
 
-    bool initialised; // safe to read without lock if obtained via cache
     bool dead;
 
     u64 mode;
-    u64 links;
 
     ref_count refc;
 
@@ -37,9 +49,9 @@ typedef struct vfs_inode {
 void vfs_inode_await_initialization(vfs_inode* inode);
 // unlocks uninitialised inode, serializes all updated inode data, acts as
 // store-release
-void vfs_inode_unlock_new(vfs_inode* inode);
+vfs_inode* vfs_inode_unlock_new(vfs_inode* inode);
 
-void vfs_inode_acquire(vfs_inode* inode);
+vfs_inode* vfs_inode_acquire(vfs_inode* inode);
 void vfs_inode_release(vfs_inode* inode);
 
 // agressively destroy inode caller got from vfs_icache_get,
@@ -48,7 +60,7 @@ void vfs_inode_release(vfs_inode* inode);
 void vfs_inode_drop(vfs_inode* inode);
 
 void vfs_inode_drop_link(vfs_inode* inode);
-u64 vfs_inode_add_link(vfs_inode* inode);
+void vfs_inode_add_link(vfs_inode* inode);
 
 void vfs_inode_lock_shared(vfs_inode* inode);
 void vfs_inode_unlock_shared(vfs_inode* inode);

@@ -1,6 +1,7 @@
 #include "ramfs.h"
 #include "../../error/errno.h"
 #include "../../error/error.h"
+#include "../../lib/flagops.h"
 #include "../dcache/dentry.h"
 #include "internal_tree.h"
 
@@ -30,7 +31,7 @@ vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     if (IS_ERROR(inode))
         return inode;
 
-    if (inode->initialised)
+    if (inode->flags & INODE_INITIALISED)
         return inode;
 
     inode->links = 1 + node->subnodes.size;
@@ -38,8 +39,7 @@ vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     inode->ops = &inode_ops;
     inode->type = node->type;
 
-    vfs_inode_unlock_new(inode);
-    return inode;
+    return vfs_inode_unlock_new(inode);
 }
 
 u64 ramfs_fill_super(vfs_super_block* sb, device* dev) {
@@ -66,8 +66,7 @@ vfs_dentry* ramfs_mount(vfs_type* type, device* dev) {
     if (IS_ERROR(sb))
         return ERROR_PTR(sb);
 
-    vfs_dentry_acquire(sb->root);
-    return sb->root;
+    return vfs_dentry_acquire(sb->root);
 }
 
 vfs_dentry* ramfs_lookup(vfs_dentry* parent, string name) {
@@ -83,8 +82,17 @@ vfs_dentry* ramfs_lookup(vfs_dentry* parent, string name) {
 }
 
 u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child) {
-    unlink_nodes(dir->private_data, child->inode->private_data);
-    vfs_inode_drop_link(child->inode);
+    vfs_inode_drop_link(dir);
+
+    vfs_inode* inode = child->inode;
+
+    unlink_nodes(dir->private_data, inode->private_data);
+    vfs_inode_lock(inode);
+    vfs_inode_drop_link(inode);
+    if (inode->links == 0)
+        ATOMIC_SET_FLAGS(inode->flags, INODE_DEAD);
+    vfs_inode_lock(inode);
+
     return 0;
 }
 
@@ -110,14 +118,18 @@ u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
 
     // fail-safe replacements
     unlink_nodes(old_parent, old_child);
-    if (new_child)
-        unlink_nodes(new_parent, new_child);
     old_child->name = name;
     link_nodes(new_parent, old_child);
 
     vfs_inode_drop_link(old_parent_dentry->inode);
-    if (new_dentry)
+
+    if (new_dentry) {
+        unlink_nodes(new_parent, new_child);
+        vfs_inode_drop_link(new_dentry->inode);
+        if (new_dentry->inode->links == 0)
+            ATOMIC_SET_FLAGS(new_dentry->inode->flags, INODE_DEAD);
         vfs_inode_unlock(new_dentry->inode);
+    }
 
     return 0;
 }

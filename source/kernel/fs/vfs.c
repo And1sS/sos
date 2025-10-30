@@ -170,8 +170,9 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
     // TODO: add check for mountpoints
     // TODO: add check that new_dentry is not child of old_dentry
 
-    error = old_dentry->inode->ops->rename(
-        old_parent_dentry, old_dentry, new_parent_dentry, new_dentry, new_name);
+    error = old_dentry->inode->ops->rename(old_parent_dentry, old_dentry,
+                                           new_parent_dentry, new_dentry,
+                                           new_name_copy);
 
     vfs_dentry_move(new_parent_dentry, old_dentry, new_name_copy);
 
