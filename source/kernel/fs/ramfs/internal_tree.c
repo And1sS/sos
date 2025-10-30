@@ -1,4 +1,5 @@
 #include "internal_tree.h"
+#include "../../error/errno.h"
 #include "../../lib/string.h"
 
 static tree_node root = {.name = "[root]",
@@ -46,6 +47,11 @@ static tree_node* alloc_tree_node(u64 id, string name, vfs_inode_type type) {
     return node;
 }
 
+void evict_node(tree_node* node) {
+    strfree(node->name);
+    kfree(node);
+}
+
 void link_nodes(tree_node* parent, tree_node* child) {
     child->parent = parent;
     linked_list_add_last_node(&parent->subnodes, &child->self_node);
@@ -54,6 +60,16 @@ void link_nodes(tree_node* parent, tree_node* child) {
 void unlink_nodes(tree_node* parent, tree_node* child) {
     linked_list_remove_node(&parent->subnodes, &child->self_node);
     child->parent = NULL;
+}
+
+u64 rename_node(tree_node* node, string name) {
+    string name_copy = strcpy(name);
+    if (!name_copy)
+        return -ENOMEM;
+
+    strfree(node->name);
+    node->name = name_copy;
+    return 0;
 }
 
 tree_node* get_root() { return &root; }

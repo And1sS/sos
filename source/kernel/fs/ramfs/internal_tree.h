@@ -21,6 +21,10 @@ void internal_tree_init();
 tree_node* get_root();
 tree_node* find_subnode(tree_node* node, string name);
 
+u64 rename_node(tree_node* node, string name);
+
+void evict_node(tree_node* node);
+
 void unlink_nodes(tree_node* parent, tree_node* child);
 void link_nodes(tree_node* parent, tree_node* child);
 

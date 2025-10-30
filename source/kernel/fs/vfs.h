@@ -16,11 +16,13 @@ struct vfs_dentry;
 struct vfs_path;
 
 typedef struct {
+    void (*evict)(struct vfs_inode* inode);
+
     // file operations
-    u64 (*open)(struct vfs_inode* vn, int flags);
-    u64 (*close)(struct vfs_inode* vn);
-    u64 (*read)(struct vfs_inode* vn, u64 off, u8* buffer);
-    u64 (*write)(struct vfs_inode* vn, u64 off, u8* buffer);
+    u64 (*open)(struct vfs_inode* inode, int flags);
+    u64 (*close)(struct vfs_inode* inode);
+    u64 (*read)(struct vfs_inode* inode, u64 off, u8* buffer);
+    u64 (*write)(struct vfs_inode* inode, u64 off, u8* buffer);
 
     // directory operations
     u64 (*unlink)(struct vfs_inode* dir, struct vfs_dentry* dentry);

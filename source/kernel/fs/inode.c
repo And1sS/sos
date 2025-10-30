@@ -39,6 +39,12 @@ void vfs_icache_init(u64 max_inodes) {
 
 static void vfs_inode_destroy(vfs_inode* inode) {
     // at this point inode is unreachable for others
+
+    // safe to do plain links read since no one can modify this and visibility
+    // is carried by refc
+    if (inode->links == 0 && inode->ops->evict)
+        inode->ops->evict(inode);
+
     vfs_super_release(inode->sb);
     kfree(inode);
 }

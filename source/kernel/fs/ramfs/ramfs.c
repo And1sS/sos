@@ -5,28 +5,33 @@
 #include "../dcache/dentry.h"
 #include "internal_tree.h"
 
-static u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev);
-static vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
-static vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
-static u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
-                        vfs_dentry* new_parent_dentry, vfs_dentry* new_dentry,
-                        string name);
-static u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child);
+void ramfs_evict(struct vfs_inode* inode);
+u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev);
+vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
+vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
+u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
+                 vfs_dentry* new_parent_dentry, vfs_dentry* new_dentry,
+                 string name);
+u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child);
 
 static vfs_type_ops ops = {.fill_super = ramfs_fill_super,
                            .mount = ramfs_mount,
                            .sync = NULL,
                            .unmount = NULL};
-static vfs_inode_ops inode_ops = {
-    .lookup = ramfs_lookup, .unlink = ramfs_unlink, .rename = ramfs_rename};
-static struct vfs_type ramfs_type = {.name = RAMFS_NAME, .ops = &ops};
+
+static vfs_inode_ops inode_ops = {.evict = ramfs_evict,
+                                  .lookup = ramfs_lookup,
+                                  .unlink = ramfs_unlink,
+                                  .rename = ramfs_rename};
+
+static vfs_type ramfs_type = {.name = RAMFS_NAME, .ops = &ops};
 
 void ramfs_init() {
     register_vfs_type(&ramfs_type);
     internal_tree_init();
 }
 
-vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
+static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);
     if (IS_ERROR(inode))
         return inode;
@@ -41,6 +46,8 @@ vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
 
     return vfs_inode_unlock_new(inode);
 }
+
+void ramfs_evict(vfs_inode* inode) { evict_node(inode->private_data); }
 
 u64 ramfs_fill_super(vfs_super_block* sb, device* dev) {
     vfs_inode* root_inode = to_inode(get_root(), sb);
@@ -100,36 +107,42 @@ u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
                  vfs_dentry* new_parent_dentry, vfs_dentry* new_dentry,
                  string name) {
 
+    u64 error = 0;
+
     tree_node* old_parent = old_parent_dentry->inode->private_data;
     tree_node* new_parent = new_parent_dentry->inode->private_data;
     tree_node* old_child = old_dentry->inode->private_data;
     tree_node* new_child = new_dentry ? new_dentry->inode->private_data : NULL;
 
     // lock directory inode so that nobody can modify directory concurrently
-    if (new_dentry && new_dentry->inode->type == DIRECTORY) {
+    if (new_dentry && new_dentry->inode->type == DIRECTORY)
         vfs_inode_lock(new_dentry->inode);
 
-        // inode private data is guarded by inode->rw_mutex
-        if (new_child->subnodes.size != 0) {
-            vfs_inode_unlock(new_dentry->inode);
-            return -ENOTEMPTY;
-        }
-    }
+    // inode private data is guarded by inode->rw_mutex
+    error = new_child && new_child->subnodes.size != 0 ? -ENOTEMPTY : 0;
+    if (IS_ERROR(error))
+        goto out;
+
+    error = rename_node(old_child, name);
+    if (IS_ERROR(error))
+        goto out;
 
     // fail-safe replacements
     unlink_nodes(old_parent, old_child);
-    old_child->name = name;
-    link_nodes(new_parent, old_child);
-
     vfs_inode_drop_link(old_parent_dentry->inode);
+
+    link_nodes(new_parent, old_child);
 
     if (new_dentry) {
         unlink_nodes(new_parent, new_child);
         vfs_inode_drop_link(new_dentry->inode);
         if (new_dentry->inode->links == 0)
             ATOMIC_SET_FLAGS(new_dentry->inode->flags, INODE_DEAD);
-        vfs_inode_unlock(new_dentry->inode);
     }
 
-    return 0;
+out:
+    if (new_dentry && new_dentry->inode->type == DIRECTORY)
+        vfs_inode_unlock(new_dentry->inode);
+
+    return error;
 }
