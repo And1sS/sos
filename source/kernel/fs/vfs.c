@@ -193,7 +193,9 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
                                            new_parent_dentry, victim_dentry,
                                            new_name_copy);
 
-    vfs_dentry_move(new_parent_dentry, old_dentry, new_name_copy);
+    if (!error)
+        vfs_dentry_move(new_parent_dentry, old_dentry, new_name_copy);
+
     if (victim_dentry)
         vfs_dentry_release(victim_dentry);
 
