@@ -5,6 +5,11 @@
 #include "../vfs.h"
 #include "dcache.h"
 
+// set when dentry is no longer reachable from cache and is
+// about to be freed, this is needed so that traversal of
+// children can check whether it can use this dentry or not
+#define DENTRY_DYING (1 << 0)
+
 typedef struct vfs_dentry {
     // Immutable data
     vfs_inode* inode;
@@ -23,13 +28,9 @@ typedef struct vfs_dentry {
     // 2) when destroying dentry
     linked_list_node dentry_node;
 
-    lock lock;     // guards all fields below
-    bool dying;    // set when dentry is no longer reachable from cache and is
-                   // about to be freed, this is needed so that traversal of
-                   // children can check whether it can use this dentry or not
-    bool detached; // set when dentry is detached (from rmdir or unlink) and
-                   // should not stay in cache after refcount reaches 0 even if
-                   // cache is not full
+    u64 flags; // Should be accessed atomically
+
+    lock lock; // guards all fields below
 
     dcache_bucket* hash_bucket; // dcache hash table bucket where dentry
                                 // resides, NULL if not hashed
@@ -39,6 +40,7 @@ typedef struct vfs_dentry {
     // dentry locks, and parent inode->mut locked for write. Each time any of
     // these fields changes - dentry should be unhashed or rehashed.
     string name;
+
     struct vfs_dentry* parent; // never NULL(real parent or self-reference)
 
     // holds references to 'dentry_node's of children dentries, this means that
@@ -64,7 +66,7 @@ void vfs_dentry_delete(vfs_dentry* dentry);
 // held during this operation
 void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name);
 
-void vfs_dentry_acquire(vfs_dentry* dentry);
+vfs_dentry* vfs_dentry_acquire(vfs_dentry* dentry);
 void vfs_dentry_release(vfs_dentry* dentry);
 vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry);
 

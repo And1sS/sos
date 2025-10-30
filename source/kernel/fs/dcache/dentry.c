@@ -1,6 +1,7 @@
 #include "dentry.h"
 #include "../../error/errno.h"
 #include "../../error/error.h"
+#include "../../lib/flagops.h"
 #include "../../lib/hash.h"
 #include "../../lib/string.h"
 
@@ -57,20 +58,19 @@ static vfs_dentry* vfs_dentry_allocate(vfs_inode* inode, string name) {
         return ERROR_PTR(-ENOMEM);
     }
 
-    memset(dentry, NULL, sizeof(vfs_dentry));
+    memset(dentry, 0, sizeof(vfs_dentry));
 
     dentry->name = name_copy;
     dentry->inode = inode;
     vfs_inode_acquire(inode);
 
     dentry->unused_node = LINKED_LIST_NODE_OF(dentry);
-    memset(&dentry->hash_entry, NULL, sizeof(dcache_hash_entry));
+    memset(&dentry->hash_entry, 0, sizeof(dcache_hash_entry));
     dentry->hash_entry.name = name_copy;
 
     dentry->lock = SPIN_LOCK_STATIC_INITIALIZER;
 
-    dentry->dying = false;
-    dentry->detached = false;
+    dentry->flags = 0;
     dentry->hash_bucket = NULL;
 
     dentry->dentry_node = LINKED_LIST_NODE_OF(dentry);
@@ -78,8 +78,7 @@ static vfs_dentry* vfs_dentry_allocate(vfs_inode* inode, string name) {
 
     dentry->refc = REF_COUNT_STATIC_INITIALIZER;
 
-    vfs_dentry_acquire(dentry);
-    return dentry;
+    return vfs_dentry_acquire(dentry);
 }
 
 vfs_dentry* vfs_dentry_create_root(vfs_inode* inode) {
@@ -185,7 +184,6 @@ void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name) {
         dcache_remove(new_bucket, existing_child);
         existing_child->parent = existing_child;
         existing_child->hash_bucket = NULL;
-        existing_child->detached = true;
         spin_unlock(&existing_child->lock);
     }
 
@@ -224,7 +222,6 @@ void vfs_dentry_delete(vfs_dentry* dentry) {
     spin_lock(&dentry->lock);
 
     dcache_remove(bucket, dentry);
-    dentry->detached = true;
     dentry->parent = dentry;
     dentry->hash_bucket = NULL;
 
@@ -243,7 +240,10 @@ vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry) {
     return parent;
 }
 
-void vfs_dentry_acquire(vfs_dentry* dentry) { ref_acquire(&dentry->refc); }
+vfs_dentry* vfs_dentry_acquire(vfs_dentry* dentry) {
+    ref_acquire(&dentry->refc);
+    return dentry;
+}
 
 // This function is a tradeoff, releasing operation may cause chain reaction of:
 // release -> delete -> release parent -> delete parent and so on, which:
@@ -289,12 +289,12 @@ retry_bucket_lock:
     if (dentry->refc.count != 0)
         goto out;
 
-    if (!dentry->detached && dcache_has_space()) {
+    if (dentry->hash_bucket && dcache_has_space()) {
         dcache_put_unused(bucket, dentry);
         goto out;
     }
 
-    dentry->dying = true;
+    ATOMIC_SET_FLAGS(dentry->flags, DENTRY_DYING);
     dentry->hash_bucket = NULL;
     dcache_remove(bucket, dentry);
 
