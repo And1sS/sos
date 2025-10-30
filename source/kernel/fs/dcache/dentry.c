@@ -152,7 +152,7 @@ out:
 
 void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name) {
     // Safe to do plain reads of parent and name since caller already holds both
-    // old and new parents inode->rw_mut which carries visibility and prevents
+    // old and new parents inode->rw_mut which carry visibility and prevent
     // concurrent changes
     vfs_dentry* old_parent = child->parent;
 
@@ -362,7 +362,8 @@ bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
 }
 
 bool vfs_dentry_is_orphaned(vfs_dentry* dentry) {
-    // safe to do plain reads here since caller is holding inode->rw_mut which
-    // carries visibility and prevents concurrent changes
+    // safe to do plain reads here since caller is holding inode->rw_mut or
+    // parent inode->rw_mut which carries visibility and prevents concurrent
+    // changes
     return dentry->parent == dentry && !vfs_dentry_is_root(dentry);
 }
