@@ -35,10 +35,11 @@ typedef struct vfs_dentry {
     dcache_bucket* hash_bucket; // dcache hash table bucket where dentry
                                 // resides, NULL if not hashed
 
-    // these two are closely tied to hash_entry, can be changed only during
+    // these two are closely tied to hash_bucket, can be changed only during
     // creation or namespace changes. Should be changed under both dcache and
-    // dentry locks, and parent inode->mut locked for write. Each time any of
-    // these fields changes - dentry should be unhashed or rehashed.
+    // dentry locks (to synchronize with dentry release), and parent inode->mut
+    // locked for write (to prevent concurrent namespace changes). Each time any
+    // of these fields changes - dentry should be unhashed or rehashed.
     string name;
 
     struct vfs_dentry* parent; // never NULL(real parent or self-reference)
@@ -59,7 +60,7 @@ vfs_dentry* vfs_dentry_create_root(vfs_inode* inode);
 vfs_dentry* vfs_dentry_lookup(vfs_dentry* parent, string name);
 
 // parent inode mutex should be held for write during this operation
-void vfs_dentry_delete(vfs_dentry* dentry);
+void vfs_dentry_unlink(vfs_dentry* dentry);
 
 // atomically replaces name in `new_parent` with `child` of `old parent` and
 // unlinks existing name both old parent and new parent inode mutexes should be

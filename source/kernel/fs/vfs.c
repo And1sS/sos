@@ -106,7 +106,7 @@ u64 vfs_unlink(vfs_path start, string path) {
 
     error = dir->ops->unlink(dir, child);
     if (!IS_ERROR(error))
-        vfs_dentry_delete(child);
+        vfs_dentry_unlink(child);
 
 failed_to_unlink:
     vfs_dentry_release(child);
@@ -169,10 +169,10 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
         goto out;
 
     // recheck that old_dentry hasn't been moved while we weren't holding lock
+    // safe to read parent since we are holding old_parent_dentry->inode->rw_mut
+    // which carries visibility and prevents concurrent modifications
     error = -ENOENT;
-    vfs_dentry* _old_parent_dentry = vfs_dentry_get_parent(old_dentry);
-    vfs_dentry_release(_old_parent_dentry);
-    if (_old_parent_dentry != old_parent_dentry)
+    if (old_dentry->parent != old_parent_dentry)
         goto out;
 
     // check that we are not moving directory into its subdirectory

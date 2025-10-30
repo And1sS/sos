@@ -207,9 +207,9 @@ void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name) {
     // parent reference just been moved to new child
 }
 
-void vfs_dentry_detach(vfs_dentry* dentry) {
-    // safe to do plain reads here since caller is holding inode->rw_mut which
-    // carries visibility and prevents concurrent changes
+void vfs_dentry_unlink(vfs_dentry* dentry) {
+    // safe to do plain reads here since caller is holding parent inode->rw_mut
+    // which carries visibility and prevents concurrent changes
     vfs_dentry* parent = dentry->parent;
     dcache_bucket* bucket = dentry->hash_bucket;
 
