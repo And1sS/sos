@@ -367,3 +367,11 @@ bool vfs_dentry_is_orphaned(vfs_dentry* dentry) {
     // changes
     return dentry->parent == dentry && !vfs_dentry_is_root(dentry);
 }
+
+void vfs_dentry_set_mountpoint(vfs_dentry* dentry) {
+    ATOMIC_SET_FLAGS(dentry->flags, DENTRY_MOUNTPOINT);
+}
+
+bool vfs_dentry_is_mountpoint(vfs_dentry* dentry) {
+    return ATOMIC_TEST_FLAG(dentry->flags, DENTRY_MOUNTPOINT);
+}

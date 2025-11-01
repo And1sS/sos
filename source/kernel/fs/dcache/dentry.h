@@ -10,6 +10,9 @@
 // children can check whether it can use this dentry or not
 #define DENTRY_DYING (1 << 0)
 
+// set when dentry is a mountpoint
+#define DENTRY_MOUNTPOINT (1 << 1)
+
 typedef struct vfs_dentry {
     // Immutable data
     vfs_inode* inode;
@@ -78,5 +81,8 @@ bool vfs_dentry_is_dir(vfs_dentry* dentry);
 bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor);
 // inode mutex should be held during this operation
 bool vfs_dentry_is_orphaned(vfs_dentry* dentry);
+
+void vfs_dentry_set_mountpoint(vfs_dentry* dentry);
+bool vfs_dentry_is_mountpoint(vfs_dentry* dentry);
 
 #endif // SOS_DENTRY_H
