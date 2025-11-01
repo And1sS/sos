@@ -22,10 +22,10 @@ typedef struct vfs_super_block {
     ref_count refc;
 } vfs_super_block;
 
-struct vfs_super_block* vfs_super_get(struct vfs_type* type, device* dev);
-u64 vfs_super_destroy(struct vfs_super_block* sb);
+vfs_super_block* vfs_super_get(struct vfs_type* type, device* dev);
+u64 vfs_super_destroy(vfs_super_block* sb);
 
-void vfs_super_acquire(struct vfs_super_block* sb);
-void vfs_super_release(struct vfs_super_block* sb);
+void vfs_super_acquire(vfs_super_block* sb);
+void vfs_super_release(vfs_super_block* sb);
 
 #endif // SOS_SUPER_BLOCK_H
