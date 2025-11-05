@@ -73,7 +73,7 @@ vfs_dentry* lookup(vfs_dentry* parent, string path) {
     }
 
     if (streq(path, ".."))
-        return vfs_dentry_get_parent(parent);
+        return vfs_dentry_parent(parent);
 
     vfs_dentry* child = vfs_dentry_lookup(parent, path);
     return child ? child : parent->inode->ops->lookup(parent, path);

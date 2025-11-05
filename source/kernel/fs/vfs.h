@@ -32,7 +32,6 @@ typedef struct {
                   struct vfs_dentry* new_parent_dentry,
                   struct vfs_dentry* new_dentry, string name);
 
-    //
     //    u64 (*create)(struct vfs_inode* dir, string name, struct vattr* vattr,
     //                  struct vfs_entry** result);
     //
@@ -46,9 +45,6 @@ typedef struct {
     //    u64 (*hardlink)(struct vfs_inode* dir, string name, struct vnode*
     //    target,
     //                    struct vfs_entry** result);
-    //
-    //    u64 (*unlink)(struct vfs_inode* dir, struct vnode* vn,
-    //                  struct vfs_entry* ve);
     //
     //    u64 (*mkdir)(struct vfs_inode* dir, string name, struct vattr* vattr,
     //                 struct vfs_entry** result);

@@ -225,7 +225,7 @@ void vfs_dentry_unlink(vfs_dentry* dentry) {
     vfs_dentry_release(parent);
 }
 
-vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry) {
+vfs_dentry* vfs_dentry_parent(vfs_dentry* dentry) {
     spin_lock(&dentry->lock);
     // acquire done under lock since parent is guaranteed to be valid during
     // whole locked scope, which might not be the case after
@@ -341,7 +341,7 @@ bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
     vfs_dentry* parent;
 
     while (true) {
-        parent = vfs_dentry_get_parent(iter);
+        parent = vfs_dentry_parent(iter);
 
         if (parent == ancestor) {
             result = true;

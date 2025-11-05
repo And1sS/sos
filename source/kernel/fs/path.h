@@ -3,7 +3,7 @@
 
 #include "mount.h"
 
-#define MAX_PATH_LENGTH 512
+#define MAX_PATH_LENGTH 256
 
 typedef struct vfs_path {
     vfs_mount* mount;

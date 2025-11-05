@@ -71,7 +71,7 @@ void vfs_dentry_move(vfs_dentry* new_parent, vfs_dentry* child, string name);
 
 vfs_dentry* vfs_dentry_acquire(vfs_dentry* dentry);
 void vfs_dentry_release(vfs_dentry* dentry);
-vfs_dentry* vfs_dentry_get_parent(vfs_dentry* dentry);
+vfs_dentry* vfs_dentry_parent(vfs_dentry* dentry);
 
 bool vfs_dentry_is_root(vfs_dentry* dentry);
 bool vfs_dentry_is_dir(vfs_dentry* dentry);
