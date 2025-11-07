@@ -16,4 +16,19 @@ references and incrementing their reference counts.
 
 4) Each inode holds a reference to super block.
 
+5) Each superblock holds a reference to fs type
+
+6) Each mount holds a reference to parent mount
+
+All above rules can be summarized into:
+Lifetime: type > mount > super > inode > dentry
+Ownership (A holds refcounted pointer of B, A → B):
+
+         to parent     to root
+             ┌───┐ ┌───────────────┐
+             │   ▼ ▼               │
+             └── dentry → inode → super → type
+             ┌───┐ ▲
+ to parent   │   ▼ │  to root and mountpoint
+             └─ mount
 
