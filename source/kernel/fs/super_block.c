@@ -14,7 +14,7 @@ void vfs_super_unmount(vfs_super_block* sb) {
     SET_FLAGS(sb->flags, SUPER_DYING);
     spin_unlock(&sb->type->lock);
 
-    // TODO: clear unused dentries
+    dcache_evict_unused(sb);
     // TODO: clear unused inodes
 
     vfs_super_release(sb);

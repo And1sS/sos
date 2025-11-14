@@ -86,6 +86,7 @@ u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
     vfs_mount* mnt = start.mount;
     vfs_dentry* dentry = start.dentry;
 
+    // TODO: handle root, handle global lookups
     if (parts->parts_left == 0)
         return -ENOENT;
 

@@ -31,6 +31,8 @@ void dcache_unreserve();
 
 bool dcache_has_space();
 bool dcache_shrink();
+// Should be called on superblock death
+void dcache_evict_unused(struct vfs_super_block* sb);
 
 dcache_bucket* dcache_bucket_get(u64 hash);
 

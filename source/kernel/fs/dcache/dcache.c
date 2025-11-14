@@ -42,9 +42,8 @@ bool dcache_has_space() {
     return atomic_get(&alive_dentries) < atomic_get(&max_dentries);
 }
 
+extern void vfs_dentry_destroy(vfs_dentry* dentry);
 bool dcache_shrink() {
-    extern void vfs_dentry_destroy(vfs_dentry * dentry);
-
     for (u64 i = 0; i < cache.buckets.size; i++) {
         dcache_bucket* bucket = dcache_bucket_get(i);
 
@@ -61,6 +60,34 @@ bool dcache_shrink() {
     }
 
     return false;
+}
+
+void dcache_evict_unused(vfs_super_block* sb) {
+    linked_list unused = LINKED_LIST_STATIC_INITIALIZER;
+    linked_list_node* iter;
+
+    for (u64 i = 0; i < cache.buckets.size; i++) {
+        dcache_bucket* bucket = dcache_bucket_get(i);
+
+        dcache_bucket_lock(bucket);
+        iter = bucket->unused_list.head;
+
+        while (iter) {
+            vfs_dentry* victim = iter->value;
+            iter = iter->next;
+            if (victim->inode->sb != sb)
+                continue;
+
+            dcache_remove(bucket, victim);
+            linked_list_add_last_node(&unused, &victim->unused_node);
+        }
+        dcache_bucket_unlock(bucket);
+    }
+
+    while (unused.size != 0) {
+        linked_list_node* node = linked_list_remove_first_node(&unused);
+        vfs_dentry_destroy(node->value);
+    }
 }
 
 dcache_bucket* dcache_bucket_get(u64 hash) {
