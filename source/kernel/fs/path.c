@@ -67,6 +67,9 @@ static void walk_next_part(path_parts* parts) {
 }
 
 vfs_dentry* lookup(vfs_dentry* parent, string path) {
+    if (vfs_super_is_dying(parent->inode->sb))
+        return ERROR_PTR(-EBUSY);
+
     if (streq(path, ".")) {
         vfs_dentry_acquire(parent);
         return parent;

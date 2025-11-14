@@ -76,6 +76,17 @@ void deregister_vfs_type(vfs_type* type) {
     spin_unlock_irq_restore(&type_registry_lock, interrupts_enabled);
 }
 
+vfs_type* vfs_type_acquire(vfs_type* type) {
+    ref_acquire(&type->refc);
+    return type;
+}
+
+void vfs_type_release(vfs_type* type) {
+    spin_lock(&type->lock);
+    ref_release(&type->refc);
+    spin_unlock(&type->lock);
+}
+
 u64 vfs_unlink(vfs_path start, string path) {
     if (path_ends_with_dot(path) || path_ends_with_dotdot(path))
         return -EPERM;
@@ -165,9 +176,11 @@ u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
 
     vfs_rename_lock(old_parent_dentry, new_parent_dentry);
 
+    // TODO: check that we are not moving unhashed dentries
     // recheck that parents are still alive
     u64 error = -ENOENT;
-    if (vfs_dentry_is_orphaned(new_parent_dentry))
+    if (vfs_dentry_is_orphaned(new_parent_dentry)
+        || vfs_dentry_is_orphaned(old_dentry))
         goto out;
 
     error = -EPERM;

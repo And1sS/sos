@@ -5,19 +5,15 @@
 #include "../dcache/dentry.h"
 #include "internal_tree.h"
 
-void ramfs_evict(struct vfs_inode* inode);
-u64 ramfs_fill_super(struct vfs_super_block* sb, device* dev);
-vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
-vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
-u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
-                 vfs_dentry* new_parent_dentry, vfs_dentry* new_dentry,
-                 string name);
-u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child);
+static void ramfs_evict(struct vfs_inode* inode);
+static vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
+static vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
+static u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
+                        vfs_dentry* new_parent_dentry, vfs_dentry* new_dentry,
+                        string name);
+static u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child);
 
-static vfs_type_ops ops = {.fill_super = ramfs_fill_super,
-                           .mount = ramfs_mount,
-                           .sync = NULL,
-                           .unmount = NULL};
+static vfs_type_ops ops = {.mount = ramfs_mount, .sync = NULL, .unmount = NULL};
 
 static vfs_inode_ops inode_ops = {.evict = ramfs_evict,
                                   .lookup = ramfs_lookup,
@@ -27,8 +23,8 @@ static vfs_inode_ops inode_ops = {.evict = ramfs_evict,
 static vfs_type ramfs_type = {.name = RAMFS_NAME, .ops = &ops};
 
 void ramfs_init() {
-    register_vfs_type(&ramfs_type);
     internal_tree_init();
+    register_vfs_type(&ramfs_type);
 }
 
 static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
@@ -36,7 +32,7 @@ static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     if (IS_ERROR(inode))
         return inode;
 
-    if (inode->flags & INODE_INITIALISED)
+    if (inode->flags & INODE_INITIALIZED)
         return inode;
 
     inode->links = 1 + node->subnodes.size;
@@ -49,7 +45,7 @@ static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
 
 void ramfs_evict(vfs_inode* inode) { evict_node(inode->private_data); }
 
-u64 ramfs_fill_super(vfs_super_block* sb, device* dev) {
+u64 ramfs_fill_super(vfs_super_block* sb) {
     vfs_inode* root_inode = to_inode(get_root(), sb);
     if (IS_ERROR(root_inode))
         return PTR_ERROR(root_inode);
@@ -61,9 +57,7 @@ u64 ramfs_fill_super(vfs_super_block* sb, device* dev) {
     }
 
     vfs_inode_release(root_inode);
-
     sb->root = root_dentry;
-    sb->device = dev;
 
     return 0;
 }
@@ -73,7 +67,23 @@ vfs_dentry* ramfs_mount(vfs_type* type, device* dev) {
     if (IS_ERROR(sb))
         return ERROR_PTR(sb);
 
-    return vfs_dentry_acquire(sb->root);
+    if (sb->flags & SUPER_INITIALIZED) {
+        vfs_dentry* root = vfs_dentry_acquire(sb->root);
+        vfs_super_release(sb);
+        return root;
+    }
+
+    u64 res = ramfs_fill_super(sb);
+    if (IS_ERROR(res)) {
+        vfs_super_unlock_failed(sb);
+        vfs_super_release(sb);
+        return ERROR_PTR(-ENOMEM);
+    }
+
+    vfs_super_unlock_new(sb);
+    vfs_dentry* root = vfs_dentry_acquire(sb->root);
+    vfs_super_release(sb);
+    return root;
 }
 
 vfs_dentry* ramfs_lookup(vfs_dentry* parent, string name) {
@@ -97,8 +107,8 @@ u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child) {
     vfs_inode_lock(inode);
     vfs_inode_drop_link(inode);
     if (inode->links == 0)
-        ATOMIC_SET_FLAGS(inode->flags, INODE_DEAD);
-    vfs_inode_lock(inode);
+        SET_FLAGS(inode->flags, INODE_DEAD);
+    vfs_inode_unlock(inode);
 
     return 0;
 }
@@ -137,7 +147,7 @@ u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
         unlink_nodes(new_parent, new_child);
         vfs_inode_drop_link(new_dentry->inode);
         if (new_dentry->inode->links == 0)
-            ATOMIC_SET_FLAGS(new_dentry->inode->flags, INODE_DEAD);
+            SET_FLAGS(new_dentry->inode->flags, INODE_DEAD);
     }
 
 out:

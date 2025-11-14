@@ -1,6 +1,7 @@
 #include "inode.h"
 #include "../error/errno.h"
 #include "../error/error.h"
+#include "../lib/flagops.h"
 #include "../lib/hash.h"
 #include "../lib/math.h"
 #include "super_block.h"
@@ -42,7 +43,8 @@ static void vfs_inode_destroy(vfs_inode* inode) {
 
     // safe to do plain links read since no one can modify this and visibility
     // is carried by refc
-    if (inode->links == 0 && inode->ops->evict)
+    if (inode->flags & INODE_INITIALIZED && inode->links == 0
+        && inode->ops->evict)
         inode->ops->evict(inode);
 
     vfs_super_release(inode->sb);
@@ -63,25 +65,47 @@ static vfs_inode* vfs_inode_allocate(u64 id, vfs_super_block* sb) {
 
     inode->flags = 0;
     inode->links = 0;
+    inode->refc = 0;
 
     inode->lock = SPIN_LOCK_STATIC_INITIALIZER;
-    inode->refc = REF_COUNT_STATIC_INITIALIZER;
 
     vfs_super_acquire(sb);
 
     return vfs_inode_acquire(inode);
 }
 
+static bool vfs_inode_initialization_finished(vfs_inode* inode) {
+    return (inode->flags & INODE_INITIALIZED)
+           || (inode->flags & INODE_INITIALIZATION_FAILED);
+}
+
+static bool vfs_inode_await_initialization(vfs_inode* inode) {
+    if (TEST_FLAG(inode->flags, INODE_INITIALIZED))
+        return true;
+
+    spin_lock(&inode->lock);
+    CON_VAR_WAIT_FOR(&inode->initialization_cvar, &inode->lock,
+                     vfs_inode_initialization_finished(inode));
+    spin_unlock(&inode->lock);
+
+    return TEST_FLAG(inode->flags, INODE_INITIALIZED);
+}
+
 vfs_inode* vfs_icache_get(vfs_super_block* sb, u64 id) {
     icache_key key = {.sb = sb, .inode_id = id};
 
+retry:
     spin_lock(&icache_lock);
     vfs_inode* inode = inode_cache_get(&icache, key);
     if (inode) {
         vfs_inode_acquire(inode);
         spin_unlock(&icache_lock);
 
-        vfs_inode_await_initialization(inode);
+        if (!vfs_inode_await_initialization(inode)) {
+            vfs_inode_release(inode);
+            goto retry;
+        }
+
         return inode;
     }
 
@@ -110,52 +134,44 @@ void vfs_inode_drop(vfs_inode* inode) {
     vfs_inode_destroy(inode);
 }
 
-void vfs_inode_await_initialization(vfs_inode* inode) {
-    spin_lock(&inode->lock);
-    while (!(inode->flags & INODE_INITIALISED)) {
-        CON_VAR_WAIT_FOR(&inode->initialization_cvar, &inode->lock,
-                         inode->flags & INODE_INITIALISED);
-    }
-    spin_unlock(&inode->lock);
-}
-
 vfs_inode* vfs_inode_unlock_new(vfs_inode* inode) {
     spin_lock(&inode->lock);
-    inode->flags |= INODE_INITIALISED;
+    inode->flags |= INODE_INITIALIZED;
     con_var_broadcast(&inode->initialization_cvar);
     spin_unlock(&inode->lock);
 
     return inode;
 }
 
-vfs_inode* vfs_inode_acquire(vfs_inode* inode) {
-    spin_lock(&inode->lock);
-    ref_acquire(&inode->refc);
-    spin_unlock(&inode->lock);
+void vfs_inode_unlock_failed(vfs_inode* inode) {
+    spin_lock(&icache_lock);
+    icache_key key = {.sb = inode->sb, .inode_id = inode->id};
+    inode_cache_remove(&icache, key);
+    spin_unlock(&icache_lock);
 
+    spin_lock(&inode->lock);
+    inode->flags |= INODE_INITIALIZATION_FAILED;
+    con_var_broadcast(&inode->initialization_cvar);
+    spin_unlock(&inode->lock);
+}
+
+vfs_inode* vfs_inode_acquire(vfs_inode* inode) {
+    atomic_increment(&inode->refc);
     return inode;
 }
 
 void vfs_inode_release(vfs_inode* inode) {
-    spin_lock(&inode->lock);
-    bool destroy = inode->refc.count == 1;
-    if (!destroy)
-        ref_release(&inode->refc);
-    spin_unlock(&inode->lock);
-    if (!destroy)
-        return;
-
     spin_lock(&icache_lock);
-    spin_lock(&inode->lock);
-    ref_release(&inode->refc);
-    if ((destroy = inode->refc.count == 0)) {
-        icache_key key = {.sb = inode->sb, .inode_id = inode->id};
-        inode_cache_remove(&icache, key);
+    if (atomic_decrement_and_get(&inode->refc) != 0) {
+        spin_unlock(&icache_lock);
+        return;
     }
+
+    icache_key key = {.sb = inode->sb, .inode_id = inode->id};
+    inode_cache_remove(&icache, key);
     spin_unlock(&icache_lock);
 
-    if (destroy)
-        vfs_inode_destroy(inode);
+    vfs_inode_destroy(inode);
 }
 
 void vfs_inode_lock_shared(vfs_inode* inode) {

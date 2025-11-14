@@ -92,8 +92,8 @@ void set_up_init_process(module init_module) {
     walk(start, &c, &c_path);
 
     vfs_path d;
-    path_parts d_path = path_parts_from_path("a/c/d");
-    walk(start, &d, &d_path);
+    path_parts d_path = path_parts_from_path("d");
+    walk(c, &d, &d_path);
 
     vfs_path b;
     path_parts b_path = path_parts_from_path("b");

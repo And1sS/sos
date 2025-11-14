@@ -32,6 +32,7 @@ typedef struct vfs_dentry {
     linked_list_node dentry_node;
 
     u64 flags; // Should be accessed atomically
+    u64 refc;  // Should be accessed atomically
 
     lock lock; // guards all fields below
 
@@ -51,8 +52,6 @@ typedef struct vfs_dentry {
     // while parent->lock is held, all children are not freed, but to use any
     // dentry from this list it has to be inspected by taking
     linked_list children;
-
-    ref_count refc;
 } vfs_dentry;
 
 vfs_dentry* vfs_dentry_create(vfs_dentry* parent, vfs_inode* inode,

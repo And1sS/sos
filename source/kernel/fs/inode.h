@@ -8,11 +8,15 @@
 
 // set once after initialisation has finished, safe to read without atomics when
 // inode has been obtained via cache
-#define INODE_INITIALISED (1 << 0)
+#define INODE_INITIALIZED (1 << 0)
+
+// set once on initialisation failure, safe to read without atomics when
+// inode has been obtained via cache
+#define INODE_INITIALIZATION_FAILED (1 << 1)
 
 // set when inode is dead (from rmdir or unlink) and should not be used
 // afterward
-#define INODE_DEAD (1 << 1)
+#define INODE_DEAD (1 << 2)
 
 typedef struct vfs_inode {
     // Immutable data
@@ -28,23 +32,20 @@ typedef struct vfs_inode {
                   // rmdir, etc.)
 
     u64 flags; // Should be accessed atomically
-    u64 links; // Should be modified atomically and inspected only under mut
+    u64 links; // Should be accessed atomically only under mut
                // (exception is inspection before freeing, since noone can
                // modify links at that point and visibility will be carried
-               // through refcount
+               // through refcount and initialization, since noone can inspect
+               // uninitialized inode)
+    u64 refc;  // Should be accessed atomically
 
     lock lock; // guards all fields below
-
     u64 mode;
-
-    ref_count refc;
-
     void* private_data;
 
     con_var initialization_cvar;
 } vfs_inode;
 
-void vfs_inode_await_initialization(vfs_inode* inode);
 // unlocks uninitialised inode, serializes all updated inode data, acts as
 // store-release
 vfs_inode* vfs_inode_unlock_new(vfs_inode* inode);

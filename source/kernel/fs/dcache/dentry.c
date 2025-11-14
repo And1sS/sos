@@ -68,15 +68,14 @@ static vfs_dentry* vfs_dentry_allocate(vfs_inode* inode, string name) {
     memset(&dentry->hash_entry, 0, sizeof(dcache_hash_entry));
     dentry->hash_entry.name = name_copy;
 
-    dentry->lock = SPIN_LOCK_STATIC_INITIALIZER;
-
     dentry->flags = 0;
+    dentry->refc = 0;
+
+    dentry->lock = SPIN_LOCK_STATIC_INITIALIZER;
     dentry->hash_bucket = NULL;
 
     dentry->dentry_node = LINKED_LIST_NODE_OF(dentry);
     dentry->children = LINKED_LIST_STATIC_INITIALIZER;
-
-    dentry->refc = REF_COUNT_STATIC_INITIALIZER;
 
     return vfs_dentry_acquire(dentry);
 }
@@ -236,7 +235,7 @@ vfs_dentry* vfs_dentry_parent(vfs_dentry* dentry) {
 }
 
 vfs_dentry* vfs_dentry_acquire(vfs_dentry* dentry) {
-    ref_acquire(&dentry->refc);
+    atomic_increment(&dentry->refc);
     return dentry;
 }
 
@@ -257,52 +256,47 @@ vfs_dentry* vfs_dentry_acquire(vfs_dentry* dentry) {
 static vfs_dentry* vfs_dentry_release_and_not_release_parent(
     vfs_dentry* dentry) {
 
-    // fast-path, release here only if we won't destroy dentry anyway
-    spin_lock(&dentry->lock);
-    dcache_bucket* bucket = dentry->hash_bucket;
-    bool destroy = dentry->refc.count == 1;
-    if (!destroy)
-        ref_release(&dentry->refc);
-    spin_unlock(&dentry->lock);
-    if (!destroy)
-        return NULL;
-
-    // slow-path, release and maybe destroy
+    bool destroy = false;
+    dcache_bucket* bucket;
 retry_bucket_lock:
+    bucket = READ_ONCE(dentry->hash_bucket);
+
     dcache_bucket_lock(bucket);
     spin_lock(&dentry->lock);
     if (dentry->hash_bucket != bucket) {
-        // someone moved dentry to new bucket or removed from dcache
-        dcache_bucket* new_bucket = dentry->hash_bucket;
         spin_unlock(&dentry->lock);
         dcache_bucket_unlock(bucket);
-        bucket = new_bucket;
         goto retry_bucket_lock;
     }
 
-    ref_release(&dentry->refc);
-    if (dentry->refc.count != 0)
+    if (atomic_decrement_and_get(&dentry->refc) != 0)
         goto out;
 
-    if (dentry->hash_bucket && dcache_has_space()) {
+    // Initialization failure is always visible since all sbs are obtained via
+    // vfs_super_get, dying is synchronized with dcache unused dentries eviction
+    // - even if we miss flag update due to cache coherence delays (before
+    // eviction), dentry will be picked up by shrinker. If eviction has already
+    // started - then flag will be carried by bucket lock
+    vfs_super_block* sb = dentry->inode->sb;
+    if (bucket && dcache_has_space() && !vfs_super_is_dying(sb)
+        && !vfs_super_is_initialization_failed(sb)) {
         dcache_put_unused(bucket, dentry);
         goto out;
     }
 
-    ATOMIC_SET_FLAGS(dentry->flags, DENTRY_DYING);
-    dentry->hash_bucket = NULL;
+    SET_FLAGS(dentry->flags, DENTRY_DYING);
+    destroy = true;
+
+    if (!bucket)
+        goto out;
     dcache_remove(bucket, dentry);
-
-    spin_unlock(&dentry->lock);
-    dcache_bucket_unlock(bucket);
-
-    return vfs_dentry_destroy_and_not_release_parent(dentry);
+    dentry->hash_bucket = NULL;
 
 out:
     spin_unlock(&dentry->lock);
     dcache_bucket_unlock(bucket);
 
-    return NULL;
+    return destroy ? vfs_dentry_destroy_and_not_release_parent(dentry) : NULL;
 }
 
 // this function is based on vfs_dentry_release_and_not_release_parent and
@@ -369,9 +363,9 @@ bool vfs_dentry_is_orphaned(vfs_dentry* dentry) {
 }
 
 void vfs_dentry_set_mountpoint(vfs_dentry* dentry) {
-    ATOMIC_SET_FLAGS(dentry->flags, DENTRY_MOUNTPOINT);
+    SET_FLAGS(dentry->flags, DENTRY_MOUNTPOINT);
 }
 
 bool vfs_dentry_is_mountpoint(vfs_dentry* dentry) {
-    return ATOMIC_TEST_FLAG(dentry->flags, DENTRY_MOUNTPOINT);
+    return TEST_FLAG(dentry->flags, DENTRY_MOUNTPOINT);
 }

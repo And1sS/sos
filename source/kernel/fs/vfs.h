@@ -65,7 +65,6 @@ typedef enum {
 } vfs_inode_type;
 
 typedef struct {
-    u64 (*fill_super)(struct vfs_super_block* sb, device* dev);
     struct vfs_dentry* (*mount)(struct vfs_type* type, device* dev);
     u64 (*unmount)(struct vfs_super_block* sb);
     u64 (*sync)(struct vfs_super_block* sb);
@@ -85,6 +84,8 @@ void vfs_init();
 
 bool register_vfs_type(vfs_type* type);
 void deregister_vfs_type(vfs_type* type);
+vfs_type* vfs_type_acquire(vfs_type* type);
+void vfs_type_release(vfs_type* type);
 
 u64 vfs_unlink(struct vfs_path start, string path);
 u64 vfs_rename(struct vfs_path old_parent, struct vfs_dentry* old_dentry,
