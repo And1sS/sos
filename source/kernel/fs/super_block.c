@@ -8,6 +8,7 @@ void vfs_super_unmount(vfs_super_block* sb) {
     spin_lock(&sb->type->lock);
     if (atomic_decrement_and_get(&sb->mount_count) != 0) {
         spin_unlock(&sb->type->lock);
+        vfs_super_release(sb);
         return;
     }
 
@@ -26,8 +27,11 @@ vfs_super_block* vfs_super_acquire(vfs_super_block* sb) {
 }
 
 void vfs_super_release(vfs_super_block* sb) {
-    vfs_type* type = sb->type;
+    if (atomic_decrement_not_one(&sb->refc))
+        return;
 
+    // slow path
+    vfs_type* type = sb->type;
     spin_lock(&type->lock);
     u64 refc = atomic_decrement_and_get(&sb->refc);
     if (refc == 0) {

@@ -79,6 +79,10 @@
 // has read-acquire semantics
 extern u64 atomic_exchange(volatile u64* addr, u64 new_value);
 
+// returns old value
+extern u64 atomic_compare_exchange(volatile u64* addr, u64 old_value,
+                                   u64 new_value);
+
 // has write-release semantics
 extern void atomic_set(volatile u64* addr, u64 value);
 
@@ -90,9 +94,17 @@ extern void atomic_or(volatile u64* addr, u64 mask);
 
 extern void atomic_increment(volatile u64* addr);
 
+// returns true when atomically increments any value > 0,
+// or false when observed value was 0
+bool atomic_increment_not_zero(volatile u64* addr);
+
 extern u64 atomic_increment_and_get(volatile u64* addr);
 
 extern void atomic_decrement(volatile u64* addr);
+
+// returns true when atomically decrements any value > 1,
+// or false when observed value was 1
+bool atomic_decrement_not_one(volatile u64* addr);
 
 extern u64 atomic_decrement_and_get(volatile u64* addr);
 

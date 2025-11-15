@@ -256,6 +256,10 @@ vfs_dentry* vfs_dentry_acquire(vfs_dentry* dentry) {
 static vfs_dentry* vfs_dentry_release_and_not_release_parent(
     vfs_dentry* dentry) {
 
+    if (atomic_decrement_not_one(&dentry->refc))
+        return NULL;
+
+    // slow path
     bool destroy = false;
     dcache_bucket* bucket;
 retry_bucket_lock:

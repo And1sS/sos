@@ -11,6 +11,17 @@ u64 atomic_exchange(volatile u64* addr, volatile u64 new_value) {
     return old_value;
 }
 
+u64 atomic_compare_exchange(volatile u64* addr, u64 old_value, u64 new_value) {
+    u64 prev;
+
+    __asm__ volatile("lock cmpxchgq %2, %1"
+                     : "=a"(prev), "+m"(*addr)
+                     : "r"(new_value), "a"(old_value)
+                     : "memory");
+
+    return prev;
+}
+
 void atomic_set(volatile u64* addr, volatile u64 value) {
     // x86-64 does not reorder writes -> already has write-release semantics
     *addr = value;
