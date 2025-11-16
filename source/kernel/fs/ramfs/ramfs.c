@@ -29,10 +29,7 @@ void ramfs_init() {
 
 static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);
-    if (IS_ERROR(inode))
-        return inode;
-
-    if (inode->flags & INODE_INITIALIZED)
+    if (IS_ERROR(inode) || inode->flags & INODE_INITIALIZED)
         return inode;
 
     inode->links = 1 + node->subnodes.size;
