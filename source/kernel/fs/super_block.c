@@ -50,23 +50,21 @@ void vfs_super_release(vfs_super_block* sb) {
 
     // Here refc == 1 and root exists
     if (TEST_FLAG(sb->flags, SUPER_DYING)) {
-        // If refc = 1, this means that there is no inodes/dentries alive apart
+        // If refc == 1, this means that there is no inodes/dentries alive apart
         // from root dentry
         linked_list_remove_node(&type->super_blocks, &sb->self_node);
         spin_unlock(&type->lock);
         vfs_dentry_release(root);
         return;
-    }
-
-    if (TEST_FLAG(sb->flags, SUPER_INITIALIZATION_FAILED)) {
+    } else if (TEST_FLAG(sb->flags, SUPER_INITIALIZATION_FAILED)) {
         spin_unlock(&type->lock);
         vfs_dentry_release(root);
         return;
     }
-
     spin_unlock(&type->lock);
-    // Root exists, refcount == 1, initialized successfully and not dying - do
-    // nothing, just exit
+
+    // Root exists, refcount == 1 (root holds reference to sb), initialized
+    // successfully and not dying - do nothing, just exit
 }
 
 void vfs_super_destroy(vfs_super_block* sb) {
