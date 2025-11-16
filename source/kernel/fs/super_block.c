@@ -27,10 +27,11 @@ vfs_super_block* vfs_super_acquire(vfs_super_block* sb) {
 }
 
 void vfs_super_release(vfs_super_block* sb) {
-    if (atomic_decrement_not_one(&sb->refc))
+    // fast path, transition for any refc > 2
+    if (atomic_decrement_greater_than(&sb->refc, 2))
         return;
 
-    // slow path
+    // slow path, transitions 2 -> 1, 1 -> 0
     vfs_type* type = sb->type;
     spin_lock(&type->lock);
     u64 refc = atomic_decrement_and_get(&sb->refc);
@@ -48,10 +49,8 @@ void vfs_super_release(vfs_super_block* sb) {
         return;
     }
 
-    // Here refc == 1 and root exists
+    // Here refc == 1 and root exists - only root dentry(and its inode) alive
     if (TEST_FLAG(sb->flags, SUPER_DYING)) {
-        // If refc == 1, this means that there is no inodes/dentries alive apart
-        // from root dentry
         linked_list_remove_node(&type->super_blocks, &sb->self_node);
         spin_unlock(&type->lock);
         vfs_dentry_release(root);

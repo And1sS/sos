@@ -102,6 +102,8 @@ extern u64 atomic_increment_and_get(volatile u64* addr);
 
 extern void atomic_decrement(volatile u64* addr);
 
+bool atomic_decrement_greater_than(volatile u64* addr, u64 threshold);
+
 // returns true when atomically decrements any value > 1,
 // or false when observed value was 1
 bool atomic_decrement_not_one(volatile u64* addr);

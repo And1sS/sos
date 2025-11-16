@@ -15,11 +15,11 @@ bool atomic_increment_not_zero(volatile u64* addr) {
     }
 }
 
-bool atomic_decrement_not_one(volatile u64* addr) {
+bool atomic_decrement_greater_than(volatile u64* addr, u64 threshold) {
     u64 old, value = atomic_get(addr);
 
     while (true) {
-        if (value == 1)
+        if (value <= threshold)
             return false;
 
         old = atomic_compare_exchange(addr, value, value - 1);
@@ -28,4 +28,8 @@ bool atomic_decrement_not_one(volatile u64* addr) {
 
         value = old;
     }
+}
+
+bool atomic_decrement_not_one(volatile u64* addr) {
+    return atomic_decrement_greater_than(addr, 1);
 }

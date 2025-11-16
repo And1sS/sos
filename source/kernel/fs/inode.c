@@ -161,9 +161,11 @@ vfs_inode* vfs_inode_acquire(vfs_inode* inode) {
 }
 
 void vfs_inode_release(vfs_inode* inode) {
+    // fast path, transition for any refc > 1
     if (atomic_decrement_not_one(&inode->refc))
         return;
 
+    // slow path, transition 1 -> 0
     spin_lock(&icache_lock);
     if (atomic_decrement_and_get(&inode->refc) != 0) {
         spin_unlock(&icache_lock);
