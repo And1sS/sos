@@ -19,12 +19,8 @@ typedef struct vfs_super_block {
     u64 id;
     struct vfs_type* type;
     device* device;
-    struct vfs_dentry* root; // Root dentry remains valid if:
-                             // 1) There are active references to any dentry
-                             //    that belongs to current sb
-                             // 2) mount_count > 0 and SUPER_INITIALIZED set
-                             // In any other case caller should check
-                             // SUPER_DYING flag before
+    struct vfs_dentry* root; // Root dentry remains valid if there is any active
+                             // reference to sb obtained via vfs_type
     // End of immutable data
 
     u64 flags;       // Should be accessed atomically
