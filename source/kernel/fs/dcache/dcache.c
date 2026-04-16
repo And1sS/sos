@@ -109,13 +109,21 @@ void dcache_bucket_unlock(dcache_bucket* bucket) {
 }
 
 void dcache_buckets_lock(dcache_bucket* first, dcache_bucket* second) {
-    dcache_bucket_lock(MIN(first, second));
-    dcache_bucket_lock(MAX(first, second));
+    if (first == second)
+        dcache_bucket_lock(first);
+    else {
+        dcache_bucket_lock(MIN(first, second));
+        dcache_bucket_lock(MAX(first, second));
+    }
 }
 
 void dcache_buckets_unlock(dcache_bucket* first, dcache_bucket* second) {
-    dcache_bucket_unlock(first);
-    dcache_bucket_unlock(second);
+    if (first == second)
+        dcache_bucket_unlock(first);
+    else {
+        dcache_bucket_unlock(first);
+        dcache_bucket_unlock(second);
+    }
 }
 
 void dcache_remove(dcache_bucket* bucket, vfs_dentry* dentry) {
