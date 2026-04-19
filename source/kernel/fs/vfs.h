@@ -29,29 +29,8 @@ typedef struct {
     struct vfs_dentry* (*lookup)(struct vfs_dentry* parent, string name);
     u64 (*rename)(struct vfs_dentry* old_parent_dentry,
                   struct vfs_dentry* old_dentry,
-                  struct vfs_dentry* new_parent_dentry,
+                  struct vfs_dentry* victim_dentry,
                   struct vfs_dentry* new_dentry, string name);
-
-    //    u64 (*create)(struct vfs_inode* dir, string name, struct vattr* vattr,
-    //                  struct vfs_entry** result);
-    //
-    //    u64 (*mknod)(struct vfs_inode* dir, string name, struct vattr* vattr,
-    //                 u64 dev, struct vfs_entry** result);
-    //
-    //    u64 (*symlink)(struct vfs_inode* dir, string name, struct vattr*
-    //    vattr,
-    //                   string target, struct vfs_entry** result);
-    //
-    //    u64 (*hardlink)(struct vfs_inode* dir, string name, struct vnode*
-    //    target,
-    //                    struct vfs_entry** result);
-    //
-    //    u64 (*mkdir)(struct vfs_inode* dir, string name, struct vattr* vattr,
-    //                 struct vfs_entry** result);
-    //
-    //    u64 (*rmdir)(struct vfs_inode* dir, struct vnode* vn, struct
-    //    vfs_entry* ve);
-
 } vfs_inode_ops;
 
 typedef enum {
@@ -88,7 +67,7 @@ vfs_type* vfs_type_acquire(vfs_type* type);
 void vfs_type_release(vfs_type* type);
 
 u64 vfs_unlink(struct vfs_path start, string path);
-u64 vfs_rename(struct vfs_path old_parent, struct vfs_dentry* old_dentry,
-               struct vfs_path new_parent, string new_name);
+u64 vfs_rename(struct vfs_path old_dir, struct vfs_dentry* source,
+               struct vfs_path new_dir, string name);
 
 #endif // SOS_VFS_H

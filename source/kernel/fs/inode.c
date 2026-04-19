@@ -201,6 +201,9 @@ void vfs_inodes_unlock(vfs_inode* left, vfs_inode* right) {
     vfs_inode_unlock(right);
 }
 
-void vfs_inode_drop_link(vfs_inode* inode) { atomic_decrement(&inode->links); }
+void vfs_inode_drop_link(vfs_inode* inode) {
+    if (atomic_decrement_and_get(&inode->links) == 0)
+        SET_FLAGS(inode->flags, INODE_DEAD);
+}
 
 void vfs_inode_add_link(vfs_inode* inode) { atomic_increment(&inode->links); }

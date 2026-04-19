@@ -38,6 +38,8 @@ typedef struct vfs_dentry {
 
     dcache_bucket* hash_bucket; // dcache hash table bucket where dentry
                                 // resides, NULL if not hashed
+                                // should be changed only while holding
+                                // inode->mut in exclusive mode
 
     // these two are closely tied to hash_bucket, can be changed only during
     // creation or namespace changes. Should be changed under both dcache and
@@ -81,6 +83,9 @@ bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor);
 // inode mutex should be held during this operation
 bool vfs_dentry_is_orphaned(vfs_dentry* dentry);
 
+// These are for setting/testing mountpoint flag in a fast way,
+// can give slightly stale data, so should not be used for decision-making.
+// exist mainly for lookups where staleness can be tolerated.
 void vfs_dentry_set_mountpoint(vfs_dentry* dentry);
 bool vfs_dentry_is_mountpoint(vfs_dentry* dentry);
 

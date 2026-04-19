@@ -132,97 +132,125 @@ out:
     return error;
 }
 
-static void vfs_rename_lock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
-    mutex_lock(&old_parent->inode->sb->rename_mut);
+static void vfs_rename_lock(vfs_dentry* old_dir, vfs_dentry* new_dir) {
+    if (old_dir == new_dir) {
+        vfs_inode_lock(old_dir->inode);
+        return;
+    }
 
-    if (old_parent == new_parent)
-        vfs_inode_lock(old_parent->inode);
-    else if (vfs_dentry_is_ancestor(old_parent, new_parent)) {
-        vfs_inode_lock(new_parent->inode);
-        vfs_inode_lock(old_parent->inode);
-    } else if (vfs_dentry_is_ancestor(new_parent, old_parent)) {
-        vfs_inode_lock(old_parent->inode);
-        vfs_inode_lock(new_parent->inode);
+    mutex_lock(&old_dir->inode->sb->rename_mut);
+    if (vfs_dentry_is_ancestor(old_dir, new_dir)) {
+        vfs_inode_lock(new_dir->inode);
+        vfs_inode_lock(old_dir->inode);
+    } else if (vfs_dentry_is_ancestor(new_dir, old_dir)) {
+        vfs_inode_lock(old_dir->inode);
+        vfs_inode_lock(new_dir->inode);
     } else
-        vfs_inodes_lock(old_parent->inode, new_parent->inode);
+        vfs_inodes_lock(old_dir->inode, new_dir->inode);
 }
 
-static void vfs_rename_unlock(vfs_dentry* old_parent, vfs_dentry* new_parent) {
-    if (old_parent == new_parent)
-        vfs_inode_unlock(old_parent->inode);
-    else // unlock order doesn't matter
-        vfs_inodes_unlock(old_parent->inode, new_parent->inode);
-
-    mutex_unlock(&old_parent->inode->sb->rename_mut);
+static void vfs_rename_unlock(vfs_dentry* old_dir, vfs_dentry* new_dir) {
+    if (old_dir == new_dir)
+        vfs_inode_unlock(old_dir->inode);
+    else {
+        // unlock order doesn't matter
+        vfs_inodes_unlock(old_dir->inode, new_dir->inode);
+        mutex_unlock(&old_dir->inode->sb->rename_mut);
+    }
 }
 
-u64 vfs_rename(vfs_path old_parent, vfs_dentry* old_dentry, vfs_path new_parent,
-               string new_name) {
+static void vfs_rename_lock_children(vfs_dentry* source, vfs_dentry* target) {
+    if (!target)
+        vfs_inode_lock(source->inode);
+    else
+        vfs_inodes_lock(source->inode, target->inode);
+}
 
-    string new_name_copy = strcpy(new_name);
-    if (!new_name_copy)
+static void vfs_rename_unlock_children(vfs_dentry* source, vfs_dentry* target) {
+    if (!target)
+        vfs_inode_unlock(source->inode);
+    else
+        vfs_inodes_unlock(source->inode, target->inode);
+}
+
+u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
+               string name) {
+
+    string name_copy = strcpy(name);
+    if (!name_copy)
         return -ENOMEM;
 
-    vfs_dentry* old_parent_dentry = old_parent.dentry;
-    vfs_dentry* new_parent_dentry = new_parent.dentry;
+    vfs_dentry* old_dir_dentry = old_dir.dentry;
+    vfs_dentry* new_dir_dentry = new_dir.dentry;
 
-    // check that parents are in same superblock, and we are renaming (moving)
-    // into a directory
-    if (old_parent_dentry->inode->sb != new_parent_dentry->inode->sb
-        || !vfs_dentry_is_dir(new_parent_dentry)) {
-        strfree(new_name_copy);
+    // check that parents are in same superblock, and we are renaming
+    // (moving) into a directory
+    if (old_dir_dentry->inode->sb != new_dir_dentry->inode->sb
+        || !vfs_dentry_is_dir(new_dir_dentry)) {
+        strfree(name_copy);
         return -EPERM;
     }
 
-    vfs_rename_lock(old_parent_dentry, new_parent_dentry);
+    vfs_rename_lock(old_dir_dentry, new_dir_dentry);
 
     // TODO: check that we are not moving unhashed dentries
     // recheck that parents are still alive
     u64 error = -ENOENT;
-    if (vfs_dentry_is_orphaned(new_parent_dentry)
-        || vfs_dentry_is_orphaned(old_dentry))
+    if (vfs_dentry_is_orphaned(new_dir_dentry)
+        || vfs_dentry_is_orphaned(source))
         goto out;
 
     error = -EPERM;
-    if (!old_dentry->inode->ops->rename)
+    if (!source->inode->ops->rename)
         goto out;
 
-    // recheck that old_dentry hasn't been moved while we weren't holding lock
-    // safe to read parent since we are holding old_parent_dentry->inode->rw_mut
-    // which carries visibility and prevents concurrent modifications
+    // recheck that source hasn't been moved while we weren't holding lock
+    // safe to read parent since we are holding
+    // old_dir_dentry->inode->rw_mut which carries visibility and prevents
+    // concurrent modifications
     error = -ENOENT;
-    if (old_dentry->parent != old_parent_dentry)
+    if (source->parent != old_dir_dentry)
         goto out;
 
     // check that we are not moving directory into its subdirectory
     error = -EINVAL;
-    if (vfs_dentry_is_ancestor(new_parent_dentry, old_dentry))
+    if (vfs_dentry_is_ancestor(new_dir_dentry, source))
         goto out;
 
     // lookup victim that will be replaced
-    vfs_dentry* victim_dentry = lookup(new_parent_dentry, new_name);
-    error = IS_ERROR(victim_dentry) ? PTR_ERROR(victim_dentry) : 0;
-    victim_dentry = IS_ERROR(victim_dentry) ? NULL : victim_dentry;
+    vfs_dentry* target = lookup(new_dir_dentry, name);
+    error = IS_ERROR(target) ? PTR_ERROR(target) : 0;
     if (error && error != (u64) -ENOENT)
         goto out;
 
+    target = target && !IS_ERROR(target) ? target : NULL;
+
+    // check that we are not changing anything in case old name == new name
+    error = 0;
+    if (target == source)
+        goto no_rename_needed;
+
+    vfs_rename_lock_children(source, target);
+
     // TODO: add check for mountpoints
 
-    error = old_dentry->inode->ops->rename(old_parent_dentry, old_dentry,
-                                           new_parent_dentry, victim_dentry,
-                                           new_name_copy);
+    error = source->inode->ops->rename(old_dir_dentry, source, new_dir_dentry,
+                                       target, name_copy);
 
     if (!error)
-        vfs_dentry_move(new_parent_dentry, old_dentry, new_name_copy);
+        vfs_dentry_move(new_dir_dentry, source, name_copy);
 
-    if (victim_dentry)
-        vfs_dentry_release(victim_dentry);
+    vfs_rename_unlock_children(source, target);
+
+no_rename_needed:
+    if (target)
+        vfs_dentry_release(target);
 
 out:
     if (error)
-        strfree(new_name_copy);
+        strfree(name_copy);
 
-    vfs_rename_unlock(old_parent_dentry, new_parent_dentry);
+    vfs_rename_unlock(old_dir_dentry, new_dir_dentry);
 
     return error;
 }

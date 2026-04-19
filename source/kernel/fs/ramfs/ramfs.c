@@ -8,9 +8,8 @@
 static void ramfs_evict(struct vfs_inode* inode);
 static vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
 static vfs_dentry* ramfs_lookup(struct vfs_dentry* parent, string name);
-static u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
-                        vfs_dentry* new_parent_dentry, vfs_dentry* new_dentry,
-                        string name);
+static u64 ramfs_rename(vfs_dentry* old_dir, vfs_dentry* source,
+                        vfs_dentry* new_dir, vfs_dentry* target, string name);
 static u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child);
 
 static vfs_type_ops ops = {.mount = ramfs_mount, .sync = NULL, .unmount = NULL};
@@ -32,6 +31,7 @@ static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     if (IS_ERROR(inode) || inode->flags & INODE_INITIALIZED)
         return inode;
 
+    // 1 for parent + children count
     inode->links = 1 + node->subnodes.size;
     inode->private_data = node;
     inode->ops = &inode_ops;
@@ -96,60 +96,41 @@ vfs_dentry* ramfs_lookup(vfs_dentry* parent, string name) {
 }
 
 u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child) {
+    unlink_nodes(dir->private_data, child->inode->private_data);
     vfs_inode_drop_link(dir);
-
-    vfs_inode* inode = child->inode;
-
-    unlink_nodes(dir->private_data, inode->private_data);
-    vfs_inode_lock(inode);
-    vfs_inode_drop_link(inode);
-    if (inode->links == 0)
-        SET_FLAGS(inode->flags, INODE_DEAD);
-    vfs_inode_unlock(inode);
+    vfs_inode_drop_link(child->inode);
 
     return 0;
 }
 
-u64 ramfs_rename(vfs_dentry* old_parent_dentry, vfs_dentry* old_dentry,
-                 vfs_dentry* new_parent_dentry, vfs_dentry* new_dentry,
-                 string name) {
+u64 ramfs_rename(vfs_dentry* old_dir, vfs_dentry* source, vfs_dentry* new_dir,
+                 vfs_dentry* target, string name) {
 
     u64 error = 0;
 
-    tree_node* old_parent = old_parent_dentry->inode->private_data;
-    tree_node* new_parent = new_parent_dentry->inode->private_data;
-    tree_node* old_child = old_dentry->inode->private_data;
-    tree_node* new_child = new_dentry ? new_dentry->inode->private_data : NULL;
-
-    // lock directory inode so that nobody can modify directory concurrently
-    if (new_dentry && new_dentry->inode->type == DIRECTORY)
-        vfs_inode_lock(new_dentry->inode);
+    tree_node* old_dir_node = old_dir->inode->private_data;
+    tree_node* new_dir_node = new_dir->inode->private_data;
+    tree_node* source_node = source->inode->private_data;
+    tree_node* target_node = target ? target->inode->private_data : NULL;
 
     // inode private data is guarded by inode->rw_mutex
-    error = new_child && new_child->subnodes.size != 0 ? -ENOTEMPTY : 0;
+    error = target_node && target_node->subnodes.size != 0 ? -ENOTEMPTY : 0;
     if (IS_ERROR(error))
-        goto out;
+        return error;
 
-    error = rename_node(old_child, name);
+    error = rename_node(source_node, name);
     if (IS_ERROR(error))
-        goto out;
+        return error;
 
-    // fail-safe replacements
-    unlink_nodes(old_parent, old_child);
-    vfs_inode_drop_link(old_parent_dentry->inode);
+    unlink_nodes(old_dir_node, source_node);
+    link_nodes(new_dir_node, source_node);
 
-    link_nodes(new_parent, old_child);
+    vfs_inode_drop_link(old_dir->inode);
+    if (target) {
+        unlink_nodes(new_dir_node, target_node);
+        vfs_inode_drop_link(target->inode);
+    } else
+        vfs_inode_add_link(new_dir->inode);
 
-    if (new_dentry) {
-        unlink_nodes(new_parent, new_child);
-        vfs_inode_drop_link(new_dentry->inode);
-        if (new_dentry->inode->links == 0)
-            SET_FLAGS(new_dentry->inode->flags, INODE_DEAD);
-    }
-
-out:
-    if (new_dentry && new_dentry->inode->type == DIRECTORY)
-        vfs_inode_unlock(new_dentry->inode);
-
-    return error;
+    return 0;
 }

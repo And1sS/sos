@@ -55,7 +55,7 @@ static u64 part_length(string path) {
     return len;
 }
 
-static void walk_next_part(path_parts* parts) {
+static string walk_next_part(path_parts* parts) {
     while (*parts->path == '/')
         parts->path++;
 
@@ -64,22 +64,22 @@ static void walk_next_part(path_parts* parts) {
     parts->part[part_len] = '\0';
     parts->path = parts->path + part_len;
     parts->parts_left--;
+
+    return parts->part;
 }
 
-vfs_dentry* lookup(vfs_dentry* parent, string path) {
-    if (vfs_super_is_dying(parent->inode->sb))
+vfs_dentry* lookup(vfs_dentry* dir, string path) {
+    if (vfs_super_is_dying(dir->inode->sb))
         return ERROR_PTR(-EBUSY);
 
-    if (streq(path, ".")) {
-        vfs_dentry_acquire(parent);
-        return parent;
-    }
+    if (streq(path, "."))
+        return vfs_dentry_acquire(dir);
 
     if (streq(path, ".."))
-        return vfs_dentry_parent(parent);
+        return vfs_dentry_parent(dir);
 
-    vfs_dentry* child = vfs_dentry_lookup(parent, path);
-    return child ? child : parent->inode->ops->lookup(parent, path);
+    vfs_dentry* child = vfs_dentry_lookup(dir, path);
+    return child ? child : dir->inode->ops->lookup(dir, path);
 }
 
 u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
@@ -90,13 +90,17 @@ u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
     if (parts->parts_left == 0)
         return -ENOENT;
 
+    // Try to resolve mountpoint, if we've missed mount due to race condition -
+    // just ignore it
+    dentry = vfs_dentry_is_mountpoint(dentry) ? vfs_mount_resolve(mnt, dentry)
+                                              : dentry;
+    // in case of failure fallback to starting dentry
+    dentry = dentry ? dentry : start.dentry;
+
     if (dentry->inode->type != DIRECTORY)
         return -ENOTDIR;
 
-    // TODO: resolve mountpoints
-    walk_next_part(parts);
-    dentry = lookup(dentry, parts->part);
-
+    dentry = lookup(dentry, walk_next_part(parts));
     *res = (vfs_path) {.dentry = dentry, .mount = mnt};
     return IS_ERROR(dentry) ? PTR_ERROR(dentry) : 0;
 }

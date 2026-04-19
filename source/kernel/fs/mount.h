@@ -28,4 +28,6 @@ vfs_mount* vfs_mount_get_root();
 vfs_mount* vfs_mount_acquire(vfs_mount* mount);
 void vfs_mount_release(vfs_mount* mount);
 
+vfs_dentry* vfs_mount_resolve(vfs_mount* mount, vfs_dentry* dentry);
+
 #endif // SOS_MOUNT_H

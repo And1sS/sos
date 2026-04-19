@@ -22,10 +22,15 @@ bool path_ends_with_dotdot(string path);
 
 path_parts path_parts_from_path(string path);
 
+// assumes that dir->inode->mut is locked in shared mode
 u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts);
+
+// these two will take necessary locks on their own
 u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts);
 u64 walk(vfs_path start, vfs_path* res, path_parts* parts);
-struct vfs_dentry* lookup(struct vfs_dentry* dentry, string name);
+
+// assumes that dir->inode->mut is locked in shared mode
+struct vfs_dentry* lookup(struct vfs_dentry* dir, string name);
 
 vfs_path vfs_path_create(vfs_mount* mnt, struct vfs_dentry* dentry);
 void vfs_path_release(vfs_path* path);
