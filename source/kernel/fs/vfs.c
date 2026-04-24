@@ -176,6 +176,7 @@ static void vfs_rename_unlock_children(vfs_dentry* source, vfs_dentry* target) {
 u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
                string name) {
 
+    // TODO: add check for name for dot and dotdot
     string name_copy = strcpy(name);
     if (!name_copy)
         return -ENOMEM;
@@ -193,8 +194,7 @@ u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
 
     vfs_rename_lock(old_dir_dentry, new_dir_dentry);
 
-    // TODO: check that we are not moving unhashed dentries
-    // recheck that parents are still alive
+    // recheck that new dir and source are still alive
     u64 error = -ENOENT;
     if (vfs_dentry_is_orphaned(new_dir_dentry)
         || vfs_dentry_is_orphaned(source))
@@ -218,7 +218,7 @@ u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
         goto out;
 
     // lookup victim that will be replaced
-    vfs_dentry* target = lookup(new_dir_dentry, name);
+    vfs_dentry* target = lookup_child(new_dir_dentry, name);
     error = IS_ERROR(target) ? PTR_ERROR(target) : 0;
     if (error && error != (u64) -ENOENT)
         goto out;
@@ -232,7 +232,10 @@ u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
 
     vfs_rename_lock_children(source, target);
 
-    // TODO: add check for mountpoints
+    error = -EBUSY;
+    if (vfs_dentry_is_mountpoint(source)
+        || vfs_dentry_is_mountpoint(target))
+        goto error_dentry;
 
     error = source->inode->ops->rename(old_dir_dentry, source, new_dir_dentry,
                                        target, name_copy);
@@ -240,6 +243,7 @@ u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
     if (!error)
         vfs_dentry_move(new_dir_dentry, source, name_copy);
 
+error_dentry:
     vfs_rename_unlock_children(source, target);
 
 no_rename_needed:

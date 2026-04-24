@@ -68,50 +68,93 @@ static string walk_next_part(path_parts* parts) {
     return parts->part;
 }
 
-vfs_dentry* lookup(vfs_dentry* dir, string path) {
-    if (vfs_super_is_dying(dir->inode->sb))
-        return ERROR_PTR(-EBUSY);
+static u64 lookup_current(vfs_path start, vfs_path* res) {
+    res->dentry = vfs_dentry_acquire(start.dentry);
+    res->mount = vfs_mount_acquire(start.mount);
+    return 0;
+}
+
+static u64 lookup_parent(vfs_path start, vfs_path* res) {
+    vfs_dentry* dentry = start.dentry;
+    vfs_mount* mount = start.mount;
+
+    // Safe to do plain reads of parent since caller already holds dentry
+    // inode->rw_mut which carry visibility and prevent concurrent changes
+    if (dentry->parent != dentry) {
+        res->dentry = vfs_dentry_acquire(dentry->parent);
+        res->mount = vfs_mount_acquire(mount);
+    } else {
+        // we have encountered mountpoint root, need to cross namespaces
+        res->dentry = vfs_dentry_acquire(mount->mounted_at);
+        res->mount = vfs_mount_acquire(mount->parent_mount);
+    }
+
+    return 0;
+}
+
+vfs_dentry* lookup_child(vfs_dentry* dentry, string name) {
+    if (dentry->inode->type != DIRECTORY)
+        return ERROR_PTR(-ENOTDIR);
+
+    vfs_dentry* child = vfs_dentry_lookup(dentry, name);
+    return child ? child : dentry->inode->ops->lookup(dentry, name);
+}
+
+u64 lookup(vfs_path start, vfs_path* res, string path) {
+    vfs_dentry* dentry = start.dentry;
+    vfs_mount* mount = start.mount;
+
+    if (vfs_super_is_dying(dentry->inode->sb))
+        return -EBUSY;
 
     if (streq(path, "."))
-        return vfs_dentry_acquire(dir);
+        return lookup_current(start, res);
 
     if (streq(path, ".."))
-        return vfs_dentry_parent(dir);
+        return lookup_parent(start, res);
 
-    vfs_dentry* child = vfs_dentry_lookup(dir, path);
-    return child ? child : dir->inode->ops->lookup(dir, path);
+    bool is_mountpoint = vfs_dentry_is_mountpoint(dentry);
+    if (is_mountpoint) {
+        u64 error = vfs_mount_find(mount, dentry, res);
+        if (IS_ERROR(error))
+            panic("Error in vfs, couldn't resolve mount");
+
+        dentry = res->dentry;
+        mount = res->mount;
+    }
+
+    vfs_dentry* child = lookup_child(dentry, path);
+
+    // release resolved mountpoint root reference
+    // for non-mountpoints, caller is reference owner
+    if (is_mountpoint)
+        vfs_dentry_release(dentry);
+
+    if (IS_ERROR(child))
+        return PTR_ERROR(child);
+
+    res->dentry = child; // child reference is already incremented
+    res->mount = vfs_mount_acquire(mount);
+    return 0;
 }
 
 u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
-    vfs_mount* mnt = start.mount;
-    vfs_dentry* dentry = start.dentry;
-
-    // TODO: handle root, handle global lookups
     if (parts->parts_left == 0)
         return -ENOENT;
 
-    // Try to resolve mountpoint, if we've missed mount due to race condition -
-    // just ignore it
-    dentry = vfs_dentry_is_mountpoint(dentry) ? vfs_mount_resolve(mnt, dentry)
-                                              : dentry;
-    // in case of failure fallback to starting dentry
-    dentry = dentry ? dentry : start.dentry;
-
-    if (dentry->inode->type != DIRECTORY)
-        return -ENOTDIR;
-
-    dentry = lookup(dentry, walk_next_part(parts));
-    *res = (vfs_path) {.dentry = dentry, .mount = mnt};
-    return IS_ERROR(dentry) ? PTR_ERROR(dentry) : 0;
+    return lookup(start, res, walk_next_part(parts));
 }
 
 u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts) {
     vfs_path iter = start;
     vfs_dentry* dentry = iter.dentry;
+    vfs_mount* mount = iter.mount;
 
     *res = start;
 
     vfs_dentry_acquire(dentry);
+    vfs_mount_acquire(mount);
+
     while (true) {
         if (parts->parts_left == 1)
             return 0;
@@ -121,12 +164,14 @@ u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts) {
         vfs_inode_unlock_shared(dentry->inode);
 
         vfs_dentry_release(dentry);
+        vfs_mount_release(mount);
 
         if (IS_ERROR(error))
             return error;
 
         iter = *res;
         dentry = iter.dentry;
+        mount = iter.mount;
     }
 }
 
@@ -136,11 +181,14 @@ u64 walk(vfs_path start, vfs_path* res, path_parts* parts) {
         return error;
 
     vfs_dentry* parent = res->dentry;
+    vfs_mount* mount = res->mount;
+
     vfs_inode_lock_shared(parent->inode);
     error = walk_one(*res, res, parts);
     vfs_inode_unlock_shared(parent->inode);
 
     vfs_dentry_release(parent);
+    vfs_mount_release(mount);
 
     return error;
 }

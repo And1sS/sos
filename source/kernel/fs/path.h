@@ -29,10 +29,10 @@ u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts);
 u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts);
 u64 walk(vfs_path start, vfs_path* res, path_parts* parts);
 
-// assumes that dir->inode->mut is locked in shared mode
-struct vfs_dentry* lookup(struct vfs_dentry* dir, string name);
-
-vfs_path vfs_path_create(vfs_mount* mnt, struct vfs_dentry* dentry);
-void vfs_path_release(vfs_path* path);
+// these two assume that dir->inode->mut is locked in shared mode
+// this can look up ., .., and children with mountpoint resolution
+u64 lookup(vfs_path start, vfs_path* res, string name);
+// this one only looks up direct child
+vfs_dentry* lookup_child(vfs_dentry* dentry, string name);
 
 #endif // SOS_PATH_H

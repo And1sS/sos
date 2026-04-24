@@ -11,10 +11,9 @@ typedef struct {
 } rw_spin_lock;
 
 #define RW_LOCK_STATIC_INITIALIZER                                             \
-    {                                                                          \
-        .readers = 0, .writer_involved = false,                                \
-        .lock = SPIN_LOCK_STATIC_INITIALIZER                                   \
-    }
+    ((rw_spin_lock) {.readers = 0,                                             \
+                     .writer_involved = false,                                 \
+                     .lock = SPIN_LOCK_STATIC_INITIALIZER})
 
 #define DECLARE_RW_LOCK(name) rw_spin_lock name = RW_LOCK_STATIC_INITIALIZER
 

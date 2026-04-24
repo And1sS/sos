@@ -36,6 +36,7 @@ typedef struct vfs_super_block {
 } vfs_super_block;
 
 vfs_super_block* vfs_super_get(struct vfs_type* type, device* dev);
+void vfs_super_unmount(vfs_super_block* sb);
 void vfs_super_destroy(vfs_super_block* sb);
 
 vfs_super_block* vfs_super_acquire(vfs_super_block* sb);

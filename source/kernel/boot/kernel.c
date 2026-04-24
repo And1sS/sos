@@ -99,8 +99,20 @@ void set_up_init_process(module init_module) {
     path_parts b_path = path_parts_from_path("b");
     walk(start, &b, &b_path);
 
+    vfs_path e;
+    path_parts e_path = path_parts_from_path("e");
+    walk(b, &e, &e_path);
+
     print_tree();
-    print_u64(vfs_rename(c, d.dentry, b, "e"));
+    vfs_mount* root = vfs_mount_get_root();
+    vfs_mount_attach(root, e.dentry, start.dentry);
+
+    u64 err = -vfs_rename(c, d.dentry, b, "e");
+    print_u64(err);
+
+    vfs_path mnted_c;
+    path_parts mnted_c_path = path_parts_from_path("b/e/a/c");
+    walk(start, &mnted_c, &mnted_c_path);
     print_tree();
     while (true) {
     }
