@@ -103,7 +103,6 @@ void set_up_init_process(module init_module) {
     path_parts e_path = path_parts_from_path("e");
     walk(b, &e, &e_path);
 
-    print_tree();
     vfs_mount* root = vfs_mount_get_root();
     vfs_mount_attach(root, e.dentry, start.dentry);
 
@@ -113,7 +112,6 @@ void set_up_init_process(module init_module) {
     vfs_path mnted_c;
     path_parts mnted_c_path = path_parts_from_path("b/e/a/c");
     walk(start, &mnted_c, &mnted_c_path);
-    print_tree();
     while (true) {
     }
 }

@@ -15,11 +15,11 @@ typedef struct {
 } icache_key;
 
 static u64 icache_hash(icache_key key) {
-    return hash2(key.sb->id, key.inode_id);
+    return hash2((u64) key.sb, key.inode_id);
 }
 
 static bool icache_comparator(icache_key a, icache_key b) {
-    return a.inode_id == b.inode_id && a.sb->id == b.sb->id;
+    return a.inode_id == b.inode_id && a.sb == b.sb;
 }
 
 DEFINE_HASH_TABLE(inode_cache, icache_key, vfs_inode*, icache_hash,

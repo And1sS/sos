@@ -1,7 +1,6 @@
 #include "ramfs.h"
 #include "../../error/errno.h"
 #include "../../error/error.h"
-#include "../../lib/flagops.h"
 #include "../dcache/dentry.h"
 #include "internal_tree.h"
 
@@ -21,10 +20,7 @@ static vfs_inode_ops inode_ops = {.evict = ramfs_evict,
 
 static vfs_type ramfs_type = {.name = RAMFS_NAME, .ops = &ops};
 
-void ramfs_init() {
-    internal_tree_init();
-    register_vfs_type(&ramfs_type);
-}
+void ramfs_init() { register_vfs_type(&ramfs_type); }
 
 static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);
@@ -43,7 +39,7 @@ static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
 void ramfs_evict(vfs_inode* inode) { evict_node(inode->private_data); }
 
 u64 ramfs_fill_super(vfs_super_block* sb) {
-    vfs_inode* root_inode = to_inode(get_root(), sb);
+    vfs_inode* root_inode = to_inode(internal_tree_create(), sb);
     if (IS_ERROR(root_inode))
         return PTR_ERROR(root_inode);
 

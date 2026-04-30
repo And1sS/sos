@@ -16,7 +16,7 @@ typedef struct _tree_node {
     linked_list_node self_node;
 } tree_node;
 
-void internal_tree_init();
+tree_node* internal_tree_create();
 
 tree_node* get_root();
 tree_node* find_subnode(tree_node* node, string name);
@@ -27,7 +27,5 @@ void evict_node(tree_node* node);
 
 void unlink_nodes(tree_node* parent, tree_node* child);
 void link_nodes(tree_node* parent, tree_node* child);
-
-void print_tree();
 
 #endif // SOS_INTERNAL_TREE_H
