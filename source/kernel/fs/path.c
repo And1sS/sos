@@ -78,17 +78,14 @@ static u64 lookup_parent(vfs_path start, vfs_path* res) {
     vfs_dentry* dentry = start.dentry;
     vfs_mount* mount = start.mount;
 
-    // Safe to do plain reads of parent since caller already holds dentry
-    // inode->rw_mut which carry visibility and prevent concurrent changes
-    if (dentry->parent != dentry) {
-        res->dentry = vfs_dentry_acquire(dentry->parent);
-        res->mount = vfs_mount_acquire(mount);
-    } else {
+    if (vfs_dentry_is_root(dentry))
         // we have encountered mountpoint root, need to cross namespaces
-        res->dentry = vfs_dentry_acquire(mount->mounted_at);
-        res->mount = vfs_mount_acquire(mount->parent_mount);
-    }
+        return vfs_mount_walk_up(mount, res);
 
+    // Safe to do plain reads of parent since caller already holds dentry
+    // inode->rw_mut which carries visibility and prevent concurrent changes
+    res->dentry = vfs_dentry_acquire(dentry->parent);
+    res->mount = vfs_mount_acquire(mount);
     return 0;
 }
 
@@ -115,7 +112,7 @@ u64 lookup(vfs_path start, vfs_path* res, string path) {
 
     bool is_mountpoint = vfs_dentry_is_mountpoint(dentry);
     if (is_mountpoint) {
-        u64 error = vfs_mount_find(mount, dentry, res);
+        u64 error = vfs_mount_walk_down(mount, dentry, res);
         if (IS_ERROR(error))
             panic("Error in vfs, couldn't resolve mount");
 

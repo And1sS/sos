@@ -361,9 +361,8 @@ bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor) {
 }
 
 bool vfs_dentry_is_orphaned(vfs_dentry* dentry) {
-    // safe to do plain reads here since caller is holding inode->rw_mut or
-    // parent inode->rw_mut which carries visibility and prevents concurrent
-    // changes
+    // safe to do plain reads here since caller is holding inode->rw_mut which
+    // carries visibility and prevents concurrent changes
     return dentry->parent == dentry && !vfs_dentry_is_root(dentry);
 }
 

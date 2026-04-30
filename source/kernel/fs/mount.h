@@ -10,19 +10,21 @@ typedef struct vfs_mount {
     // End of immutable data
 
     linked_list_node mount_node; // node used in parent`s children list, guarded
-                                 // by parent`s mount lock and mount_mut
+                                 // by parent`s mount lock and mount_tree_mut
 
     u64 refc; // Should be accessed atomically
 
     lock lock; // guards all the fields below
 
-    // these three should be modified only under both mount_mut in exclusive
-    // mode and this mount lock
+    // these three should be modified only under both mount_tree_mut in
+    // exclusive mode and this mount lock
     struct vfs_mount* parent_mount;
     vfs_dentry* mounted_at;
 
     linked_list children;
 } vfs_mount;
+
+void vfs_mount_tree_init();
 
 void vfs_mount_root(vfs_dentry* root);
 vfs_mount* vfs_mount_get_root();
@@ -33,7 +35,16 @@ vfs_mount* vfs_mount_attach(vfs_mount* parent_mount, vfs_dentry* mounted_at,
 vfs_mount* vfs_mount_acquire(vfs_mount* mount);
 void vfs_mount_release(vfs_mount* mount);
 
-u64 vfs_mount_find(vfs_mount* mount, vfs_dentry* dentry,
-                      struct vfs_path* res);
+u64 vfs_mount_walk_up(vfs_mount* mount, struct vfs_path* res);
+u64 vfs_mount_walk_down(vfs_mount* mount, vfs_dentry* dentry,
+                        struct vfs_path* res);
+
+// this function should be called with mount tree locked
+bool has_submounts(vfs_dentry* dentry);
+
+void vfs_mount_tree_lock_shared();
+void vfs_mount_tree_unlock_shared();
+void vfs_mount_tree_lock();
+void vfs_mount_tree_unlock();
 
 #endif // SOS_MOUNT_H

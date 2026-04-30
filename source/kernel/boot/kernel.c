@@ -104,7 +104,9 @@ void set_up_init_process(module init_module) {
     walk(b, &e, &e_path);
 
     vfs_mount* root = vfs_mount_get_root();
-    vfs_mount_attach(root, e.dentry, start.dentry);
+    vfs_type* ramfs_type = vfs_type_get(RAMFS_NAME);
+    vfs_dentry* submount_root = ramfs_type->ops->mount(ramfs_type, (device*) 1);
+    vfs_mount_attach(root, e.dentry, submount_root);
 
     u64 err = -vfs_rename(c, d.dentry, b, "e");
     print_u64(err);

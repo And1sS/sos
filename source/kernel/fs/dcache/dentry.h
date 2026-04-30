@@ -10,7 +10,8 @@
 // children can check whether it can use this dentry or not
 #define DENTRY_DYING (1 << 0)
 
-// set when dentry is a mountpoint
+// set when dentry is a mountpoint, should be set/freed under inode->mut and
+// mount_tree_mut, reset under mount_tree_mut
 #define DENTRY_MOUNTPOINT (1 << 1)
 
 typedef struct vfs_dentry {
@@ -78,14 +79,18 @@ bool vfs_dentry_is_root(vfs_dentry* dentry);
 bool vfs_dentry_is_dir(vfs_dentry* dentry);
 
 // used for rename operation to avoid loops in tree structure, sb->rename_mut
-// should be held during this operation
+// should be held during this operation TODO: should it?
 bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor);
 // inode mutex should be held during this operation
 bool vfs_dentry_is_orphaned(vfs_dentry* dentry);
 
-// These are for setting/testing mountpoint flag in a fast way,
+// These two are for setting/testing mountpoint flag in a fast way,
 // can give slightly stale data, so should not be used for decision-making.
 // exist mainly for lookups where staleness can be tolerated.
+
+// This one should be called under dentry->inode->rw_mut held for write and
+// mount_tree_mut held for write, so that reads under same mutexes can be
+// authoritive
 void vfs_dentry_set_mountpoint(vfs_dentry* dentry);
 bool vfs_dentry_is_mountpoint(vfs_dentry* dentry);
 

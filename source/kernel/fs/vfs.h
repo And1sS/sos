@@ -63,6 +63,8 @@ void vfs_init();
 
 bool register_vfs_type(vfs_type* type);
 void deregister_vfs_type(vfs_type* type);
+
+vfs_type* vfs_type_get(string name);
 vfs_type* vfs_type_acquire(vfs_type* type);
 void vfs_type_release(vfs_type* type);
 

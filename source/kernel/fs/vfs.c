@@ -21,6 +21,7 @@ void vfs_init() {
     // TODO: calculate based on available ram or get from config
     dcache_init(4, 10000);
     vfs_icache_init(10000);
+    vfs_mount_tree_init();
 
     ramfs_init();
     vfs_type* rootfs_type = vfs_registry_get(&type_registry, RAMFS_NAME);
@@ -47,6 +48,10 @@ vfs_type* vfs_type_create(string name) {
     new->name = name_copy;
     new->refc = REF_COUNT_STATIC_INITIALIZER;
     return new;
+}
+
+vfs_type* vfs_type_get(string name) {
+    return vfs_registry_get(&type_registry, name);
 }
 
 void vfs_type_destroy(vfs_type* type) {
@@ -113,6 +118,12 @@ u64 vfs_unlink(vfs_path start, string path) {
     if (child->inode->type == DIRECTORY)
         goto failed_to_unlink;
 
+    error = -EBUSY;
+    // can only report invalid state when we raced with unmouning and missed
+    // flag change to false, but it is harmless in this case
+    if (vfs_dentry_is_mountpoint(child))
+        goto failed_to_unlink;
+
     error = -EPERM;
     if (!dir->ops->unlink)
         goto failed_to_unlink;
@@ -122,13 +133,12 @@ u64 vfs_unlink(vfs_path start, string path) {
         vfs_dentry_unlink(child);
 
 failed_to_unlink:
-    vfs_dentry_release(child);
     vfs_inode_unlock(child->inode);
-
+    vfs_dentry_release(child);
 out:
     vfs_inode_unlock(dir);
-
     vfs_dentry_release(parent);
+
     return error;
 }
 
@@ -176,65 +186,60 @@ static void vfs_rename_unlock_children(vfs_dentry* source, vfs_dentry* target) {
 u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
                string name) {
 
-    // TODO: add check for name for dot and dotdot
+    vfs_dentry* old_dir_dentry = old_dir.dentry;
+    vfs_dentry* new_dir_dentry = new_dir.dentry;
+
+    if (path_ends_with_dot(name) || path_ends_with_dotdot(name))
+        return -EPERM;
+
     string name_copy = strcpy(name);
     if (!name_copy)
         return -ENOMEM;
 
-    vfs_dentry* old_dir_dentry = old_dir.dentry;
-    vfs_dentry* new_dir_dentry = new_dir.dentry;
+    u64 error = -EPERM;
+    // check that new_dir is directory and rename is supported
+    if (!vfs_dentry_is_dir(new_dir_dentry) || !source->inode->ops->rename)
+        goto out;
 
-    // check that parents are in same superblock, and we are renaming
-    // (moving) into a directory
-    if (old_dir_dentry->inode->sb != new_dir_dentry->inode->sb
-        || !vfs_dentry_is_dir(new_dir_dentry)) {
-        strfree(name_copy);
-        return -EPERM;
-    }
+    error = -EXDEV;
+    if (old_dir.mount != new_dir.mount) // check that parents are in same mnt
+        goto out;
 
     vfs_rename_lock(old_dir_dentry, new_dir_dentry);
-
-    // recheck that new dir and source are still alive
-    u64 error = -ENOENT;
-    if (vfs_dentry_is_orphaned(new_dir_dentry)
-        || vfs_dentry_is_orphaned(source))
-        goto out;
-
-    error = -EPERM;
-    if (!source->inode->ops->rename)
-        goto out;
-
-    // recheck that source hasn't been moved while we weren't holding lock
-    // safe to read parent since we are holding
-    // old_dir_dentry->inode->rw_mut which carries visibility and prevents
-    // concurrent modifications
-    error = -ENOENT;
-    if (source->parent != old_dir_dentry)
-        goto out;
-
-    // check that we are not moving directory into its subdirectory
-    error = -EINVAL;
-    if (vfs_dentry_is_ancestor(new_dir_dentry, source))
-        goto out;
 
     // lookup victim that will be replaced
     vfs_dentry* target = lookup_child(new_dir_dentry, name);
     error = IS_ERROR(target) ? PTR_ERROR(target) : 0;
-    if (error && error != (u64) -ENOENT)
-        goto out;
-
     target = target && !IS_ERROR(target) ? target : NULL;
+    if (error && error != (u64) -ENOENT)
+        goto out_parents_locked;
 
     // check that we are not changing anything in case old name == new name
-    error = 0;
+    error = -EEXIST;
     if (target == source)
-        goto no_rename_needed;
+        goto out_parents_locked;
 
+    // prevent concurrent changes to source or target topologies
     vfs_rename_lock_children(source, target);
 
+    // recheck that new dir and source are still alive or
+    // source hasn't been moved while we weren't holding lock
+    error = -ENOENT;
+    if (vfs_dentry_is_orphaned(new_dir_dentry) || vfs_dentry_is_orphaned(source)
+        || source->parent != old_dir_dentry)
+        goto out_children_locked;
+
+    // check that we are not moving directory into its subdirectory
+    error = -EINVAL;
+    if (vfs_dentry_is_ancestor(new_dir_dentry, source))
+        goto out_children_locked;
+
+    // prevent concurrent mnt tree changes, needed to prevent
+    // mounting/unmounting down the subtrees involved
+    vfs_mount_tree_lock_shared();
+
     error = -EBUSY;
-    if (vfs_dentry_is_mountpoint(source)
-        || vfs_dentry_is_mountpoint(target))
+    if (has_submounts(source) || (target && has_submounts(target)))
         goto error_dentry;
 
     error = source->inode->ops->rename(old_dir_dentry, source, new_dir_dentry,
@@ -244,17 +249,19 @@ u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
         vfs_dentry_move(new_dir_dentry, source, name_copy);
 
 error_dentry:
+    vfs_mount_tree_unlock_shared();
+
+out_children_locked:
     vfs_rename_unlock_children(source, target);
 
-no_rename_needed:
+out_parents_locked:
     if (target)
         vfs_dentry_release(target);
 
+    vfs_rename_unlock(old_dir_dentry, new_dir_dentry);
 out:
     if (error)
         strfree(name_copy);
-
-    vfs_rename_unlock(old_dir_dentry, new_dir_dentry);
 
     return error;
 }

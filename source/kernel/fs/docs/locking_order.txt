@@ -12,7 +12,7 @@ code that breaks it should be carefully inspected.
 Order:
 1) Superblock rename mutex
 2) Inode rw-mutex (If ancestors - ancestor first, else in inode address order)
-3) Mount tree rw-mutex (mount_mut)
+3) Mount tree rw-mutex (mount_tree_mut)
 
 3) Fs type lock, Mount lock - Those are mutually exclusive and should not be taken at the same time
 4) Superblock lock
