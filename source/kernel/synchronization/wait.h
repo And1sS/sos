@@ -24,6 +24,22 @@
                                                                                \
         while (!___condition_met && !___interrupted) {                         \
             get_current_thread()->state = BLOCKED;                             \
+                                                                               \
+            /* need to recheck here, because someone could send a signal after \
+             * interrupted check, but before setting state to BLOCKED, which   \
+             * wouldn't add current thread to scheduler run queue (since       \
+             * thread is currently running), but would set thread state to     \
+             * RUNNING, but since we have overridden it here - we have to      \
+             * recheck that this didn't happen                                 \
+             */                                                                \
+            ___interrupted =                                                   \
+                thread_any_pending_signals() || process_any_pending_signals(); \
+            if (___interrupted) {                                              \
+                /* restore state back to what it was before */                 \
+                get_current_thread()->state = RUNNING;                         \
+                break;                                                         \
+            }                                                                  \
+                                                                               \
             spin_unlock_irq_restore((lock), (flags));                          \
                                                                                \
             schedule();                                                        \
