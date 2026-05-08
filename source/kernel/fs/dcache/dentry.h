@@ -78,8 +78,9 @@ vfs_dentry* vfs_dentry_parent(vfs_dentry* dentry);
 bool vfs_dentry_is_root(vfs_dentry* dentry);
 bool vfs_dentry_is_dir(vfs_dentry* dentry);
 
-// used for rename operation to avoid loops in tree structure, sb->rename_mut
-// should be held during this operation TODO: should it?
+// used to walk up from dentry to ancestor to find whether they are linked,
+// should be used when corresponding subtree (where dentries can reside) can't
+// be changed, for example: during rename and unmounting
 bool vfs_dentry_is_ancestor(vfs_dentry* dentry, vfs_dentry* ancestor);
 // inode mutex should be held during this operation
 bool vfs_dentry_is_orphaned(vfs_dentry* dentry);
@@ -92,6 +93,7 @@ bool vfs_dentry_is_orphaned(vfs_dentry* dentry);
 // mount_tree_mut held for write, so that reads under same mutexes can be
 // authoritive
 void vfs_dentry_set_mountpoint(vfs_dentry* dentry);
+void vfs_dentry_reset_mountpoint(vfs_dentry* dentry);
 bool vfs_dentry_is_mountpoint(vfs_dentry* dentry);
 
 #endif // SOS_DENTRY_H

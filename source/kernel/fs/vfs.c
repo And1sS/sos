@@ -149,6 +149,24 @@ static void vfs_rename_lock(vfs_dentry* old_dir, vfs_dentry* new_dir) {
     }
 
     mutex_lock(&old_dir->inode->sb->rename_mut);
+
+    // Safe to check ancestor without holding old_dir and new_dir inode locks,
+    // since we only care about locking order here (deadlock avoidance in
+    // particular), lets examine all possible cases:
+    //
+    // 1) ancestor check sees there is parent->child relationship between
+    // old_dir and new_dir that, then:
+    //    1.a) if this changes during the time we are holding rename_mut -> then
+    //       child can only be detached and won't be locked at the same time
+    //       with parent, because no concurrent renames can occur -> no deadlock
+    //    1.b) if this doesn't change -> it's the easiest case, totally fine, no
+    //       deadlock
+    //
+    // 2) ancestor check sees no parent->child relationship -> then only rename
+    // could potentially try to lock both nodes, change tree structure and cause
+    // deadlock, but this also can't happen since we are holding rename_mut and
+    // preventing concurrent renames -> no deadlock
+
     if (vfs_dentry_is_ancestor(old_dir, new_dir)) {
         vfs_inode_lock(new_dir->inode);
         vfs_inode_lock(old_dir->inode);
@@ -218,6 +236,18 @@ u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
     // check that we are not changing anything in case old name == new name
     error = -EEXIST;
     if (target == source)
+        goto out_parents_locked;
+
+    error = -ENOTEMPTY;
+    // this is crucial, as locking children can cause deadlock, for example,
+    // in case of this type of topology: /new_dir/target/old_dir/source. And
+    // even though rename of this type would fail later on target emptiness
+    // check, by the time we should have checked it, we already had caused a
+    // deadlock
+    // safe to lock after this check, since if there is no parent->child
+    // relationship, it can't change for the duration of holding rename_mut
+    if (vfs_dentry_is_ancestor(source, target)
+        || vfs_dentry_is_ancestor(target, source))
         goto out_parents_locked;
 
     // prevent concurrent changes to source or target topologies

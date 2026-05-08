@@ -76,6 +76,11 @@ static vfs_mount* vfs_mount_allocate(vfs_dentry* mount_root) {
     return vfs_mount_acquire(mount);
 }
 
+static void vfs_mount_destroy(vfs_mount* mount) {
+    vfs_dentry_release(mount->mount_root);
+    kfree(mount);
+}
+
 void vfs_mount_root(vfs_dentry* root) {
     root_mount = vfs_mount_allocate(root);
     root_mount->parent_mount = root_mount;
@@ -173,7 +178,12 @@ retry:
     }
 
     mount_registry_remove(mount);
-    // TODO: set dentry->flags | DENTRY_MOUNTPOINT to 0
+
+    // Safe to operate on unlocked dentry, since mount tree is already locked,
+    // and no renames can occur, which means that number of submounts won't
+    // change.
+    if (!has_submounts(mounted_at))
+        vfs_dentry_reset_mountpoint(mounted_at);
 
     spin_lock(&parent->lock);
     linked_list_remove_node(&parent->children, &mount->mount_node);
@@ -185,7 +195,7 @@ retry:
     spin_unlock(&mount->lock);
 
     vfs_mount_tree_unlock();
-    vfs_super_unmount(mounted_at->inode->sb);
+    vfs_super_unmount(mount->mount_root->inode->sb);
 
     vfs_mount_release(parent);
     vfs_dentry_release(mounted_at);
@@ -214,7 +224,7 @@ void vfs_mount_release(vfs_mount* mount) {
 
     // mount is detached (unreachable) and this was the last reference
     if (mount->parent_mount == mount) {
-        kfree(mount);
+        vfs_mount_destroy(mount);
         return;
     }
 

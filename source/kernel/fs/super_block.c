@@ -21,8 +21,6 @@ void vfs_super_unmount(vfs_super_block* sb) {
 
     dcache_evict_unused(sb);
     // TODO: clear unused inodes
-
-    vfs_super_release(sb);
 }
 
 vfs_super_block* vfs_super_acquire(vfs_super_block* sb) {

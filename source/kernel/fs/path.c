@@ -128,15 +128,15 @@ u64 lookup(vfs_path start, vfs_path* res, string path) {
     // TODO: add lookup_mnt flag to be able to stop crossing, or do we need it?
     if (vfs_dentry_is_mountpoint(child)) {
         u64 error = vfs_mount_walk_down(mount, child, res);
-        if (IS_ERROR(error))
-            panic("Error in vfs, couldn't resolve mount");
-
-        // release reference for intermediate dentry
-        vfs_dentry_release(child);
-    } else {
-        res->dentry = child; // child reference is already incremented
-        res->mount = vfs_mount_acquire(mount);
+        if (!IS_ERROR(error)) {
+            vfs_dentry_release(child); // release intermediate dentry
+            return 0;
+        } else if (error != (u64) -ENOENT)
+            panic("Error in vfs mount resolution");
     }
+
+    res->dentry = child; // child reference is already incremented
+    res->mount = vfs_mount_acquire(mount);
 
     return 0;
 }

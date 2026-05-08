@@ -31,6 +31,7 @@ vfs_mount* vfs_mount_get_root();
 
 vfs_mount* vfs_mount_attach(vfs_mount* parent_mount, vfs_dentry* mounted_at,
                             vfs_dentry* mount_root);
+u64 vfs_mount_detach(vfs_mount* mount);
 
 vfs_mount* vfs_mount_acquire(vfs_mount* mount);
 void vfs_mount_release(vfs_mount* mount);

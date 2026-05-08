@@ -110,7 +110,7 @@ void set_up_init_process(module init_module) {
     vfs_mount* root = vfs_mount_get_root();
     vfs_type* ramfs_type = vfs_type_get(RAMFS_NAME);
     vfs_dentry* submount_root = ramfs_type->ops->mount(ramfs_type, NULL);
-    vfs_mount_attach(root, e.dentry, submount_root);
+    vfs_mount* submount = vfs_mount_attach(root, e.dentry, submount_root);
 
     u64 err = -vfs_rename(c, d.dentry, b, "e");
     print_u64(err);
@@ -118,6 +118,10 @@ void set_up_init_process(module init_module) {
     vfs_path mnted_c;
     path_parts mnted_c_path = path_parts_from_path("b/e/a/c");
     walk(start, &mnted_c, &mnted_c_path);
+    vfs_path_release(&mnted_c);
+
+    vfs_mount_detach(submount);
+    vfs_mount_release(submount);
     while (true) {
     }
 }

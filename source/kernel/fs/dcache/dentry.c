@@ -370,6 +370,10 @@ void vfs_dentry_set_mountpoint(vfs_dentry* dentry) {
     SET_FLAGS(dentry->flags, DENTRY_MOUNTPOINT);
 }
 
+void vfs_dentry_reset_mountpoint(vfs_dentry* dentry) {
+    RESET_FLAGS(dentry->flags, DENTRY_MOUNTPOINT);
+}
+
 bool vfs_dentry_is_mountpoint(vfs_dentry* dentry) {
     return TEST_FLAG(dentry->flags, DENTRY_MOUNTPOINT);
 }

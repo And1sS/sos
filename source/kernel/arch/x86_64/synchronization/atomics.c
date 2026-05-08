@@ -36,6 +36,13 @@ void atomic_or(volatile u64* addr, u64 mask) {
                      : "memory", "cc");
 }
 
+void atomic_and(volatile u64* addr, u64 mask) {
+    __asm__ volatile("lock andq %1, %0"
+                     : "+m"(*addr)
+                     : "r"(mask)
+                     : "memory", "cc");
+}
+
 void atomic_increment(volatile u64* addr) {
     __asm__ volatile("lock incq (%0)" : : "r"(addr) : "memory");
 }

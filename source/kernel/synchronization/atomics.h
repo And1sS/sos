@@ -92,6 +92,9 @@ extern u64 atomic_get(volatile u64* addr);
 // has write-release semantics
 extern void atomic_or(volatile u64* addr, u64 mask);
 
+// has write-release semantics
+extern void atomic_and(volatile u64* addr, u64 mask);
+
 extern void atomic_increment(volatile u64* addr);
 
 // returns true when atomically increments any value > 0,
