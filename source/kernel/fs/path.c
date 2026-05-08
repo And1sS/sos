@@ -46,6 +46,16 @@ path_parts path_parts_from_path(string path) {
     return (path_parts) {.path = path, .parts_left = count_parts(path)};
 }
 
+void vfs_path_acquire(vfs_path* path) {
+    vfs_dentry_acquire(path->dentry);
+    vfs_mount_acquire(path->mount);
+}
+
+void vfs_path_release(vfs_path* path) {
+    vfs_dentry_release(path->dentry);
+    vfs_mount_release(path->mount);
+}
+
 static u64 part_length(string path) {
     u64 len = 0;
     for (; path[len] != '/' && path[len] != '\0' && len < MAX_PATH_LENGTH - 1;
@@ -110,28 +120,24 @@ u64 lookup(vfs_path start, vfs_path* res, string path) {
     if (streq(path, ".."))
         return lookup_parent(start, res);
 
-    bool is_mountpoint = vfs_dentry_is_mountpoint(dentry);
-    if (is_mountpoint) {
-        u64 error = vfs_mount_walk_down(mount, dentry, res);
-        if (IS_ERROR(error))
-            panic("Error in vfs, couldn't resolve mount");
-
-        dentry = res->dentry;
-        mount = res->mount;
-    }
-
     vfs_dentry* child = lookup_child(dentry, path);
-
-    // release resolved mountpoint root reference
-    // for non-mountpoints, caller is reference owner
-    if (is_mountpoint)
-        vfs_dentry_release(dentry);
-
     if (IS_ERROR(child))
         return PTR_ERROR(child);
 
-    res->dentry = child; // child reference is already incremented
-    res->mount = vfs_mount_acquire(mount);
+    // TODO: resolve stacked mounts
+    // TODO: add lookup_mnt flag to be able to stop crossing, or do we need it?
+    if (vfs_dentry_is_mountpoint(child)) {
+        u64 error = vfs_mount_walk_down(mount, child, res);
+        if (IS_ERROR(error))
+            panic("Error in vfs, couldn't resolve mount");
+
+        // release reference for intermediate dentry
+        vfs_dentry_release(child);
+    } else {
+        res->dentry = child; // child reference is already incremented
+        res->mount = vfs_mount_acquire(mount);
+    }
+
     return 0;
 }
 
@@ -143,49 +149,38 @@ u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
 }
 
 u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts) {
-    vfs_path iter = start;
-    vfs_dentry* dentry = iter.dentry;
-    vfs_mount* mount = iter.mount;
-
     *res = start;
-
-    vfs_dentry_acquire(dentry);
-    vfs_mount_acquire(mount);
+    vfs_path_acquire(&start);
 
     while (true) {
+        vfs_path curr = *res;
+
         if (parts->parts_left == 1)
             return 0;
 
+        vfs_dentry* dentry = curr.dentry;
         vfs_inode_lock_shared(dentry->inode);
-        u64 error = walk_one(iter, res, parts);
+        u64 error = walk_one(curr, res, parts);
         vfs_inode_unlock_shared(dentry->inode);
 
-        vfs_dentry_release(dentry);
-        vfs_mount_release(mount);
+        vfs_path_release(&curr);
 
         if (IS_ERROR(error))
             return error;
-
-        iter = *res;
-        dentry = iter.dentry;
-        mount = iter.mount;
     }
 }
 
 u64 walk(vfs_path start, vfs_path* res, path_parts* parts) {
-    u64 error = walk_parent(start, res, parts);
+    vfs_path parent;
+    u64 error = walk_parent(start, &parent, parts);
     if (IS_ERROR(error))
         return error;
 
-    vfs_dentry* parent = res->dentry;
-    vfs_mount* mount = res->mount;
+    vfs_inode_lock_shared(parent.dentry->inode);
+    error = walk_one(parent, res, parts);
+    vfs_inode_unlock_shared(parent.dentry->inode);
 
-    vfs_inode_lock_shared(parent->inode);
-    error = walk_one(*res, res, parts);
-    vfs_inode_unlock_shared(parent->inode);
-
-    vfs_dentry_release(parent);
-    vfs_mount_release(mount);
+    vfs_path_release(&parent);
 
     return error;
 }

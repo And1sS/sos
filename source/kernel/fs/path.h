@@ -22,6 +22,9 @@ bool path_ends_with_dotdot(string path);
 
 path_parts path_parts_from_path(string path);
 
+void vfs_path_acquire(vfs_path* path);
+void vfs_path_release(vfs_path* path);
+
 // assumes that dir->inode->mut is locked in shared mode
 u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts);
 

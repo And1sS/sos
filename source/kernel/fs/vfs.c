@@ -207,7 +207,8 @@ u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
 
     vfs_rename_lock(old_dir_dentry, new_dir_dentry);
 
-    // lookup victim that will be replaced
+    // lookup victim that will be replaced, no need for crossing mount since
+    // victim is not allowed to be mountpoint anyway
     vfs_dentry* target = lookup_child(new_dir_dentry, name);
     error = IS_ERROR(target) ? PTR_ERROR(target) : 0;
     target = target && !IS_ERROR(target) ? target : NULL;

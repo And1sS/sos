@@ -69,11 +69,15 @@ void set_up_init_process(module init_module) {
      *            /           \
      *           a             b
      *          /             /
-     *         c             e
-     *        /
-     *       d
-     *      /
-     *     f
+     *         c             e (submnt)
+     *        /            /        \
+     *       d            a          b
+     *      /            /          /
+     *     f            c          e
+     *                 /
+     *                d
+     *               /
+     *              f
      */
     vfs_mount* mnt = vfs_mount_get_root();
     vfs_path res;
@@ -85,7 +89,7 @@ void set_up_init_process(module init_module) {
     print("walked to: ");
     print(res.dentry->name);
     println("");
-    vfs_dentry_release(res.dentry);
+    vfs_path_release(&res);
 
     vfs_path c;
     path_parts c_path = path_parts_from_path("a/c");
@@ -105,7 +109,7 @@ void set_up_init_process(module init_module) {
 
     vfs_mount* root = vfs_mount_get_root();
     vfs_type* ramfs_type = vfs_type_get(RAMFS_NAME);
-    vfs_dentry* submount_root = ramfs_type->ops->mount(ramfs_type, (device*) 1);
+    vfs_dentry* submount_root = ramfs_type->ops->mount(ramfs_type, NULL);
     vfs_mount_attach(root, e.dentry, submount_root);
 
     u64 err = -vfs_rename(c, d.dentry, b, "e");

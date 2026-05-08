@@ -5,6 +5,10 @@
 #include "dcache/dentry.h"
 
 void vfs_super_unmount(vfs_super_block* sb) {
+    if (atomic_decrement_not_one(&sb->mount_count))
+        return;
+
+    // slow path
     spin_lock(&sb->type->lock);
     if (atomic_decrement_and_get(&sb->mount_count) != 0) {
         spin_unlock(&sb->type->lock);
@@ -148,7 +152,7 @@ static vfs_super_block* vfs_super_find(vfs_type* type, device* dev) {
 vfs_super_block* vfs_super_get(vfs_type* type, device* dev) {
 retry:
     spin_lock(&type->lock);
-    vfs_super_block* sb = vfs_super_find(type, dev);
+    vfs_super_block* sb = dev ? vfs_super_find(type, dev) : NULL;
     if (!sb) {
         sb = vfs_super_allocate(type, dev);
         goto out;
