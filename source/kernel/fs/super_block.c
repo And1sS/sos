@@ -122,8 +122,7 @@ void vfs_super_unlock_failed(vfs_super_block* sb) {
 }
 
 static bool vfs_super_initialization_finished(vfs_super_block* sb) {
-    return (sb->flags & SUPER_INITIALIZED)
-           || (sb->flags & SUPER_INITIALIZATION_FAILED);
+    return sb->flags & (SUPER_INITIALIZED | SUPER_INITIALIZATION_FAILED);
 }
 
 static bool vfs_super_await_initialization(vfs_super_block* sb) {

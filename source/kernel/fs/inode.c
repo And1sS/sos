@@ -75,8 +75,7 @@ static vfs_inode* vfs_inode_allocate(u64 id, vfs_super_block* sb) {
 }
 
 static bool vfs_inode_initialization_finished(vfs_inode* inode) {
-    return (inode->flags & INODE_INITIALIZED)
-           || (inode->flags & INODE_INITIALIZATION_FAILED);
+    return inode->flags & (INODE_INITIALIZED | INODE_INITIALIZATION_FAILED);
 }
 
 static bool vfs_inode_await_initialization(vfs_inode* inode) {
