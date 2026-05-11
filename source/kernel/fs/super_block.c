@@ -12,13 +12,13 @@ void vfs_super_unmount(vfs_super_block* sb) {
     spin_lock(&sb->type->lock);
     if (atomic_decrement_and_get(&sb->mount_count) != 0) {
         spin_unlock(&sb->type->lock);
-        vfs_super_release(sb);
         return;
     }
 
     SET_FLAGS(sb->flags, SUPER_DYING);
     spin_unlock(&sb->type->lock);
 
+    vfs_dentry_release(sb->root);
     dcache_evict_unused(sb);
     // TODO: clear unused inodes
 }
@@ -29,43 +29,22 @@ vfs_super_block* vfs_super_acquire(vfs_super_block* sb) {
 }
 
 void vfs_super_release(vfs_super_block* sb) {
-    // fast path, transition for any refc > 2
-    if (atomic_decrement_greater_than(&sb->refc, 2))
+    // fast path, transition for any refc > 1
+    if (atomic_decrement_not_one(&sb->refc))
         return;
 
-    // slow path, transitions 2 -> 1, 1 -> 0
+    // slow path, transition 1 -> 0
     vfs_type* type = sb->type;
     spin_lock(&type->lock);
-    u64 refc = atomic_decrement_and_get(&sb->refc);
-    if (refc == 0) {
-        spin_unlock(&type->lock);
-        vfs_super_destroy(sb);
-        return;
-    }
-
-    // Safe to do plain read since at this point root is stabilized to be
-    // either NULL or real root which won't change
-    vfs_dentry* root = sb->root;
-    if (!root || refc > 1) {
+    if (atomic_decrement_and_get(&sb->refc) > 0) {
         spin_unlock(&type->lock);
         return;
     }
 
-    // Here refc == 1 and root exists - only root dentry(and its inode) alive
-    if (TEST_FLAG(sb->flags, SUPER_DYING)) {
-        linked_list_remove_node(&type->super_blocks, &sb->self_node);
-        spin_unlock(&type->lock);
-        vfs_dentry_release(root);
-        return;
-    } else if (TEST_FLAG(sb->flags, SUPER_INITIALIZATION_FAILED)) {
-        spin_unlock(&type->lock);
-        vfs_dentry_release(root);
-        return;
-    }
+    linked_list_remove_node(&type->super_blocks, &sb->self_node);
     spin_unlock(&type->lock);
 
-    // Root exists, refcount == 1 (root holds reference to sb), initialized
-    // successfully and not dying - do nothing, just exit
+    vfs_super_destroy(sb);
 }
 
 void vfs_super_destroy(vfs_super_block* sb) {

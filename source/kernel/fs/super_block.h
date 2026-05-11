@@ -19,8 +19,8 @@ typedef struct vfs_super_block {
     u64 id;
     struct vfs_type* type;
     device* device;
-    struct vfs_dentry* root; // Root dentry remains valid if there is any active
-                             // reference to sb obtained via vfs_type
+    struct vfs_dentry* root; // Strong reference, released once mount_count
+                             // reaches 0
     // End of immutable data
 
     u64 flags;       // Should be accessed atomically
