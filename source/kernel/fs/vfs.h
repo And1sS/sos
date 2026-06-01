@@ -7,6 +7,7 @@
 #include "../lib/container/linked_list/linked_list.h"
 #include "../lib/ref_count/ref_count.h"
 #include "../lib/types.h"
+#include "../memory/virtual/umem.h"
 #include "../synchronization/spin_lock.h"
 
 struct vfs_type;
@@ -14,34 +15,7 @@ struct vfs_super_block;
 struct vfs_inode;
 struct vfs_dentry;
 struct vfs_path;
-
-typedef struct {
-    void (*evict)(struct vfs_inode* inode);
-
-    // file operations
-    u64 (*open)(struct vfs_inode* inode, int flags);
-    u64 (*close)(struct vfs_inode* inode);
-    u64 (*read)(struct vfs_inode* inode, u64 off, u8* buffer);
-    u64 (*write)(struct vfs_inode* inode, u64 off, u8* buffer);
-
-    // directory operations
-    u64 (*unlink)(struct vfs_inode* dir, struct vfs_dentry* dentry);
-    struct vfs_dentry* (*lookup)(struct vfs_dentry* parent, string name);
-    u64 (*rename)(struct vfs_dentry* old_parent_dentry,
-                  struct vfs_dentry* old_dentry,
-                  struct vfs_dentry* victim_dentry,
-                  struct vfs_dentry* new_dentry, string name);
-} vfs_inode_ops;
-
-typedef enum {
-    FILE,
-    DIRECTORY,
-    CHARACTER_DEVICE,
-    BLOCK_DEVICE,
-    PIPE,
-    SYMLINK,
-    SOCKET
-} vfs_inode_type;
+struct vfs_file;
 
 typedef struct {
     struct vfs_dentry* (*mount)(struct vfs_type* type, device* dev);
@@ -68,8 +42,20 @@ vfs_type* vfs_type_get(string name);
 vfs_type* vfs_type_acquire(vfs_type* type);
 void vfs_type_release(vfs_type* type);
 
+struct vfs_file* vfs_open(struct vfs_path start, string path, u64 flags);
+struct vfs_file* vfs_create(struct vfs_path path, string name, u64 mode);
+u64 vfs_close(struct vfs_file* file);
+
+struct vfs_file* vfs_mkdir(struct vfs_path path, string name, u64 flags,
+                           u64 mode);
+u64 vfs_rmdir(struct vfs_path path);
+u64 vfs_listdir(struct vfs_path path);
+
 u64 vfs_unlink(struct vfs_path start, string path);
 u64 vfs_rename(struct vfs_path old_dir, struct vfs_dentry* source,
                struct vfs_path new_dir, string name);
+
+u64 vfs_read(struct vfs_file* file, __user void* buf, u64 size);
+u64 vfs_write(struct vfs_file* file, __user void* buf, u64 size);
 
 #endif // SOS_VFS_H

@@ -46,6 +46,8 @@ static void vfs_inode_destroy(vfs_inode* inode) {
     if (inode->flags & INODE_INITIALIZED && inode->links == 0
         && inode->ops->evict)
         inode->ops->evict(inode);
+    else if (inode->flags & INODE_INITIALIZED && inode->ops->release)
+        inode->ops->release(inode);
 
     vfs_super_release(inode->sb);
     kfree(inode);
@@ -64,6 +66,7 @@ static vfs_inode* vfs_inode_allocate(u64 id, vfs_super_block* sb) {
     inode->mut = RW_MUTEX_STATIC_INITIALIZER;
 
     inode->flags = 0;
+    inode->size = 0;
     inode->links = 0;
     inode->refc = 0;
 

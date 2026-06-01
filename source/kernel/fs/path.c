@@ -46,14 +46,16 @@ path_parts path_parts_from_path(string path) {
     return (path_parts) {.path = path, .parts_left = count_parts(path)};
 }
 
-void vfs_path_acquire(vfs_path* path) {
-    vfs_dentry_acquire(path->dentry);
-    vfs_mount_acquire(path->mount);
+vfs_path vfs_path_acquire(vfs_path path) {
+    vfs_dentry_acquire(path.dentry);
+    vfs_mount_acquire(path.mount);
+
+    return path;
 }
 
-void vfs_path_release(vfs_path* path) {
-    vfs_dentry_release(path->dentry);
-    vfs_mount_release(path->mount);
+void vfs_path_release(vfs_path path) {
+    vfs_dentry_release(path.dentry);
+    vfs_mount_release(path.mount);
 }
 
 static u64 part_length(string path) {
@@ -150,7 +152,7 @@ u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
 
 u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts) {
     *res = start;
-    vfs_path_acquire(&start);
+    vfs_path_acquire(start);
 
     while (true) {
         vfs_path curr = *res;
@@ -163,7 +165,7 @@ u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts) {
         u64 error = walk_one(curr, res, parts);
         vfs_inode_unlock_shared(dentry->inode);
 
-        vfs_path_release(&curr);
+        vfs_path_release(curr);
 
         if (IS_ERROR(error))
             return error;
@@ -180,7 +182,7 @@ u64 walk(vfs_path start, vfs_path* res, path_parts* parts) {
     error = walk_one(parent, res, parts);
     vfs_inode_unlock_shared(parent.dentry->inode);
 
-    vfs_path_release(&parent);
+    vfs_path_release(parent);
 
     return error;
 }

@@ -4,6 +4,7 @@
 #include "../lib/string.h"
 #include "dcache/dcache.h"
 #include "dcache/dentry.h"
+#include "file.h"
 #include "mount.h"
 #include "path.h"
 #include "ramfs/ramfs.h"
@@ -90,6 +91,134 @@ void vfs_type_release(vfs_type* type) {
     spin_lock(&type->lock);
     ref_release(&type->refc);
     spin_unlock(&type->lock);
+}
+
+vfs_file* vfs_create(vfs_path start, string path, u64 mode) {
+    return vfs_open(start, path, mode | O_WRONLY | O_CREAT | O_TRUNC);
+}
+
+static u64 handle_truncation(vfs_inode* inode, u64 flags) {
+    if (!(flags & O_TRUNC))
+        return 0;
+
+    if (inode->type != FILE)
+        return -EISDIR;
+
+    // TODO: vfs_truncate()
+    return 0;
+}
+
+vfs_file* vfs_open(vfs_path start, string path, u64 flags) {
+    vfs_path parent;
+    vfs_path child;
+    path_parts parts = path_parts_from_path(path);
+
+    u64 error = walk_parent(start, &parent, &parts);
+    if (IS_ERROR(error))
+        return ERROR_PTR(error);
+
+    vfs_inode* dir = parent.dentry->inode;
+    vfs_inode_lock(dir);
+
+    error = walk_one(parent, &child, &parts);
+    string name = parts.part;
+
+    if (IS_ERROR(error)) {
+        if (error != (u64) -ENOENT || !(flags & O_CREAT) || flags & O_DIRECTORY)
+            goto out_error_get_child;
+
+        error = -EPERM;
+        if (!dir->ops->create)
+            goto out_error_get_child;
+
+        vfs_dentry* child_dentry = dir->ops->create(parent.dentry, name, flags);
+        error = PTR_ERROR(child_dentry);
+        if (IS_ERROR(child_dentry))
+            goto out_error_get_child;
+
+        child.dentry = child_dentry; // child reference is already incremented
+        child.mount = vfs_mount_acquire(parent.mount);
+    }
+
+    vfs_inode_unlock(dir);
+    vfs_path_release(parent);
+
+    vfs_inode* inode = child.dentry->inode;
+
+    error = handle_truncation(inode, flags);
+    if (IS_ERROR(error))
+        goto out_error_no_open;
+
+    error = -EPERM;
+    if (!inode->file_ops->open)
+        goto out_error_no_open;
+
+    vfs_file* file = vfs_file_create(child, flags);
+    vfs_path_release(child);
+
+    error = PTR_ERROR(file);
+    if (IS_ERROR(file))
+        goto out_error_create_file;
+
+    error = file->ops->open(file, flags);
+    if (IS_ERROR(error)) {
+        vfs_file_release(file);
+        goto out_error_open;
+    }
+
+    return file;
+
+out_error_get_child:
+    vfs_inode_unlock(dir);
+
+    vfs_path_release(parent);
+    return ERROR_PTR(error);
+
+out_error_create_file:
+out_error_no_open:
+    vfs_path_release(child);
+
+out_error_open:
+    return ERROR_PTR(error);
+}
+
+u64 vfs_close(vfs_file* file) {
+    // no locking needed, since upper layer has to restrict this procedure usage
+    // but first removing file descriptor from process fd table
+    if (file->ops->close)
+        return file->ops->close(file);
+
+    return 0;
+}
+
+u64 vfs_read(vfs_file* file, __user void* buf, u64 size) {
+    if (!file->ops->read)
+        return -EPERM;
+
+    vfs_inode* inode = file->path.dentry->inode;
+    if (inode->type == DIRECTORY)
+        return -EISDIR;
+
+    vfs_inode_lock_shared(inode);
+    u64 res = file->ops->read(file, buf, size);
+    vfs_inode_unlock_shared(inode);
+
+    return res;
+}
+
+u64 vfs_write(struct vfs_file* file, __user void* buf, u64 size) {
+    if (!file->ops->write || (file->flags & O_RONLY))
+        return -EPERM;
+
+    vfs_inode* inode = file->path.dentry->inode;
+    if (inode->type == DIRECTORY)
+        return -EISDIR;
+
+    vfs_inode_lock(inode);
+    u64 res = file->ops->write(file, buf, size);
+    vfs_inode_unlock(inode);
+
+    return res;
 }
 
 u64 vfs_unlink(vfs_path start, string path) {

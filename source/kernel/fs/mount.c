@@ -77,6 +77,7 @@ static vfs_mount* vfs_mount_allocate(vfs_dentry* mount_root) {
 }
 
 static void vfs_mount_destroy(vfs_mount* mount) {
+    // mount is detached at this point
     vfs_dentry_release(mount->mount_root);
     kfree(mount);
 }

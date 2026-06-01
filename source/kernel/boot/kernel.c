@@ -1,12 +1,14 @@
 #include "../arch/common/init.h"
 #include "../arch/common/vmm.h"
 #include "../fs/dcache/dentry.h"
+#include "../fs/file.h"
 #include "../fs/mount.h"
 #include "../fs/path.h"
 #include "../fs/ramfs/internal_tree.h"
 #include "../fs/ramfs/ramfs.h"
 #include "../fs/vfs.h"
 #include "../interrupts/irq.h"
+#include "../lib/string.h"
 #include "../memory/heap/kheap.h"
 #include "../memory/virtual/vmm.h"
 #include "../threading/kthread.h"
@@ -89,7 +91,7 @@ void set_up_init_process(module init_module) {
     print("walked to: ");
     print(res.dentry->name);
     println("");
-    vfs_path_release(&res);
+    vfs_path_release(res);
 
     vfs_path c;
     path_parts c_path = path_parts_from_path("a/c");
@@ -119,7 +121,19 @@ void set_up_init_process(module init_module) {
     vfs_path mnted_c;
     path_parts mnted_c_path = path_parts_from_path("b/e/a/c");
     walk(start, &mnted_c, &mnted_c_path);
-    vfs_path_release(&mnted_c);
+
+    vfs_file* file = vfs_create(mnted_c, "test", 0);
+    print_u64((u64) file);
+
+    string test = "hello VFS world!";
+    u64 written = vfs_write(file, (void*) test, strlen(test));
+    UNUSED(written);
+
+    vfs_unlink(mnted_c, "test");
+    vfs_close(file);
+    vfs_file_release(file);
+
+    vfs_path_release(mnted_c);
 
     vfs_mount_detach(submount);
     vfs_mount_release(submount);

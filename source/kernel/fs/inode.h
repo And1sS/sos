@@ -18,6 +18,50 @@
 // afterward
 #define INODE_DEAD (1 << 2)
 
+struct vfs_file;
+
+typedef struct vfs_file_ops {
+    u64 (*open)(struct vfs_file* file, u64 flags);
+    u64 (*close)(struct vfs_file* file);
+
+    u64 (*read)(struct vfs_file* file, __user void* buff, u64 size);
+    u64 (*write)(struct vfs_file* file, __user void* buff, u64 size);
+
+    // called upon destruction
+    void (*release)(struct vfs_file* file);
+} vfs_file_ops;
+
+typedef struct {
+    // called upon destruction when inode is unlinked
+    void (*evict)(struct vfs_inode* inode);
+    // called upon destruction when inode is not unlinked
+    void (*release)(struct vfs_inode* inode);
+
+    // file operations
+    struct vfs_dentry* (*create)(struct vfs_dentry* parent, string name,
+                                 u64 flags);
+
+    // directory operations
+    struct vfs_dentry* (*mkdir)(struct vfs_dentry* parent, string name,
+                                u64 flags);
+    u64 (*unlink)(struct vfs_inode* dir, struct vfs_dentry* dentry);
+    struct vfs_dentry* (*lookup)(struct vfs_dentry* parent, string name);
+    u64 (*rename)(struct vfs_dentry* old_parent_dentry,
+                  struct vfs_dentry* old_dentry,
+                  struct vfs_dentry* victim_dentry,
+                  struct vfs_dentry* new_dentry, string name);
+} vfs_inode_ops;
+
+typedef enum {
+    FILE,
+    DIRECTORY,
+    CHARACTER_DEVICE,
+    BLOCK_DEVICE,
+    PIPE,
+    SYMLINK,
+    SOCKET
+} vfs_inode_type;
+
 typedef struct vfs_inode {
     // Immutable data
     u64 id;
@@ -25,18 +69,21 @@ typedef struct vfs_inode {
     struct vfs_super_block* sb;
     vfs_inode_type type;
     vfs_inode_ops* ops;
+    vfs_file_ops* file_ops;
     // End of immutable data
 
     rw_mutex mut; // This mutex used for separating reading operations such as
                   // (lookup, readdir) from modifying operations (link, unlink,
-                  // rmdir, etc.)
+                  // rmdir, etc.), also for synchronizing concurrent writes
 
-    u64 flags; // Should be accessed atomically
+    u64 size;  // Should be accessed atomically only under mut
     u64 links; // Should be accessed atomically only under mut
                // (exception is inspection before freeing, since noone can
                // modify links at that point and visibility will be carried
                // through refcount and initialization, since noone can inspect
                // uninitialized inode)
+
+    u64 flags; // Should be accessed atomically
     u64 refc;  // Should be accessed atomically
 
     lock lock; // guards all fields below
