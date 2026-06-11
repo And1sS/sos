@@ -6,9 +6,6 @@
 #include "../lib/math.h"
 #include "super_block.h"
 
-// for now - no references mean free the struct
-// TODO: make cache smarter and free only when
-// some limit of cached dentries is reached
 typedef struct {
     struct vfs_super_block* sb;
     u64 inode_id;
@@ -22,18 +19,16 @@ static bool icache_comparator(icache_key a, icache_key b) {
     return a.inode_id == b.inode_id && a.sb == b.sb;
 }
 
+// Unused inodes are not cached, this layer relies on dcache to hold references
+// to inodes
 DEFINE_HASH_TABLE(inode_cache, icache_key, vfs_inode*, icache_hash,
                   icache_comparator)
 
 static lock icache_lock = SPIN_LOCK_STATIC_INITIALIZER;
-
 static inode_cache icache;
 
-static volatile u64 inodes_cached = 0;
-static u64 max_cached;
 
-void vfs_icache_init(u64 max_inodes) {
-    max_cached = max_inodes;
+void vfs_icache_init() {
     if (!inode_cache_init(&icache))
         panic("Can't init inode cache");
 }

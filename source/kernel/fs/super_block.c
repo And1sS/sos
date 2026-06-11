@@ -4,6 +4,8 @@
 #include "../lib/flagops.h"
 #include "dcache/dentry.h"
 
+static volatile u64 idgen = 0;
+
 void vfs_super_unmount(vfs_super_block* sb) {
     if (atomic_decrement_not_one(&sb->mount_count))
         return;
@@ -20,7 +22,6 @@ void vfs_super_unmount(vfs_super_block* sb) {
 
     vfs_dentry_release(sb->root);
     dcache_evict_unused(sb);
-    // TODO: clear unused inodes
 }
 
 vfs_super_block* vfs_super_acquire(vfs_super_block* sb) {
@@ -61,7 +62,7 @@ static vfs_super_block* vfs_super_allocate(vfs_type* type, device* dev) {
 
     memset(sb, 0, sizeof(vfs_super_block));
 
-    sb->id = 0; // TODO: add id generation
+    sb->id = atomic_increment_and_get(&idgen);
     sb->type = vfs_type_acquire(type);
     sb->device = dev; // TODO: add reference counting
 

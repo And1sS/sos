@@ -21,7 +21,7 @@ void vfs_init() {
 
     // TODO: calculate based on available ram or get from config
     dcache_init(4, 10000);
-    vfs_icache_init(10000);
+    vfs_icache_init();
     vfs_mount_tree_init();
 
     ramfs_init();

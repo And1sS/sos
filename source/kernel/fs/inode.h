@@ -115,7 +115,7 @@ void vfs_inode_unlock(vfs_inode* inode);
 void vfs_inodes_lock(vfs_inode* left, vfs_inode* right);
 void vfs_inodes_unlock(vfs_inode* left, vfs_inode* right);
 
-void vfs_icache_init(u64 max_inodes);
+void vfs_icache_init();
 
 // Safe to use inside fill_super, since fill_super is called on unpublished
 // superblock without superblock lock held
