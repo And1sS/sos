@@ -11,8 +11,12 @@ void con_var_wait(con_var* var, lock* lock) {
     thread* current = get_current_thread();
     queue_node waiter_node = QUEUE_NODE_OF(current);
     queue_push(&var->wait_queue, &waiter_node);
-    current->state = BLOCKED;
-    smp_mb(); // to ensure that state change is seen by scheduler
+    current->state = BLOCKED; // no need to guard state with barriers, since
+                              // next time it will be used by scheduler it will
+                              // be on same core and all modern architectures
+                              // preserve memory order for data dependencies,
+                              // and other cores will see this value carried
+                              // through scheduler lock
 
     spin_unlock(lock);
     schedule();
@@ -27,8 +31,12 @@ bool con_var_wait_irq_save(con_var* var, lock* lock, bool interrupts_enabled) {
     thread* current = get_current_thread();
     queue_node waiter_node = QUEUE_NODE_OF(current);
     queue_push(&var->wait_queue, &waiter_node);
-    current->state = BLOCKED;
-    smp_mb(); // to ensure that state change is seen by scheduler
+    current->state = BLOCKED; // no need to guard state with barriers, since
+                              // next time it will be used by scheduler it will
+                              // be on same core and all modern architectures
+                              // preserve memory order for data dependencies,
+                              // and other cores will see this value carried
+                              // through scheduler lock
 
     spin_unlock_irq_restore(lock, interrupts_enabled);
     schedule();

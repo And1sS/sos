@@ -33,6 +33,45 @@ thread* get_current_thread() {
 
 void schedule_thread(thread* thrd) {
     bool interrupts_enabled = spin_lock_irq_save(&schedule_lock);
+
+    // This is needed to solve race with any sleep waits on conditions - lost
+    // updates. If we don't set state to RUNNING here, this may happen:
+    // CPU1:
+    //   if (condition)
+    //      abort sleep
+    //   queue_push(wait_queue, curr_thread)
+    //   curr_thread->state = BLOCKED
+    //   spin_unlock(lock)
+    //
+    //                                          CPU2:
+    //                                            spin_lock(lock)
+    //                       missed by CPU1 ->    condition = true
+    //                                            thrd = queue_pop(wait_queue)
+    // ignored, CPU1 currently running thrd ->    schedule_thread(thrd)
+    //
+    // CPU1:
+    //   schedule(); <- sees state = BLOCKED and skips adding to run_queue
+    //
+    // In this case, condition change is missed by thread, and we won't be able
+    // to notify thread through wait_queue.
+    //
+    // It's fine to modify thread state outside of cpu where thread is
+    // running in this case, since this function can be called in one of three
+    // orders (with respect to schedule()) because both are synchronized on
+    // scheduler lock:
+    //
+    // 1) before schedule() and before thread checked necessary conditions and
+    // set its state - good, there is nothing to do, thread will check
+    // necessary condition which is already met and won’t sleep.
+    //
+    // 2) After thread set its state and before schedule - since both are
+    // synchronized on scheduler lock, our state override will be visible to
+    // schedule() through this lock
+    //
+    // 3) after schedule() - then if thread has been blocked, its already not
+    // running and not on run_queue we will wake it up
+    thrd->state = RUNNING;
+
     if (!thrd->currently_running && !thrd->on_run_queue) {
         queue_push(&run_queue, &thrd->scheduler_node);
         thrd->on_run_queue = true;
