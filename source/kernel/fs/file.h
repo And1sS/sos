@@ -21,7 +21,8 @@ typedef struct vfs_file {
 
     u64 pos; // not guarded, it is up to user to synchronize accesses to file,
              // data corruption is not a kernel concern, kernel guards accesses
-             // only to an actual inode, not handle to inode
+             // only to an actual inode, so fs implementations should carefully
+             // inspect this field before using it
 
     void* private_data; // same
 

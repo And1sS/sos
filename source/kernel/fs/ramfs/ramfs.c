@@ -165,8 +165,11 @@ u64 ramfs_read(vfs_file* file, __user void* buf, u64 size) {
         return 0;
 
     u64 read = end - start;
-    return copy_to_user(buf, node->file_data.buf + start, read) ? read
-                                                                : (u64) -EFAULT;
+    if (!copy_to_user(buf, node->file_data.buf + start, read))
+        return (u64) -EFAULT;
+
+    file->pos += read;
+    return read;
 }
 
 u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child) {
