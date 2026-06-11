@@ -34,6 +34,22 @@ bool array_list_init(array_list* list, u64 capacity) {
     return true;
 }
 
+bool array_list_copy(array_list* dst, array_list* src) {
+    if (dst->capacity < src->size) {
+        void** new_array = krealloc(dst->array, sizeof(void*) * src->capacity);
+        if (!new_array)
+            return false;
+
+        dst->array = new_array;
+        dst->capacity = src->capacity;
+    }
+
+    memcpy(dst->array, src->array, sizeof(void*) * src->size);
+    dst->size = src->size;
+
+    return true;
+}
+
 void array_list_clear(array_list* list) {
     if (list->capacity > 0) {
         list->size = 0;

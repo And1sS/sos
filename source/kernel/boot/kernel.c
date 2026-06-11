@@ -32,6 +32,9 @@ void set_up(const multiboot_info* mboot_info) {
     print_u64(KHEAP_INITIAL_SIZE);
     println("");
 
+    vfs_init();
+    println("Finished vfs initialization!");
+
     threading_init();
     processing_init();
 
@@ -43,28 +46,24 @@ void set_up(const multiboot_info* mboot_info) {
     print_multiboot_info(mboot_info);
     println("Finished initialization!");
 
-    vfs_init();
     println("Finished vfs initialization");
 }
 
 void set_up_init_process(module init_module) {
-    UNUSED(init_module);
-    //    vm_area_flags flags = {
-    //        .writable = true, .user_access_allowed = true, .executable =
-    //        true};
-    //
-    //    // temporary hardcoded loading of test.bin for test, which code and
-    //    data are
-    //    // within single page, start is mapped to 0x1000, entrypoint is 0x1000
-    //    vm_space_map_page(init_process.vm, 0x1000, flags);
-    //    void* user_text = vm_space_get_page_view(init_process.vm, 0x1000);
-    //    memcpy(user_text, (void*) P2V(init_module.mod_start),
-    //           init_module.mod_end - init_module.mod_start);
-    //
-    //    thread_start(uthread_create_orphan(&init_process, "test", NULL,
-    //                                       (uthread_func*) 0x1000));
-    //
-    //    vm_space_print(init_process.vm);
+    vm_area_flags flags = {
+        .writable = true, .user_access_allowed = true, .executable = true};
+
+    // temporary hardcoded loading of test.bin for test, which code and data are
+    // within single page, start is mapped to 0x1000, entrypoint is 0x1000
+    vm_space_map_page(init_process.vm, 0x1000, flags);
+    void* user_text = vm_space_get_page_view(init_process.vm, 0x1000);
+    memcpy(user_text, (void*) P2V(init_module.mod_start),
+           init_module.mod_end - init_module.mod_start);
+
+    thread_start(uthread_create_orphan(&init_process, "test", NULL,
+                                       (uthread_func*) 0x1000));
+
+    vm_space_print(init_process.vm);
 
     /*
      *                root
@@ -81,64 +80,64 @@ void set_up_init_process(module init_module) {
      *               /
      *              f
      */
-    vfs_mount* mnt = vfs_mount_get_root();
-    vfs_path res;
-    vfs_path start = {.mount = mnt, .dentry = mnt->mount_root};
-    path_parts parts = path_parts_from_path("a/c/d/f");
-    print("Walk status code: ");
-    print_u64(walk(start, &res, &parts));
-    println("");
-    print("walked to: ");
-    print(res.dentry->name);
-    println("");
-    vfs_path_release(res);
-
-    vfs_path c;
-    path_parts c_path = path_parts_from_path("a/c");
-    walk(start, &c, &c_path);
-
-    vfs_path d;
-    path_parts d_path = path_parts_from_path("d");
-    walk(c, &d, &d_path);
-
-    vfs_path b;
-    path_parts b_path = path_parts_from_path("b");
-    walk(start, &b, &b_path);
-
-    vfs_path e;
-    path_parts e_path = path_parts_from_path("e");
-    walk(b, &e, &e_path);
-
-    vfs_mount* root = vfs_mount_get_root();
-    vfs_type* ramfs_type = vfs_type_get(RAMFS_NAME);
-    vfs_dentry* submount_root = ramfs_type->ops->mount(ramfs_type, NULL);
-    vfs_mount* submount = vfs_mount_attach(root, e.dentry, submount_root);
-    vfs_dentry_release(submount_root);
-
-    u64 err = -vfs_rename(c, d.dentry, b, "e");
-    print_u64(err);
-
-    vfs_path mnted_c;
-    path_parts mnted_c_path = path_parts_from_path("b/e/a/c");
-    walk(start, &mnted_c, &mnted_c_path);
-
-    vfs_file* file = vfs_create(mnted_c, "test", 0);
-    print_u64((u64) file);
-
-    string test = "hello VFS world!";
-    u64 written = vfs_write(file, (void*) test, strlen(test));
-    UNUSED(written);
-
-    vfs_unlink(mnted_c, "test");
-    vfs_close(file);
-    vfs_file_release(file);
-
-    vfs_path_release(mnted_c);
-
-    vfs_mount_detach(submount);
-    vfs_mount_release(submount);
-    while (true) {
-    }
+    //    vfs_mount* mnt = vfs_mount_get_root();
+    //    vfs_path res;
+    //    vfs_path start = {.mount = mnt, .dentry = mnt->mount_root};
+    //    path_parts parts = path_parts_from_path("a/c/d/f");
+    //    print("Walk status code: ");
+    //    print_u64(walk(start, &res, &parts));
+    //    println("");
+    //    print("walked to: ");
+    //    print(res.dentry->name);
+    //    println("");
+    //    vfs_path_release(res);
+    //
+    //    vfs_path c;
+    //    path_parts c_path = path_parts_from_path("a/c");
+    //    walk(start, &c, &c_path);
+    //
+    //    vfs_path d;
+    //    path_parts d_path = path_parts_from_path("d");
+    //    walk(c, &d, &d_path);
+    //
+    //    vfs_path b;
+    //    path_parts b_path = path_parts_from_path("b");
+    //    walk(start, &b, &b_path);
+    //
+    //    vfs_path e;
+    //    path_parts e_path = path_parts_from_path("e");
+    //    walk(b, &e, &e_path);
+    //
+    //    vfs_mount* root = vfs_mount_get_root();
+    //    vfs_type* ramfs_type = vfs_type_get(RAMFS_NAME);
+    //    vfs_dentry* submount_root = ramfs_type->ops->mount(ramfs_type, NULL);
+    //    vfs_mount* submount = vfs_mount_attach(root, e.dentry, submount_root);
+    //    vfs_dentry_release(submount_root);
+    //
+    //    u64 err = -vfs_rename(c, d.dentry, b, "e");
+    //    print_u64(err);
+    //
+    //    vfs_path mnted_c;
+    //    path_parts mnted_c_path = path_parts_from_path("b/e/a/c");
+    //    walk(start, &mnted_c, &mnted_c_path);
+    //
+    //    vfs_file* file = vfs_create(mnted_c, "test", 0);
+    //    print_u64((u64) file);
+    //
+    //    string test = "hello VFS world!";
+    //    u64 written = vfs_write(file, (void*) test, strlen(test));
+    //    UNUSED(written);
+    //
+    //    vfs_unlink(mnted_c, "test");
+    //    vfs_close(file);
+    //    vfs_file_release(file);
+    //
+    //    vfs_path_release(mnted_c);
+    //
+    //    vfs_mount_detach(submount);
+    //    vfs_mount_release(submount);
+    //    while (true) {
+    //    }
 }
 
 _Noreturn void kernel_main(paddr multiboot_structure) {

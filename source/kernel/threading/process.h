@@ -1,6 +1,7 @@
 #ifndef SOS_PROCESS_H
 #define SOS_PROCESS_H
 
+#include "../fs/file.h"
 #include "../lib/container/array_list/array_list.h"
 #include "../lib/id_generator.h"
 #include "../memory/memory_map.h"
@@ -39,6 +40,9 @@ typedef struct _process {
     id_generator tgid_generator;
     array_list threads;
 
+    vfs_path working_directory;
+    array_list files;
+
     struct _process* parent;
 
     linked_list_node process_node; // node that will be used in parent process
@@ -67,5 +71,18 @@ _Noreturn void process_exit(u64 exit_code);
 bool process_set_sigaction(signal sig, sigaction action);
 sigaction process_get_sigaction(signal sig);
 bool process_any_pending_signals();
+
+// Returns refcounted working directory path
+vfs_path process_working_directory();
+
+// Accepts (and consumes) file reference for passed file (means this procedure
+// won't additionally acquire file again), returns file descriptor in case of
+// success
+u64 process_add_file(vfs_file* file);
+// Removes file given the file descriptor, returns removed file which carries
+// file reference
+vfs_file* process_remove_file(u64 fd);
+// Returns reference to file given the file descriptor
+vfs_file* process_get_file(u64 fd);
 
 #endif // SOS_PROCESS_H

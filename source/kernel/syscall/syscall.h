@@ -2,6 +2,7 @@
 #define SOS_SYSCALL_H
 
 #include "../lib/types.h"
+#include "../memory/virtual/umem.h"
 
 #define SYS_PRINT 0
 #define SYS_PRINT_U64 1
@@ -20,7 +21,13 @@
 #define SYS_WAIT 10
 #define SYS_GETPID 11
 
-#define SYSCALLS_IMPLEMENTED_COUNT 12
+#define SYS_OPEN 12
+#define SYS_OPENAT 13
+#define SYS_CLOSE 14
+#define SYS_READ 15
+#define SYS_WRITE 16
+
+#define SYSCALLS_IMPLEMENTED_COUNT 17
 #define SYSCALLS_MAX_COUNT 1024
 
 struct cpu_context;
@@ -48,5 +55,13 @@ _Noreturn u64 sys_exit(u64 arg0, struct cpu_context* context);
 u64 sys_fork(struct cpu_context* context);
 u64 sys_wait(u64 arg0, u64 arg1, struct cpu_context* context);
 u64 sys_getpid(struct cpu_context* context);
+
+u64 sys_open(string __user path, u64 flags);
+u64 sys_openat(u64 fd, string __user path, u64 flags);
+
+u64 sys_close(u64 fd);
+
+u64 sys_read(u64 fd, void* __user buf, u64 size);
+u64 sys_write(u64 fd, void* __user buf, u64 size);
 
 #endif // SOS_SYSCALL_H

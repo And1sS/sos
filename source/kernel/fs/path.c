@@ -60,7 +60,7 @@ void vfs_path_release(vfs_path path) {
 
 static u64 part_length(string path) {
     u64 len = 0;
-    for (; path[len] != '/' && path[len] != '\0' && len < MAX_PATH_LENGTH - 1;
+    for (; path[len] != '/' && path[len] != '\0' && len < NAME_MAX - 1;
          len++)
         ;
 

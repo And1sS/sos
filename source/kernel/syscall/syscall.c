@@ -24,8 +24,7 @@ typedef struct {
     u8 arguments_count;
 } syscall_descriptor;
 
-#define SYSCALLN(impl, n)                                                      \
-    { .handler = impl, .arguments_count = n }
+#define SYSCALLN(impl, n) {.handler = impl, .arguments_count = n}
 
 #define SYSCALL0(handler) SYSCALLN(handler, 0)
 #define SYSCALL1(handler) SYSCALLN(handler, 1)
@@ -52,6 +51,12 @@ static syscall_descriptor syscall_handlers[1024] = {
     [SYS_FORK] = SYSCALL0(sys_fork),
     [SYS_WAIT] = SYSCALL2(sys_wait),
     [SYS_GETPID] = SYSCALL0(sys_getpid),
+
+    [SYS_OPEN] = SYSCALL2(sys_open),
+    [SYS_OPENAT] = SYSCALL3(sys_openat),
+    [SYS_CLOSE] = SYSCALL1(sys_close),
+    [SYS_READ] = SYSCALL3(sys_read),
+    [SYS_WRITE] = SYSCALL3(sys_write),
 
     [SYSCALLS_IMPLEMENTED_COUNT + 1 ... SYSCALLS_MAX_COUNT - 1] = {0}};
 

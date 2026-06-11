@@ -3,7 +3,8 @@
 
 #include "mount.h"
 
-#define MAX_PATH_LENGTH 256
+#define NAME_MAX 256
+#define PATH_MAX 4096
 
 typedef struct vfs_path {
     vfs_mount* mount;
@@ -12,7 +13,7 @@ typedef struct vfs_path {
 
 // temporary structure for path walking
 typedef struct path_parts {
-    char part[MAX_PATH_LENGTH];
+    char part[NAME_MAX];
     u64 parts_left;
     string path;
 } path_parts;

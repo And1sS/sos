@@ -93,6 +93,14 @@ void vfs_type_release(vfs_type* type) {
     spin_unlock(&type->lock);
 }
 
+vfs_path vfs_root() {
+    // TODO: walk down the mounts
+    vfs_mount* mount = vfs_mount_get_root();
+
+    return (vfs_path) {.mount = vfs_mount_acquire(mount),
+                       .dentry = vfs_dentry_acquire(mount->mount_root)};
+}
+
 vfs_file* vfs_create(vfs_path start, string path, u64 mode) {
     return vfs_open(start, path, mode | O_WRONLY | O_CREAT | O_TRUNC);
 }
@@ -184,11 +192,14 @@ out_error_open:
 
 u64 vfs_close(vfs_file* file) {
     // no locking needed, since upper layer has to restrict this procedure usage
-    // but first removing file descriptor from process fd table
+    // by first removing file descriptor from process fd table
+    u64 result = 0;
     if (file->ops->close)
-        return file->ops->close(file);
+        result = file->ops->close(file);
 
-    return 0;
+    vfs_file_release(file);
+
+    return result;
 }
 
 u64 vfs_read(vfs_file* file, __user void* buf, u64 size) {

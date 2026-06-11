@@ -14,4 +14,6 @@ bool copy_to_user(void* __user dst, void* src, u64 length);
 
 bool copy_from_user(void* dst, void* __user src, u64 length);
 
+string copy_string_from_user(string __user src, u64 limit);
+
 #endif // SOS_UMEM_H

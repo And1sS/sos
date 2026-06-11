@@ -1,4 +1,5 @@
 #include "exit.h"
+#include "file.h"
 #include "fork.h"
 #include "getpid.h"
 #include "pthread.h"
@@ -83,13 +84,7 @@ void run_threads() {
     }
 }
 
-void __attribute__((section(".entrypoint"))) main() {
-    // This one should succeed (e.g. return 0)
-    long sigint_act_set = process_set_sigaction(SIGINT, &sigint_action);
-    // This one should fail (e.g. return value < 0)
-    long sigkill_act_set = process_set_sigaction(SIGKILL, &sigkill_action);
-    long sigchld_act_set = process_set_sigaction(SIGCHLD, &sigchld_action);
-
+void fork_test() {
     run_threads();
 
     for (int i = 0; i < 11; i++) {
@@ -126,4 +121,29 @@ void __attribute__((section(".entrypoint"))) main() {
     printll(getpid());
     print(" exiting\n");
     exit(0xDEADB33F);
+}
+
+void io_test() {
+    long long fd = open("/a/c/d/f", 0);
+    printll(fd);
+    const char test[] = "Hello from write syscall!!";
+    const char buf[256];
+    write(fd, test, 26);
+    close(fd);
+
+    fd = open("a/c/d/f", 0);
+    read(fd, buf, 26);
+    print(buf);
+
+    exit(0xDEADB33F);
+}
+
+void __attribute__((section(".entrypoint"))) main() {
+    // This one should succeed (e.g. return 0)
+    long sigint_act_set = process_set_sigaction(SIGINT, &sigint_action);
+    // This one should fail (e.g. return value < 0)
+    long sigkill_act_set = process_set_sigaction(SIGKILL, &sigkill_action);
+    long sigchld_act_set = process_set_sigaction(SIGCHLD, &sigchld_action);
+
+    io_test();
 }
