@@ -34,7 +34,7 @@ static vfs_inode_ops inode_ops = {.evict = ramfs_evict,
 
 static vfs_type ramfs_type = {.name = RAMFS_NAME, .ops = &ops};
 
-void ramfs_init() { register_vfs_type(&ramfs_type); }
+void ramfs_init() { vfs_type_register(&ramfs_type); }
 
 static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
     vfs_inode* inode = vfs_icache_get(sb, node->id);

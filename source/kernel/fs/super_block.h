@@ -3,6 +3,7 @@
 
 #include "../lib/types.h"
 #include "../synchronization/mutex.h"
+#include "fs_type.h"
 #include "vfs.h"
 
 // set once after initialisation has finished, safe to read without atomics when
@@ -17,7 +18,7 @@
 typedef struct vfs_super_block {
     // Immutable data
     u64 id;
-    struct vfs_type* type;
+    vfs_type* type;
     device* device;
     struct vfs_dentry* root; // Strong reference, released once mount_count
                              // reaches 0

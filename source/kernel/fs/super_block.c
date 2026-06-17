@@ -127,9 +127,16 @@ static vfs_super_block* vfs_super_find(vfs_type* type, device* dev) {
 }
 
 vfs_super_block* vfs_super_get(vfs_type* type, device* dev) {
+    vfs_super_block* sb;
+
 retry:
     spin_lock(&type->lock);
-    vfs_super_block* sb = dev ? vfs_super_find(type, dev) : NULL;
+    if (TEST_FLAG(type->flags, FS_TYPE_DYING)) {
+        sb = ERROR_PTR(-EBUSY);
+        goto out;
+    }
+
+    sb = dev ? vfs_super_find(type, dev) : NULL;
     if (!sb) {
         sb = vfs_super_allocate(type, dev);
         goto out;
