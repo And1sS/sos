@@ -60,8 +60,7 @@ void vfs_path_release(vfs_path path) {
 
 static u64 part_length(string path) {
     u64 len = 0;
-    for (; path[len] != '/' && path[len] != '\0' && len < NAME_MAX - 1;
-         len++)
+    for (; path[len] != '/' && path[len] != '\0' && len < NAME_MAX - 1; len++)
         ;
 
     return len;
@@ -81,23 +80,18 @@ static string walk_next_part(path_parts* parts) {
 }
 
 static u64 lookup_current(vfs_path start, vfs_path* res) {
-    res->dentry = vfs_dentry_acquire(start.dentry);
-    res->mount = vfs_mount_acquire(start.mount);
+    *res = vfs_path_acquire(start);
     return 0;
 }
 
 static u64 lookup_parent(vfs_path start, vfs_path* res) {
-    vfs_dentry* dentry = start.dentry;
-    vfs_mount* mount = start.mount;
-
-    if (vfs_dentry_is_root(dentry))
-        // we have encountered mountpoint root, need to cross namespaces
-        return vfs_mount_walk_up(mount, res);
-
     // Safe to do plain reads of parent since caller already holds dentry
     // inode->rw_mut which carries visibility and prevent concurrent changes
-    res->dentry = vfs_dentry_acquire(dentry->parent);
-    res->mount = vfs_mount_acquire(mount);
+    vfs_dentry* parent = vfs_dentry_acquire(start.dentry->parent);
+
+    vfs_path parent_path = {.dentry = parent, .mount = start.mount};
+    vfs_mount_walk_up(parent_path, res);
+    vfs_dentry_release(parent);
     return 0;
 }
 
@@ -111,8 +105,6 @@ vfs_dentry* lookup_child(vfs_dentry* dentry, string name) {
 
 u64 lookup(vfs_path start, vfs_path* res, string path) {
     vfs_dentry* dentry = start.dentry;
-    vfs_mount* mount = start.mount;
-
     if (vfs_super_is_dying(dentry->inode->sb))
         return -EBUSY;
 
@@ -126,20 +118,9 @@ u64 lookup(vfs_path start, vfs_path* res, string path) {
     if (IS_ERROR(child))
         return PTR_ERROR(child);
 
-    // TODO: resolve stacked mounts
-    // TODO: add lookup_mnt flag to be able to stop crossing, or do we need it?
-    if (vfs_dentry_is_mountpoint(child)) {
-        u64 error = vfs_mount_walk_down(mount, child, res);
-        if (!IS_ERROR(error)) {
-            vfs_dentry_release(child); // release intermediate dentry
-            return 0;
-        } else if (error != (u64) -ENOENT)
-            panic("Error in vfs mount resolution");
-    }
-
-    res->dentry = child; // child reference is already incremented
-    res->mount = vfs_mount_acquire(mount);
-
+    vfs_path child_path = {.dentry = child, .mount = start.mount};
+    vfs_mount_walk_down(child_path, res);
+    vfs_dentry_release(child);
     return 0;
 }
 

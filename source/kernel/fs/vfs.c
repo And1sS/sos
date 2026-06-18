@@ -27,11 +27,14 @@ void vfs_init() {
 }
 
 vfs_path vfs_root() {
-    // TODO: walk down the mounts
     vfs_mount* mount = vfs_mount_get_root();
+    vfs_path root = {.mount = mount, // mount reference already acquired
+                     .dentry = vfs_dentry_acquire(mount->mount_root)};
 
-    return (vfs_path) {.mount = vfs_mount_acquire(mount),
-                       .dentry = vfs_dentry_acquire(mount->mount_root)};
+    vfs_path resolved_root;
+    vfs_mount_walk_down(root, &resolved_root);
+    vfs_path_release(root);
+    return resolved_root;
 }
 
 vfs_file* vfs_create(vfs_path start, string path, u64 mode) {

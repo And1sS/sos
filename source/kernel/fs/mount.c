@@ -91,7 +91,7 @@ void vfs_mount_root(vfs_dentry* root) {
         panic("Can't initialize root mount");
 }
 
-vfs_mount* vfs_mount_get_root() { return root_mount; }
+vfs_mount* vfs_mount_get_root() { return vfs_mount_acquire(root_mount); }
 
 vfs_mount* vfs_mount_attach(vfs_mount* parent_mount, vfs_dentry* mounted_at,
                             vfs_dentry* mount_root) {
@@ -234,8 +234,9 @@ out:
     spin_unlock(&mount->lock);
 }
 
-u64 vfs_mount_walk_down(vfs_mount* mount, vfs_dentry* dentry,
-                        struct vfs_path* res) {
+u64 vfs_mount_walk_down_one(vfs_path start, vfs_path* res) {
+    vfs_dentry* dentry = start.dentry;
+    vfs_mount* mount = start.mount;
 
     spin_lock(&mount->lock);
     linked_list_node* node =
@@ -251,13 +252,50 @@ u64 vfs_mount_walk_down(vfs_mount* mount, vfs_dentry* dentry,
     return error;
 }
 
-u64 vfs_mount_walk_up(vfs_mount* mount, vfs_path* res) {
+void vfs_mount_walk_down(vfs_path start, vfs_path* res) {
+    vfs_path iter = vfs_path_acquire(start);
+
+    while (true) {
+        *res = iter;
+        if (!vfs_dentry_is_mountpoint(iter.dentry))
+            break;
+
+        vfs_path resolved;
+        u64 error = vfs_mount_walk_down_one(iter, &resolved);
+        if (IS_ERROR(error))
+            break;
+
+        vfs_path_release(iter);
+        iter = resolved;
+    }
+}
+
+void vfs_mount_walk_up_one(vfs_mount* mount, vfs_path* res) {
     spin_lock(&mount->lock);
     res->dentry = vfs_dentry_acquire(mount->mounted_at);
     res->mount = vfs_mount_acquire(mount->parent_mount);
     spin_unlock(&mount->lock);
+}
 
-    return 0;
+void vfs_mount_walk_up(vfs_path start, vfs_path* res) {
+    vfs_path iter = vfs_path_acquire(start);
+
+    while (true) {
+        *res = iter;
+        if (!vfs_dentry_is_root(iter.dentry))
+            break;
+
+        vfs_path resolved;
+        vfs_mount_walk_up_one(iter.mount, &resolved);
+        if (resolved.dentry == iter.dentry) {
+            // we hit very top dentry or orphan
+            vfs_path_release(resolved);
+            break;
+        }
+
+        vfs_path_release(iter);
+        iter = resolved;
+    }
 }
 
 bool has_submounts(vfs_dentry* root) {

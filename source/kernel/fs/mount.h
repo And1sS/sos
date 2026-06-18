@@ -36,9 +36,8 @@ u64 vfs_mount_detach(vfs_mount* mount);
 vfs_mount* vfs_mount_acquire(vfs_mount* mount);
 void vfs_mount_release(vfs_mount* mount);
 
-u64 vfs_mount_walk_up(vfs_mount* mount, struct vfs_path* res);
-u64 vfs_mount_walk_down(vfs_mount* mount, vfs_dentry* dentry,
-                        struct vfs_path* res);
+void vfs_mount_walk_up(struct vfs_path start, struct vfs_path* res);
+void vfs_mount_walk_down(struct vfs_path start, struct vfs_path* res);
 
 // this function should be called with mount tree locked
 bool has_submounts(vfs_dentry* dentry);
