@@ -150,40 +150,20 @@ u64 vfs_mount_detach(vfs_mount* mount) {
     if (mount == root_mount)
         return -EPERM;
 
-    u64 error = 0;
-    vfs_mount* parent = NULL;
-    vfs_dentry* mounted_at = NULL;
-
-retry:
-    spin_lock(&mount->lock);
-    if (vfs_mount_is_detached(mount)) {
-        spin_unlock(&mount->lock);
-        return -EALREADY;
-    }
-    parent = vfs_mount_acquire(mount->parent_mount);
-    mounted_at = vfs_dentry_acquire(mount->mounted_at);
-    spin_unlock(&mount->lock);
-
     vfs_mount_tree_lock();
+    vfs_mount* parent = mount->parent_mount;
+    vfs_dentry* mounted_at = mount->mounted_at;
 
-    if (parent != mount->parent_mount) {
-        vfs_mount_tree_unlock();
-        vfs_mount_release(parent);
-        vfs_dentry_release(mounted_at);
-
-        goto retry;
-    }
+    u64 error = -EALREADY;
+    if (vfs_mount_is_detached(mount))
+        goto out_error;
 
     // now we have stable references to real parent and mounted_at
     // safe to do plain reads, since writes can be done only under
     // mount_tree_mut
-    if (mount->children.size != 0) {
-        vfs_mount_tree_unlock();
-        vfs_mount_release(parent);
-        vfs_dentry_release(mounted_at);
-
-        return -EBUSY;
-    }
+    error = -EBUSY;
+    if (mount->children.size != 0)
+        goto out_error;
 
     mount_registry_remove(mount);
 
@@ -207,6 +187,11 @@ retry:
 
     vfs_mount_release(parent);
     vfs_dentry_release(mounted_at);
+
+    return 0;
+
+out_error:
+    vfs_mount_tree_unlock();
 
     return error;
 }
