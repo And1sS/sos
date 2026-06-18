@@ -18,6 +18,8 @@ static rw_mutex mount_tree_mut = RW_MUTEX_STATIC_INITIALIZER;
 // hosting super_block to all hosted mounts mappings
 static mnt_registry mount_registry;
 
+static bool vfs_mount_is_detached(vfs_mount* mount);
+
 // these should be accessed under mount_tree_mut locked for write
 static bool mount_registry_add(vfs_mount* mount) {
     vfs_super_block* sb = mount->mounted_at->inode->sb;
@@ -108,20 +110,24 @@ vfs_mount* vfs_mount_attach(vfs_mount* parent_mount, vfs_dentry* mounted_at,
         return ERROR_PTR(-ENOENT);
     }
 
-    vfs_mount* mount = vfs_mount_allocate(mount_root);
+    vfs_mount_tree_lock();
+
+    vfs_mount* mount = ERROR_PTR(-EBUSY);
+    if (vfs_mount_is_detached(parent_mount))
+        goto out;
+
+    // TODO: check that attachment won't cause cycle
+
+    mount = ERROR_PTR(-ENOMEM);
+    if (!mount_registry_add(mount))
+        goto out;
+
+    mount = vfs_mount_allocate(mount_root);
     if (IS_ERROR(mount))
         goto out;
 
     mount->parent_mount = vfs_mount_acquire(parent_mount);
     mount->mounted_at = vfs_dentry_acquire(mounted_at);
-
-    vfs_mount_tree_lock();
-    // TODO: check that parent mount is not detached
-    // TODO: check that attachment won't cause cycle
-
-    if (!mount_registry_add(mount)) {
-        // TODO: cleanup broken mount
-    }
 
     spin_lock(&parent_mount->lock);
     // insert is done into the beginning since multiple superblocks can be
@@ -134,6 +140,7 @@ vfs_mount* vfs_mount_attach(vfs_mount* parent_mount, vfs_dentry* mounted_at,
     vfs_mount_tree_unlock();
 
 out:
+    vfs_mount_tree_unlock();
     vfs_inode_unlock(mounted_at->inode);
 
     return mount;
@@ -149,7 +156,7 @@ u64 vfs_mount_detach(vfs_mount* mount) {
 
 retry:
     spin_lock(&mount->lock);
-    if (mount->parent_mount == mount) {
+    if (vfs_mount_is_detached(mount)) {
         spin_unlock(&mount->lock);
         return -EALREADY;
     }
@@ -318,3 +325,7 @@ void vfs_mount_tree_unlock_shared() { rw_mutex_unlock_read(&mount_tree_mut); }
 void vfs_mount_tree_lock() { rw_mutex_lock_write(&mount_tree_mut); }
 
 void vfs_mount_tree_unlock() { rw_mutex_unlock_write(&mount_tree_mut); }
+
+static bool vfs_mount_is_detached(vfs_mount* mount) {
+    return mount->parent_mount == mount && mount != root_mount;
+}
