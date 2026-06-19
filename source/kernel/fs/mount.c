@@ -116,7 +116,20 @@ vfs_mount* vfs_mount_attach(vfs_mount* parent_mount, vfs_dentry* mounted_at,
     if (vfs_mount_is_detached(parent_mount))
         goto out;
 
-    // TODO: check that attachment won't cause cycle
+    // No need to check for mount cycles, since we allow to mount only
+    // superblock roots, this means that no cycle can occur. Why? Even if we
+    // mount superblock onto itself we will have different mounts which mean
+    // different "views" on same superblock.
+    //
+    //        [root] <- sb, mount M1
+    //      /        \
+    //    ...         x  - - - - [root] <- sb mounted here again, mount M2
+    //                         /        \
+    //                       ...         x
+    //
+    //  Looking up /x will result in sb root, since x hosts M2 inside M1,
+    //  but looking up /x/x - will result in dentry x, since inside M2 x
+    //  doesn't host anything.
 
     mount = ERROR_PTR(-ENOMEM);
     if (!mount_registry_add(mount))
