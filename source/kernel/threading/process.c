@@ -502,6 +502,16 @@ void process_kill(process* proc) {
     process_signal(proc, SIGKILL);
 }
 
+vfs_path process_root() {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_path root = vfs_path_acquire(proc->root);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return root;
+}
+
 vfs_path process_working_directory() {
     process* proc = get_current_thread()->proc;
 

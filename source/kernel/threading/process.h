@@ -73,6 +73,8 @@ bool process_set_sigaction(signal sig, sigaction action);
 sigaction process_get_sigaction(signal sig);
 bool process_any_pending_signals();
 
+// Returns refcounted root path
+vfs_path process_root();
 // Returns refcounted working directory path
 vfs_path process_working_directory();
 
