@@ -85,13 +85,13 @@ static u64 lookup_current(vfs_path start, vfs_path* res) {
 }
 
 static u64 lookup_parent(vfs_path start, vfs_path* res) {
-    // Safe to do plain reads of parent since caller already holds dentry
-    // inode->rw_mut which carries visibility and prevent concurrent changes
-    vfs_dentry* parent = vfs_dentry_acquire(start.dentry->parent);
+    vfs_path resolved_start;
+    vfs_mount_walk_up(start, &resolved_start);
 
-    vfs_path parent_path = {.dentry = parent, .mount = start.mount};
-    vfs_mount_walk_up(parent_path, res);
-    vfs_dentry_release(parent);
+    res->dentry = vfs_dentry_parent(resolved_start.dentry);
+    res->mount = vfs_mount_acquire(resolved_start.mount);
+    vfs_path_release(resolved_start);
+
     return 0;
 }
 

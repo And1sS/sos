@@ -86,10 +86,13 @@ static void vfs_mount_destroy(vfs_mount* mount) {
 
 void vfs_mount_root(vfs_dentry* root) {
     root_mount = vfs_mount_allocate(root);
+    if (IS_ERROR(root_mount))
+        panic("Can't initialize root mount");
+
     root_mount->parent_mount = root_mount;
     root_mount->mounted_at = root;
 
-    if (IS_ERROR(root_mount) || !mount_registry_add(root_mount))
+    if (!mount_registry_add(root_mount))
         panic("Can't initialize root mount");
 }
 
@@ -132,16 +135,23 @@ vfs_mount* vfs_mount_attach(vfs_mount* parent_mount, vfs_dentry* mounted_at,
      *  doesn't host anything.
      */
 
-    mount = ERROR_PTR(-ENOMEM);
-    if (!mount_registry_add(mount))
-        goto out;
-
     mount = vfs_mount_allocate(mount_root);
     if (IS_ERROR(mount))
         goto out;
 
-    mount->parent_mount = vfs_mount_acquire(parent_mount);
-    mount->mounted_at = vfs_dentry_acquire(mounted_at);
+    mount->parent_mount = parent_mount;
+    mount->mounted_at = mounted_at;
+
+    // uses mount->mounted_at->inode->sb
+    if (!mount_registry_add(mount)) {
+        vfs_mount_destroy(mount);
+        mount = ERROR_PTR(-ENOMEM);
+        goto out;
+    }
+
+    // acquire here, so that if adding to registry fails cleanup will be easier
+    vfs_mount_acquire(parent_mount);
+    vfs_dentry_acquire(mounted_at);
 
     spin_lock(&parent_mount->lock);
     // insert is done into the beginning since multiple superblocks can be
