@@ -19,12 +19,6 @@ static lock process_table_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 static id_generator pid_gen;
 
-static bool clone_files_data(process* dst, process* src);
-
-// Closes all opened files at the very end of process execution where only last
-// thread exists
-static void cleanup_files_data(process* proc);
-
 static bool process_init(process* proc, bool is_kernel_process);
 static bool process_add_child(process* child);
 // Assumes that current process lock is held and interrupts are disabled
@@ -78,7 +72,10 @@ static bool process_init(process* proc, bool is_kernel_process) {
     proc->finish_cvar = (con_var) CON_VAR_STATIC_INITIALIZER;
     memset(&proc->siginfo, 0, sizeof(process_siginfo));
     proc->siginfo_lock = SPIN_LOCK_STATIC_INITIALIZER;
+
     proc->working_directory = vfs_root();
+    // to have same snapshot of the vfs root in both workdir and root
+    proc->root = vfs_path_acquire(proc->working_directory);
 
     return true;
 
@@ -131,6 +128,37 @@ bool process_add_thread(process* proc, struct thread* thrd) {
     return added;
 }
 
+static bool clone_files_data(process* dst, process* src) {
+    // release paths that are about to be replaced
+    vfs_path_release(dst->root);
+    vfs_path_release(dst->working_directory);
+
+    bool interrupts_enabled = spin_lock_irq_save(&src->lock);
+    dst->root = vfs_path_acquire(src->root);
+    dst->working_directory = vfs_path_acquire(src->working_directory);
+
+    if (!array_list_copy(&dst->files, &src->files)) {
+        spin_unlock_irq_restore(&src->lock, interrupts_enabled);
+        return false;
+    }
+
+    ARRAY_LIST_FOR_EACH(&dst->files, vfs_file * file) {
+        vfs_file_acquire(file);
+    }
+    spin_unlock_irq_restore(&src->lock, interrupts_enabled);
+
+    return true;
+}
+
+static void cleanup_files_data(process* proc) {
+    vfs_path_release(proc->root);
+    vfs_path_release(proc->working_directory);
+
+    ARRAY_LIST_FOR_EACH(&proc->files, vfs_file * file) {
+        vfs_file_release(file);
+    }
+}
+
 u64 process_fork(struct cpu_context* context) {
     thread* current = get_current_thread();
     process* proc = current->proc;
@@ -139,7 +167,6 @@ u64 process_fork(struct cpu_context* context) {
     if (!created)
         goto failed_to_create_process;
 
-    vfs_path_release(created->working_directory);
     if (!clone_files_data(created, proc))
         goto failed_to_clone_file_descriptors;
 
@@ -283,6 +310,19 @@ static void process_transfer_children_to_init() {
     spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 }
 
+static void process_close_files() {
+    process* current = get_current_thread()->proc;
+
+    // No locks needed here, since no one will ever change files at this point,
+    // visibility has been carried through process lock during last thread check
+    vfs_path_release(current->root);
+    vfs_path_release(current->working_directory);
+
+    while (current->files.size != 0) {
+        vfs_file_close(array_list_remove_last(&current->files));
+    }
+}
+
 static void process_finalize() {
     thread* current = get_current_thread();
     process* proc = current->proc;
@@ -309,8 +349,7 @@ static void process_finalize() {
     spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
 
     process_transfer_children_to_init();
-
-    cleanup_files_data(proc);
+    process_close_files();
 
     interrupts_enabled = spin_lock_irq_save(&proc->lock);
     ref_count* refc = &proc->refc;
@@ -549,31 +588,4 @@ static void process_remove_child_unsafe(process* child) {
     spin_unlock(&child->lock);
 
     linked_list_remove_node(&proc->children, &child->process_node);
-}
-
-static bool clone_files_data(process* dst, process* src) {
-    bool interrupts_enabled = spin_lock_irq_save(&src->lock);
-    if (!array_list_copy(&dst->files, &src->files)) {
-        spin_unlock_irq_restore(&src->lock, interrupts_enabled);
-        return false;
-    }
-
-    ARRAY_LIST_FOR_EACH(&dst->files, vfs_file * file) {
-        vfs_file_acquire(file);
-    }
-
-    dst->working_directory = vfs_path_acquire(src->working_directory);
-    spin_unlock_irq_restore(&src->lock, interrupts_enabled);
-
-    return true;
-}
-
-static void cleanup_files_data(process* proc) {
-    // No locks needed here, since no one will ever change files at this point,
-    // visibility has been carried through process lock during last thread check
-    ARRAY_LIST_FOR_EACH(&proc->files, vfs_file * file) {
-        vfs_close(file);
-    }
-
-    vfs_path_release(proc->working_directory);
 }

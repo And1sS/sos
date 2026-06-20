@@ -19,7 +19,7 @@ u64 sys_open(string __user path, u64 flags) {
 
     u64 result = process_add_file(file);
     if (IS_ERROR(result))
-        vfs_close(file);
+        vfs_file_release(file);
 
     return result;
 }
@@ -47,7 +47,7 @@ u64 sys_openat(u64 fd, string __user path, u64 flags) {
 
     u64 result = process_add_file(file);
     if (IS_ERROR(result))
-        vfs_close(file);
+        vfs_file_release(file);
 
     return result;
 }
@@ -57,7 +57,8 @@ u64 sys_close(u64 fd) {
     if (IS_ERROR(file))
         return PTR_ERROR(file);
 
-    return vfs_close(file);
+    vfs_file_close(file);
+    return 0;
 }
 
 u64 sys_read(u64 fd, void* __user buf, u64 size) {

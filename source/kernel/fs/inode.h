@@ -22,13 +22,10 @@ struct vfs_file;
 
 typedef struct vfs_file_ops {
     u64 (*open)(struct vfs_file* file, u64 flags);
-    u64 (*close)(struct vfs_file* file);
+    void (*release)(struct vfs_file* file);
 
     u64 (*read)(struct vfs_file* file, __user void* buff, u64 size);
     u64 (*write)(struct vfs_file* file, __user void* buff, u64 size);
-
-    // called upon destruction
-    void (*release)(struct vfs_file* file);
 } vfs_file_ops;
 
 typedef struct {

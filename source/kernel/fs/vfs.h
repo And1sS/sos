@@ -25,8 +25,6 @@ struct vfs_path vfs_root();
 struct vfs_file* vfs_open(struct vfs_path start, string path, u64 flags);
 struct vfs_file* vfs_create(struct vfs_path path, string name, u64 mode);
 
-// Consumes and releases file reference after closing
-u64 vfs_close(struct vfs_file* file);
 
 struct vfs_file* vfs_mkdir(struct vfs_path path, string name, u64 flags,
                            u64 mode);

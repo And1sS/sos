@@ -126,18 +126,6 @@ out_error_open:
     return ERROR_PTR(error);
 }
 
-u64 vfs_close(vfs_file* file) {
-    // no locking needed, since upper layer has to restrict this procedure usage
-    // by first removing file descriptor from process fd table
-    u64 result = 0;
-    if (file->ops->close)
-        result = file->ops->close(file);
-
-    vfs_file_release(file);
-
-    return result;
-}
-
 u64 vfs_read(vfs_file* file, __user void* buf, u64 size) {
     if (!file->ops->read)
         return -EPERM;

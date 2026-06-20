@@ -9,10 +9,11 @@ vfs_file* vfs_file_create(vfs_path path, u64 flags) {
 
     memset(file, 0, sizeof(vfs_file));
 
-    file->refc = 0;
-    file->flags = flags;
     file->path = vfs_path_acquire(path);
     file->ops = path.dentry->inode->file_ops;
+    file->flags = flags;
+    file->pos = 0;
+    file->refc = 0;
 
     return vfs_file_acquire(file);
 }
@@ -32,4 +33,9 @@ void vfs_file_release(vfs_file* file) {
     vfs_path_release(file->path);
 
     kfree(file);
+}
+
+void vfs_file_close(vfs_file* file) {
+    // TODO: add file flushing
+    vfs_file_release(file);
 }

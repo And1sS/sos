@@ -135,6 +135,12 @@ void io_test() {
     read(fd, buf, 26);
     print(buf);
 
+    fork();
+    if (getpid() == 1) {
+        for (;;)
+            ;
+    }
+
     exit(0xDEADB33F);
 }
 

@@ -34,4 +34,6 @@ vfs_file* vfs_file_create(vfs_path path, u64 flags);
 vfs_file* vfs_file_acquire(vfs_file* file);
 void vfs_file_release(vfs_file* file);
 
+void vfs_file_close(vfs_file* file);
+
 #endif // SOS_FILE_H

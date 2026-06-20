@@ -40,6 +40,7 @@ typedef struct _process {
     id_generator tgid_generator;
     array_list threads;
 
+    vfs_path root;
     vfs_path working_directory;
     array_list files;
 
