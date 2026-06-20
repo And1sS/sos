@@ -1,6 +1,5 @@
 #include "../error/error.h"
 #include "../fs/path.h"
-#include "../lib/string.h"
 #include "../threading/process.h"
 #include "syscall.h"
 
@@ -10,7 +9,7 @@ u64 sys_open(string __user path, u64 flags) {
         return PTR_ERROR(path_copy);
 
     vfs_path start = path[0] == '/' ? vfs_root() : process_working_directory();
-    vfs_file* file = vfs_open(start, path, flags);
+    vfs_file* file = vfs_open(start, path_copy, flags);
 
     vfs_path_release(start);
     strfree(path_copy);
@@ -37,7 +36,7 @@ u64 sys_openat(u64 fd, string __user path, u64 flags) {
     }
 
     vfs_path start = path[0] == '/' ? vfs_root() : vfs_path_acquire(at->path);
-    vfs_file* file = vfs_open(start, path, flags);
+    vfs_file* file = vfs_open(start, path_copy, flags);
 
     vfs_file_release(at);
     vfs_path_release(start);
