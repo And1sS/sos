@@ -1,4 +1,3 @@
-#include "../error/errno.h"
 #include "../error/error.h"
 #include "../fs/path.h"
 #include "../threading/process.h"
@@ -65,9 +64,6 @@ u64 sys_close(u64 fd) {
 }
 
 u64 sys_read(u64 fd, void* __user buf, u64 size) {
-    if ((u64) buf + size > USER_SPACE_END_VADDR)
-        return -EFAULT;
-
     vfs_file* file = process_get_file(fd);
     if (IS_ERROR(file))
         return PTR_ERROR(file);
@@ -79,9 +75,6 @@ u64 sys_read(u64 fd, void* __user buf, u64 size) {
 }
 
 u64 sys_write(u64 fd, void* __user buf, u64 size) {
-    if ((u64) buf + size > USER_SPACE_END_VADDR)
-        return -EFAULT;
-
     vfs_file* file = process_get_file(fd);
     if (IS_ERROR(file))
         return PTR_ERROR(file);
