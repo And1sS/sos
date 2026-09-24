@@ -294,20 +294,13 @@ static void process_transfer_child_to_init(process* child) {
 }
 
 static void process_transfer_children_to_init() {
-    process* current = get_current_thread()->proc;
-
-    bool interrupts_enabled = spin_lock_irq_save(&current->lock);
-    while (current->children.size != 0) {
-        process* child = linked_list_first(&current->children);
-        spin_unlock_irq_restore(&current->lock, interrupts_enabled);
-
-        // It is safe to break atomicity in this case, since this function will
-        // be invoked in last alive thread
-        process_transfer_child_to_init(child);
-
-        interrupts_enabled = spin_lock_irq_save(&current->lock);
+    // It is safe to do lockless reads in this case, since this function will
+    // be invoked in last alive thread, and no one can change children list
+    // concurrently, and visibility is carried by previous process state checks
+    linked_list* children = &get_current_thread()->proc->children;
+    while (children->size != 0) {
+        process_transfer_child_to_init(linked_list_first(children));
     }
-    spin_unlock_irq_restore(&current->lock, interrupts_enabled);
 }
 
 static void process_close_files() {
