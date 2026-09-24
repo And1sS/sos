@@ -57,6 +57,8 @@ static syscall_descriptor syscall_handlers[1024] = {
     [SYS_CLOSE] = SYSCALL1(sys_close),
     [SYS_READ] = SYSCALL3(sys_read),
     [SYS_WRITE] = SYSCALL3(sys_write),
+    [SYS_CHROOT] = SYSCALL1(sys_chroot),
+    [SYS_CHDIR] = SYSCALL1(sys_chdir),
 
     [SYSCALLS_IMPLEMENTED_COUNT + 1 ... SYSCALLS_MAX_COUNT - 1] = {0}};
 

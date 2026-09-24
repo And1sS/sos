@@ -1,4 +1,3 @@
-
 #include "syscall.h"
 
 long long int open(const char* path, unsigned long long flags) {
@@ -21,4 +20,12 @@ long long int write(unsigned long long fd, void* buffer,
 
     return syscall3(SYS_WRITE, (long long) fd, (long long) buffer,
                     (long long) size);
+}
+
+long long int chroot(const char* path) {
+    return syscall1(SYS_CHROOT, (long long) path);
+}
+
+long long int chdir(const char* path) {
+    return syscall1(SYS_CHDIR, (long long) path);
 }

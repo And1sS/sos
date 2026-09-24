@@ -522,6 +522,28 @@ vfs_path process_working_directory() {
     return working_directory;
 }
 
+void process_change_root(vfs_path root) {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_path old_root = proc->root;
+    proc->root = vfs_path_acquire(root);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    vfs_path_release(old_root);
+}
+
+void process_change_working_directory(vfs_path workdir) {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_path old_workdir = proc->root;
+    proc->working_directory = vfs_path_acquire(workdir);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    vfs_path_release(old_workdir);
+}
+
 u64 process_add_file(vfs_file* file) {
     process* proc = get_current_thread()->proc;
 

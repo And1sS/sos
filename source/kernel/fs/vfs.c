@@ -156,6 +156,24 @@ u64 vfs_write(struct vfs_file* file, __user void* buf, u64 size) {
     return res;
 }
 
+u64 vfs_seek(vfs_file* file, u64 offset, u64 whence) {
+    if (whence >= 3) // TODO: add whence enum
+        return -EINVAL;
+
+    if (!file->ops->seek)
+        return -EPERM;
+
+    vfs_inode* inode = file->path.dentry->inode;
+    if (inode->type == DIRECTORY)
+        return -EISDIR;
+
+    vfs_inode_lock_shared(inode);
+    u64 error = file->ops->seek(file, offset, whence);
+    vfs_inode_unlock_shared(inode);
+
+    return error;
+}
+
 u64 vfs_unlink(vfs_path start, string path) {
     if (path_ends_with_dot(path) || path_ends_with_dotdot(path))
         return -EPERM;

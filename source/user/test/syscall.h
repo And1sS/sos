@@ -23,6 +23,8 @@
 #define SYS_CLOSE 14
 #define SYS_READ 15
 #define SYS_WRITE 16
+#define SYS_CHROOT 17
+#define SYS_CHDIR 18
 
 long long syscall0(int syscall_number);
 long long syscall1(int syscall_number, long long arg0);

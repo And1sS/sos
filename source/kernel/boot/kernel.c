@@ -2,15 +2,8 @@
 #include "../arch/common/vmm.h"
 #include "../fs/dcache/dentry.h"
 #include "../fs/file.h"
-#include "../fs/mount.h"
-#include "../fs/path.h"
-#include "../fs/ramfs/internal_tree.h"
-#include "../fs/ramfs/ramfs.h"
-#include "../fs/vfs.h"
 #include "../interrupts/irq.h"
-#include "../lib/string.h"
-#include "../memory/heap/kheap.h"
-#include "../memory/virtual/vmm.h"
+#include "../lib/alignment.h"
 #include "../threading/kthread.h"
 #include "../threading/scheduler.h"
 #include "../threading/thread_cleaner.h"
@@ -53,12 +46,22 @@ void set_up_init_process(module init_module) {
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
 
-    // temporary hardcoded loading of test.bin for test, which code and data are
-    // within single page, start is mapped to 0x1000, entrypoint is 0x1000
-    vm_space_map_page(init_process.vm, 0x1000, flags);
-    void* user_text = vm_space_get_page_view(init_process.vm, 0x1000);
-    memcpy(user_text, (void*) P2V(init_module.mod_start),
-           init_module.mod_end - init_module.mod_start);
+    u64 module_size = init_module.mod_end - init_module.mod_start;
+    u64 pages = align_to_upper(module_size, PAGE_SIZE) / PAGE_SIZE;
+    // temporary hardcoded loading of test.c for test, start is mapped to
+    // 0x1000, entrypoint is 0x1000
+    vm_page_mapping_result result =
+        vm_space_map_pages_exactly(init_process.vm, 0x1000, pages, flags);
+    if (result != SUCCESS)
+        panic("Couldn't map enough pages for init process");
+
+    for (u64 i = 0; i < pages; i++) {
+        u64 page_start = i * PAGE_SIZE;
+        void* user_page =
+            vm_space_get_page_view(init_process.vm, 0x1000 + page_start);
+        memcpy(user_page, (void*) P2V(init_module.mod_start),
+               MIN(module_size - page_start, PAGE_SIZE));
+    }
 
     thread_start(uthread_create_orphan(&init_process, "test", NULL,
                                        (uthread_func*) 0x1000));

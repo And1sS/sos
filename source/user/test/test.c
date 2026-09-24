@@ -124,24 +124,90 @@ void fork_test() {
 }
 
 void io_test() {
-    long long fd = open("/a/c/d/f", 0);
+    print("=========== IO test ============\n");
+    const char* path = "a/c/d/f";
+
+    long long fd = open(path, 0);
+    print("Opened file at: ");
+    print(path);
+    print(", fd: ");
     printll(fd);
+    print("\n");
+
     const char test[] = "Hello from write syscall!!";
-    const char buf[256];
-    write(fd, test, 26);
+    long long written_bytes = write(fd, test, 26);
+    if (written_bytes >= 0) {
+        print("Successfully written ");
+        printll(written_bytes);
+        print(" bytes of buffer: ");
+        print(test);
+    } else {
+        print("Couldn't write buffer to file with err code: ");
+        printll(written_bytes);
+    }
+    print("\n");
     close(fd);
 
+    const char buf[256];
     fd = open("a/c/d/f", 0);
-    read(fd, buf, 26);
+    long long read_bytes = read(fd, buf, 256);
+    print("Successfully read ");
+    printll(read_bytes);
+    print(" bytes, buffer: ");
     print(buf);
+    print("\n");
 
-    fork();
-    if (getpid() == 1) {
-        for (;;)
-            ;
+    const long long fd1 = open(".", 0);
+    print("Next fd: ");
+    printll(fd1);
+    print("\n");
+    close(fd);
+    close(fd1);
+
+    long long res = chdir("/a/c");
+    if (res < 0) {
+        print("Couldn't change workdir to /a/c");
+        exit(-1);
     }
 
-    exit(0xDEADB33F);
+    print("Successfully changed workdir to /a/c\n");
+    fd = open("d/f", 0);
+    if (fd < 0) {
+        print("Failed to open d/f");
+        exit(-1);
+    }
+    print("Successfully opened d/f\n");
+    read_bytes = read(fd, buf, 256);
+    print("Successfully read ");
+    printll(read_bytes);
+    print(" bytes, buffer: ");
+    print(buf);
+    print("\n");
+    close(fd);
+
+    res = chroot("a/c/d");
+    if (res < 0) {
+        print("Failed to change root to a/c/d");
+        exit(-1);
+    }
+
+    print("Successfully changed root to /a/c/d\n");
+    fd = open("/f", 0);
+    if (fd < 0) {
+        print("Failed to open /f");
+        exit(-1);
+    }
+    print("Successfully opened /f\n");
+    read_bytes = read(fd, buf, 256);
+    print("Successfully read ");
+    printll(read_bytes);
+    print(" bytes, buffer: ");
+    print(buf);
+    print("\n");
+    close(fd);
+
+    for (;;)
+        ;
 }
 
 void __attribute__((section(".entrypoint"))) main() {
@@ -152,4 +218,7 @@ void __attribute__((section(".entrypoint"))) main() {
     long sigchld_act_set = process_set_sigaction(SIGCHLD, &sigchld_action);
 
     io_test();
+    //    fork_test();
+    while (1)
+        ;
 }

@@ -26,8 +26,10 @@
 #define SYS_CLOSE 14
 #define SYS_READ 15
 #define SYS_WRITE 16
+#define SYS_CHROOT 17
+#define SYS_CHDIR 18
 
-#define SYSCALLS_IMPLEMENTED_COUNT 17
+#define SYSCALLS_IMPLEMENTED_COUNT 19
 #define SYSCALLS_MAX_COUNT 1024
 
 struct cpu_context;
@@ -63,5 +65,8 @@ u64 sys_close(u64 fd);
 
 u64 sys_read(u64 fd, void* __user buf, u64 size);
 u64 sys_write(u64 fd, void* __user buf, u64 size);
+
+u64 sys_chroot(string __user path);
+u64 sys_chdir(string __user path);
 
 #endif // SOS_SYSCALL_H

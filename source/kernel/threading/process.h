@@ -78,6 +78,9 @@ vfs_path process_root();
 // Returns refcounted working directory path
 vfs_path process_working_directory();
 
+void process_change_root(vfs_path root);
+void process_change_working_directory(vfs_path workdir);
+
 // Accepts (and consumes) file reference for passed file (means this procedure
 // won't additionally acquire file again), returns file descriptor in case of
 // success
