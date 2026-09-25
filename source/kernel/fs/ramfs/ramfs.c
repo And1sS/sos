@@ -3,6 +3,7 @@
 #include "../../error/error.h"
 #include "../../lib/alignment.h"
 #include "../../lib/math.h"
+#include "../../memory/virtual/kmem.h"
 #include "../dcache/dentry.h"
 #include "../file.h"
 #include "internal_tree.h"
@@ -11,6 +12,7 @@ static vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
 
 static void ramfs_evict(vfs_inode* inode);
 static vfs_dentry* ramfs_create(vfs_dentry* parent, string name, u64 flags);
+static vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags);
 
 static u64 ramfs_open(vfs_file* file, u64 mode);
 static u64 ramfs_write(vfs_file* file, __user void* buf, u64 size);
@@ -28,6 +30,7 @@ static vfs_file_ops file_ops = {
 
 static vfs_inode_ops inode_ops = {.evict = ramfs_evict,
                                   .create = ramfs_create,
+                                  .mkdir = ramfs_mkdir,
                                   .lookup = ramfs_lookup,
                                   .unlink = ramfs_unlink,
                                   .rename = ramfs_rename};
@@ -121,6 +124,19 @@ vfs_dentry* ramfs_create(vfs_dentry* parent, string name, u64 flags) {
     return ramfs_lookup(parent, name);
 }
 
+static vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags) {
+    UNUSED(flags);
+    if (find_subnode(parent->inode->private_data, name))
+        return ERROR_PTR(-EEXIST);
+
+    tree_node* child_node = alloc_tree_node(name, DIRECTORY);
+    if (IS_ERROR(child_node))
+        return ERROR_PTR(child_node);
+
+    link_nodes(parent->inode->private_data, child_node);
+    return ramfs_lookup(parent, name);
+}
+
 u64 ramfs_open(vfs_file* file, u64 mode) {
     UNUSED(file);
     UNUSED(mode);
@@ -146,7 +162,7 @@ u64 ramfs_write(vfs_file* file, __user void* buf, u64 size) {
         node->file_data.capacity = new_capacity;
     }
 
-    if (!copy_from_user(node->file_data.buf + pos, buf, size))
+    if (!copy_from(node->file_data.buf + pos, buf, size))
         return -EINVAL;
 
     inode->size = MAX(pos + size, inode->size);
@@ -165,7 +181,7 @@ u64 ramfs_read(vfs_file* file, __user void* buf, u64 size) {
         return 0;
 
     u64 read = end - start;
-    if (!copy_to_user(buf, node->file_data.buf + start, read))
+    if (!copy_to(buf, node->file_data.buf + start, read))
         return (u64) -EFAULT;
 
     file->pos += read;

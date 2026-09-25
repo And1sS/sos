@@ -12,6 +12,14 @@ u64 strlen(string str) {
     return len;
 }
 
+u64 strlenn(string str, u64 limit) {
+    u64 len = 0;
+    while (str[len] != '\0' && len < limit)
+        len++;
+
+    return len;
+}
+
 string strcpy(string str) {
     u64 len = strlen(str);
     char* copy = kmalloc(sizeof(char) * (len + 1));

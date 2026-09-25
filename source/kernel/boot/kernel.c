@@ -8,6 +8,7 @@
 #include "../threading/scheduler.h"
 #include "../threading/thread_cleaner.h"
 #include "../threading/uthread.h"
+#include "init.h"
 #include "multiboot.h"
 
 extern process init_process;
@@ -42,113 +43,13 @@ void set_up(const multiboot_info* mboot_info) {
     println("Finished vfs initialization");
 }
 
-void set_up_init_process(module init_module) {
-    vm_area_flags flags = {
-        .writable = true, .user_access_allowed = true, .executable = true};
-
-    u64 module_size = init_module.mod_end - init_module.mod_start;
-    u64 pages = align_to_upper(module_size, PAGE_SIZE) / PAGE_SIZE;
-    // temporary hardcoded loading of test.c for test, start is mapped to
-    // 0x1000, entrypoint is 0x1000
-    vm_page_mapping_result result =
-        vm_space_map_pages_exactly(init_process.vm, 0x1000, pages, flags);
-    if (result != SUCCESS)
-        panic("Couldn't map enough pages for init process");
-
-    for (u64 i = 0; i < pages; i++) {
-        u64 page_start = i * PAGE_SIZE;
-        void* user_page =
-            vm_space_get_page_view(init_process.vm, 0x1000 + page_start);
-        memcpy(user_page, (void*) P2V(init_module.mod_start),
-               MIN(module_size - page_start, PAGE_SIZE));
-    }
-
-    thread_start(uthread_create_orphan(&init_process, "test", NULL,
-                                       (uthread_func*) 0x1000));
-
-    vm_space_print(init_process.vm);
-
-    /*
-     *                root
-     *            /           \
-     *           a             b
-     *          /             /
-     *         c             e (submnt)
-     *        /            /        \
-     *       d            a          b
-     *      /            /          /
-     *     f            c          e
-     *                 /
-     *                d
-     *               /
-     *              f
-     */
-    //    vfs_mount* mnt = vfs_mount_get_root();
-    //    vfs_path res;
-    //    vfs_path start = {.mount = mnt, .dentry = mnt->mount_root};
-    //    path_parts parts = path_parts_from_path("a/c/d/f");
-    //    print("Walk status code: ");
-    //    print_u64(walk(start, &res, &parts));
-    //    println("");
-    //    print("walked to: ");
-    //    print(res.dentry->name);
-    //    println("");
-    //    vfs_path_release(res);
-    //
-    //    vfs_path c;
-    //    path_parts c_path = path_parts_from_path("a/c");
-    //    walk(start, &c, &c_path);
-    //
-    //    vfs_path d;
-    //    path_parts d_path = path_parts_from_path("d");
-    //    walk(c, &d, &d_path);
-    //
-    //    vfs_path b;
-    //    path_parts b_path = path_parts_from_path("b");
-    //    walk(start, &b, &b_path);
-    //
-    //    vfs_path e;
-    //    path_parts e_path = path_parts_from_path("e");
-    //    walk(b, &e, &e_path);
-    //
-    //    vfs_mount* root = vfs_mount_get_root();
-    //    vfs_type* ramfs_type = vfs_type_get(RAMFS_NAME);
-    //    vfs_dentry* submount_root = ramfs_type->ops->mount(ramfs_type, NULL);
-    //    vfs_mount* submount = vfs_mount_attach(root, e.dentry, submount_root);
-    //    vfs_dentry_release(submount_root);
-    //
-    //    u64 err = -vfs_rename(c, d.dentry, b, "e");
-    //    print_u64(err);
-    //
-    //    vfs_path mnted_c;
-    //    path_parts mnted_c_path = path_parts_from_path("b/e/a/c");
-    //    walk(start, &mnted_c, &mnted_c_path);
-    //
-    //    vfs_file* file = vfs_create(mnted_c, "test", 0);
-    //    print_u64((u64) file);
-    //
-    //    string test = "hello VFS world!";
-    //    u64 written = vfs_write(file, (void*) test, strlen(test));
-    //    UNUSED(written);
-    //
-    //    vfs_unlink(mnted_c, "test");
-    //    vfs_close(file);
-    //    vfs_file_release(file);
-    //
-    //    vfs_path_release(mnted_c);
-    //
-    //    vfs_mount_detach(submount);
-    //    vfs_mount_release(submount);
-    //    while (true) {
-    //    }
-}
-
 _Noreturn void kernel_main(paddr multiboot_structure) {
     multiboot_info multiboot_info =
         parse_multiboot_info((void*) P2V(multiboot_structure));
 
     set_up(&multiboot_info);
-    set_up_init_process(get_module_info(&multiboot_info, 1));
+    set_up_init_fs(get_module_info(&multiboot_info, 0));
+    set_up_init_process();
 
     local_irq_enable();
     while (true) {
