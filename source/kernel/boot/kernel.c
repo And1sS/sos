@@ -47,8 +47,7 @@ static void init_process_init() {
                 goto out;
 
             void* page = vm_space_get_page_view(init_process.vm, page_base);
-            void* dst = (void*) ((u64) page + j * chunk_size);
-            memcpy(dst, buffer, read);
+            memcpy(page + j * chunk_size, buffer, read);
         }
     }
 
