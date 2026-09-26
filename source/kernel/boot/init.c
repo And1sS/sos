@@ -8,29 +8,50 @@
 #include "../threading/thread.h"
 #include "../threading/uthread.h"
 
+static vfs_file* copy_tar_file(vfs_path parent, string name, tar_entry* entry) {
+    vfs_file* file = vfs_open(parent, name, O_CREAT);
+    if (IS_ERROR(file))
+        return file;
+
+    u64 copy_res = vfs_write(file, entry->data, tar_parse_size(entry));
+    if (IS_ERROR(copy_res)) {
+        vfs_file_close(file);
+        return ERROR_PTR(copy_res);
+    }
+
+    return file;
+}
+
+static u64 create_intermediate_dir(vfs_path parent, string name,
+                                   vfs_path* res) {
+
+    vfs_file* created = vfs_mkdir(parent, name, 0);
+    if (IS_ERROR(created))
+        return PTR_ERROR(created);
+
+    *res = vfs_path_acquire(created->path);
+    vfs_file_release(created);
+    return 0;
+}
+
+// It is safe to do io syscalls on vfs as at this stage vfs tree consists
+// on ramfs mounted as tree root, so all of the syscalls are basically RAM
+// reads/writes
 static void copy_tar_entry(tar_entry* entry) {
     char name[256];
     tar_fill_full_entry_name(entry, name);
-
     path_parts parts = path_parts_from_path(name);
 
-    vfs_path res;
     vfs_path curr = vfs_root();
-
     // create folders above our entry
     while (parts.parts_left > 1) {
+        vfs_path res;
         u64 walk_res = walk_one(curr, &res, &parts);
+        if (walk_res == (u64) -ENOENT)
+            walk_res = create_intermediate_dir(curr, parts.part, &res);
 
-        if (IS_ERROR(walk_res) && walk_res != (u64) -ENOENT)
-            goto error;
-        else if (IS_ERROR(walk_res)) {
-            vfs_file* created = vfs_mkdir(curr, parts.part, 0);
-            if (IS_ERROR(created))
-                goto error;
-
-            res = vfs_path_acquire(created->path);
-            vfs_file_release(created);
-        }
+        if (IS_ERROR(walk_res))
+            panic("Can't create initramfs directory tree");
 
         vfs_path_release(curr);
         curr = res;
@@ -38,32 +59,18 @@ static void copy_tar_entry(tar_entry* entry) {
 
     part_walk_next(&parts);
 
-    vfs_file* file;
-    switch (tar_parse_type(entry)) {
-    case TAR_NORMAL_FILE:
-        file = vfs_open(curr, parts.part, O_CREAT);
-        if (IS_ERROR(file))
-            goto error;
-
-        u64 copy_res = vfs_write(file, entry->data, tar_parse_size(entry));
-        if (IS_ERROR(copy_res))
-            goto error;
-        break;
-
-    case TAR_DIRECTORY:
+    vfs_file* file = ERROR_PTR(-EINVAL);
+    tar_file_type tar_entry_type = tar_parse_type(entry);
+    if (tar_entry_type == TAR_NORMAL_FILE)
+        file = copy_tar_file(curr, parts.part, entry);
+    else if (tar_entry_type == TAR_DIRECTORY)
         file = vfs_mkdir(curr, parts.part, 0);
-        break;
-    default:
-        goto error;
-    }
 
     if (IS_ERROR(file))
-        goto error;
+        panic("Can't create initramfs directory tree");
 
-    return;
-
-error:
-    panic("Can't create initramfs");
+    vfs_path_release(curr);
+    vfs_file_close(file);
 }
 
 void set_up_init_fs(module initramfs_module) {
