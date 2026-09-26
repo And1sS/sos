@@ -46,18 +46,6 @@ path_parts path_parts_from_path(string path) {
     return (path_parts) {.path = path, .parts_left = count_parts(path)};
 }
 
-vfs_path vfs_path_acquire(vfs_path path) {
-    vfs_dentry_acquire(path.dentry);
-    vfs_mount_acquire(path.mount);
-
-    return path;
-}
-
-void vfs_path_release(vfs_path path) {
-    vfs_dentry_release(path.dentry);
-    vfs_mount_release(path.mount);
-}
-
 static u64 part_length(string path) {
     u64 len = 0;
     for (; path[len] != '/' && path[len] != '\0' && len < NAME_MAX - 1; len++)
@@ -66,7 +54,7 @@ static u64 part_length(string path) {
     return len;
 }
 
-static string walk_next_part(path_parts* parts) {
+string part_walk_next(path_parts* parts) {
     while (*parts->path == '/')
         parts->path++;
 
@@ -77,6 +65,18 @@ static string walk_next_part(path_parts* parts) {
     parts->parts_left--;
 
     return parts->part;
+}
+
+vfs_path vfs_path_acquire(vfs_path path) {
+    vfs_dentry_acquire(path.dentry);
+    vfs_mount_acquire(path.mount);
+
+    return path;
+}
+
+void vfs_path_release(vfs_path path) {
+    vfs_dentry_release(path.dentry);
+    vfs_mount_release(path.mount);
 }
 
 static u64 lookup_current(vfs_path start, vfs_path* res) {
@@ -128,7 +128,7 @@ u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
     if (parts->parts_left == 0)
         return -ENOENT;
 
-    return lookup(start, res, walk_next_part(parts));
+    return lookup(start, res, part_walk_next(parts));
 }
 
 u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts) {

@@ -128,6 +128,11 @@ void io_test() {
     const char* path = "a/c/d/f";
 
     long long fd = open(path, 0);
+    if (fd < 0) {
+        print("Couldn't open file at ");
+        print(path);
+        exit(-1);
+    }
     print("Opened file at: ");
     print(path);
     print(", fd: ");
