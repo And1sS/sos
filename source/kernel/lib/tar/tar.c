@@ -1,5 +1,6 @@
 #include "tar.h"
 #include "../alignment.h"
+#include "../kprint.h"
 #include "../memory_util.h"
 #include "../string.h"
 
@@ -70,4 +71,21 @@ void tar_fill_full_entry_name(tar_entry* entry, char name[256]) {
     }
 
     name[255] = '\0';
+}
+
+void tar_print_entry(tar_entry* entry) {
+    tar_file_type type = tar_parse_type(entry);
+
+    print(entry->header.name);
+    print(", t: ");
+    if (type == TAR_NORMAL_FILE)
+        print("file");
+    else if (type == TAR_DIRECTORY)
+        print("dir");
+    else
+        print("unrecognized");
+
+    print(", s: ");
+    print_u64(tar_parse_size(entry));
+    println("b");
 }
