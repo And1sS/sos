@@ -40,8 +40,7 @@ static void copy_tar_entry(tar_entry* entry) {
     path_parts parts = path_parts_from_path(name);
 
     vfs_path curr = vfs_root();
-    // create folders above our entry
-    while (parts.parts_left > 1) {
+    while (parts.parts_left > 1) { // create folders above our entry
         vfs_path res;
         u64 walk_res = walk_one(curr, &res, &parts);
         if (walk_res == (u64) -ENOENT)
