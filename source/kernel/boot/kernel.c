@@ -12,16 +12,12 @@
 
 extern process init_process;
 
-void init_process_init() {
+static void init_process_init() {
     vfs_path root = vfs_root();
     vfs_file* init_binary = vfs_open(root, "/usr/bin/test.bin", 0);
     if (IS_ERROR(init_binary))
         panic("Can't open init binary");
-
     vfs_path_release(root);
-
-    vm_area_flags flags = {
-        .writable = true, .user_access_allowed = true, .executable = true};
 
     // temporary hardcoded loading of test.c for test, start is mapped to
     // 0x1000, entrypoint is 0x1000
@@ -29,8 +25,10 @@ void init_process_init() {
     u64 pages = align_to_upper(module_size, PAGE_SIZE) / PAGE_SIZE;
     u64 offset = 0x1000;
 
+    vm_area_flags flags = {
+        .writable = true, .user_access_allowed = true, .executable = true};
     vm_page_mapping_result result =
-        vm_space_map_pages_exactly(init_process.vm, 0x1000, pages, flags);
+        vm_space_map_pages_exactly(init_process.vm, offset, pages, flags);
     if (result != SUCCESS)
         panic("Couldn't map enough pages for init process");
 
@@ -62,7 +60,7 @@ out:
     vm_space_print(init_process.vm);
 }
 
-void set_up(const multiboot_info* mboot_info) {
+static void set_up(const multiboot_info* mboot_info) {
     clear_screen();
     println("Starting initialization");
     print_multiboot_info(mboot_info);
