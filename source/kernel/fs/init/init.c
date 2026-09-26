@@ -10,12 +10,11 @@ static vfs_file* copy_tar_file(vfs_path parent, string name, tar_entry* entry) {
         return file;
 
     u64 copy_res = vfs_write(file, entry->data, tar_parse_size(entry));
-    if (IS_ERROR(copy_res)) {
-        vfs_file_close(file);
-        return ERROR_PTR(copy_res);
-    }
+    if (!IS_ERROR(copy_res))
+        return file;
 
-    return file;
+    vfs_file_close(file);
+    return ERROR_PTR(copy_res);
 }
 
 static u64 create_intermediate_dir(vfs_path parent, string name,
