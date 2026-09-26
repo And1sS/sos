@@ -26,7 +26,7 @@ static u64 create_intermediate_dir(vfs_path parent, string name,
         return PTR_ERROR(created);
 
     *res = vfs_path_acquire(created->path);
-    vfs_file_release(created);
+    vfs_file_close(created);
     return 0;
 }
 
@@ -75,7 +75,6 @@ static void initramfs_init(module initramfs_tar) {
     println("Creating file system tree:");
     while (entry <= end && tar_is_valid_entry(entry)) {
         entries++;
-
         tar_print_entry(entry);
         copy_tar_entry(entry);
         entry = tar_next_entry(entry);

@@ -13,9 +13,12 @@
 extern process init_process;
 
 void init_process_init() {
-    vfs_file* init_binary = vfs_open(vfs_root(), "/usr/bin/test.bin", 0);
+    vfs_path root = vfs_root();
+    vfs_file* init_binary = vfs_open(root, "/usr/bin/test.bin", 0);
     if (IS_ERROR(init_binary))
         panic("Can't open init binary");
+
+    vfs_path_release(root);
 
     vm_area_flags flags = {
         .writable = true, .user_access_allowed = true, .executable = true};
@@ -52,6 +55,7 @@ void init_process_init() {
     }
 
 out:
+    vfs_file_close(init_binary);
     thread_start(uthread_create_orphan(&init_process, "test", NULL,
                                        (uthread_func*) offset));
 
@@ -94,5 +98,6 @@ _Noreturn void kernel_main(paddr multiboot_structure) {
     set_up(&multiboot_info);
 
     local_irq_enable();
-    while (true);
+    while (true)
+        ;
 }
