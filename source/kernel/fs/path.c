@@ -54,7 +54,7 @@ static u64 part_length(string path) {
     return len;
 }
 
-string part_walk_next(path_parts* parts) {
+string path_parts_walk_next(path_parts* parts) {
     while (*parts->path == '/')
         parts->path++;
 
@@ -128,7 +128,7 @@ u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts) {
     if (parts->parts_left == 0)
         return -ENOENT;
 
-    return lookup(start, res, part_walk_next(parts));
+    return lookup(start, res, path_parts_walk_next(parts));
 }
 
 u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts) {

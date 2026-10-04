@@ -53,7 +53,7 @@ static void copy_tar_entry(tar_entry* entry) {
         curr = res;
     }
 
-    part_walk_next(&parts);
+    path_parts_walk_next(&parts);
 
     vfs_file* file = type == TAR_NORMAL_FILE
                          ? copy_tar_file(curr, parts.part, entry)

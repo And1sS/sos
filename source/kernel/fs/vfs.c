@@ -22,6 +22,7 @@ void vfs_init() {
     if (IS_ERROR(rootfs_root))
         panic("Can't mount root filesystem");
 
+    vfs_type_release(rootfs_type);
     vfs_mount_root(rootfs_root);
     vfs_dentry_release(rootfs_root);
 }
@@ -141,7 +142,7 @@ vfs_file* vfs_mkdir(vfs_path start, string path, u64 flags) {
     if (!dir->ops->mkdir)
         goto out_error_no_mkdir;
 
-    part_walk_next(&parts);
+    path_parts_walk_next(&parts);
 
     vfs_inode_lock(dir);
     vfs_dentry* created = dir->ops->mkdir(parent_dentry, parts.part, flags);

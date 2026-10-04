@@ -23,7 +23,7 @@ bool path_ends_with_dotdot(string path);
 
 path_parts path_parts_from_path(string path);
 
-string part_walk_next(path_parts* parts);
+string path_parts_walk_next(path_parts* parts);
 
 vfs_path vfs_path_acquire(vfs_path path);
 void vfs_path_release(vfs_path path);
