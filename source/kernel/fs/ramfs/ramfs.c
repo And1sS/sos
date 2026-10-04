@@ -3,7 +3,6 @@
 #include "../../error/error.h"
 #include "../../lib/alignment.h"
 #include "../../lib/math.h"
-#include "../../memory/virtual/kmem.h"
 #include "../dcache/dentry.h"
 #include "../file.h"
 #include "internal_tree.h"
@@ -162,7 +161,7 @@ u64 ramfs_write(vfs_file* file, __user void* buf, u64 size) {
         node->file_data.capacity = new_capacity;
     }
 
-    if (!copy_from(node->file_data.buf + pos, buf, size))
+    if (!copy_from_user(node->file_data.buf + pos, buf, size))
         return -EINVAL;
 
     inode->size = MAX(pos + size, inode->size);
@@ -181,7 +180,7 @@ u64 ramfs_read(vfs_file* file, __user void* buf, u64 size) {
         return 0;
 
     u64 read = end - start;
-    if (!copy_to(buf, node->file_data.buf + start, read))
+    if (!copy_to_user(buf, node->file_data.buf + start, read))
         return (u64) -EFAULT;
 
     file->pos += read;
