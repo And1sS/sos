@@ -11,6 +11,7 @@ static vfs_dentry* ramfs_mount(struct vfs_type* type, device* dev);
 
 static void ramfs_evict(vfs_inode* inode);
 static vfs_dentry* ramfs_create(vfs_dentry* parent, string name, u64 flags);
+static vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags);
 
 static u64 ramfs_open(vfs_file* file, u64 mode);
 static u64 ramfs_write(vfs_file* file, __user void* buf, u64 size);
@@ -28,6 +29,7 @@ static vfs_file_ops file_ops = {
 
 static vfs_inode_ops inode_ops = {.evict = ramfs_evict,
                                   .create = ramfs_create,
+                                  .mkdir = ramfs_mkdir,
                                   .lookup = ramfs_lookup,
                                   .unlink = ramfs_unlink,
                                   .rename = ramfs_rename};
@@ -114,6 +116,19 @@ vfs_dentry* ramfs_lookup(vfs_dentry* parent, string name) {
 vfs_dentry* ramfs_create(vfs_dentry* parent, string name, u64 flags) {
     UNUSED(flags);
     tree_node* child_node = alloc_tree_node(name, FILE);
+    if (IS_ERROR(child_node))
+        return ERROR_PTR(child_node);
+
+    link_nodes(parent->inode->private_data, child_node);
+    return ramfs_lookup(parent, name);
+}
+
+static vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags) {
+    UNUSED(flags);
+    if (find_subnode(parent->inode->private_data, name))
+        return ERROR_PTR(-EEXIST);
+
+    tree_node* child_node = alloc_tree_node(name, DIRECTORY);
     if (IS_ERROR(child_node))
         return ERROR_PTR(child_node);
 

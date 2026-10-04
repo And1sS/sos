@@ -22,6 +22,7 @@ void vfs_init() {
     if (IS_ERROR(rootfs_root))
         panic("Can't mount root filesystem");
 
+    vfs_type_release(rootfs_type);
     vfs_mount_root(rootfs_root);
     vfs_dentry_release(rootfs_root);
 }
@@ -123,6 +124,50 @@ out_error_no_open:
     vfs_path_release(child);
 
 out_error_open:
+    return ERROR_PTR(error);
+}
+
+vfs_file* vfs_mkdir(vfs_path start, string path, u64 flags) {
+    vfs_path parent;
+    path_parts parts = path_parts_from_path(path);
+
+    u64 error = walk_parent(start, &parent, &parts);
+    if (IS_ERROR(error))
+        goto out_error_walk_parent;
+
+    vfs_dentry* parent_dentry = parent.dentry;
+    vfs_inode* dir = parent_dentry->inode;
+
+    error = -EPERM;
+    if (!dir->ops->mkdir)
+        goto out_error_no_mkdir;
+
+    path_parts_walk_next(&parts);
+
+    vfs_inode_lock(dir);
+    vfs_dentry* created = dir->ops->mkdir(parent_dentry, parts.part, flags);
+    vfs_inode_unlock(dir);
+
+    error = PTR_ERROR(created);
+    if (IS_ERROR(created))
+        goto out_error_mkdir;
+
+    vfs_path child;
+    child.dentry = created;
+    child.mount = vfs_mount_acquire(parent.mount);
+
+    vfs_path_release(parent);
+
+    vfs_file* file = vfs_file_create(child, flags);
+    vfs_path_release(child);
+
+    return file;
+
+out_error_mkdir:
+out_error_no_mkdir:
+    vfs_path_release(parent);
+
+out_error_walk_parent:
     return ERROR_PTR(error);
 }
 

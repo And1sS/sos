@@ -4,6 +4,7 @@
 #include "types.h"
 
 u64 strlen(string str);
+u64 strlenn(string str, u64 limit);
 
 // returns either pointer to string, or NULL when not enough memory
 string strcpy(string str);
