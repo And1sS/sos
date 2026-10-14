@@ -35,7 +35,7 @@ static void copy_tar_entry(tar_entry* entry) {
     if (type != TAR_NORMAL_FILE && type != TAR_DIRECTORY)
         return;
 
-    char name[256];
+    char name[TAR_NAME_MAX];
     tar_fill_full_entry_name(entry, name);
     path_parts parts = path_parts_from_path(name);
 

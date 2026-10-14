@@ -3,6 +3,7 @@
 #include "../kprint.h"
 #include "../memory_util.h"
 #include "../string.h"
+#include "../util.h"
 
 tar_file_type tar_parse_type(tar_entry* entry) {
     return entry->header.type - '0';
@@ -56,12 +57,15 @@ bool tar_is_valid_entry(tar_entry* entry) {
         if (entry->header.ustar_indicator[i] != ustar_indicator[i])
             return false;
     }
+
     return true;
 }
 
-void tar_fill_full_entry_name(tar_entry* entry, char name[256]) {
-    u64 name_len = strlenn(entry->header.name, 100);
-    u64 prefix_len = strlenn(entry->header.name_prefix, 155);
+void tar_fill_full_entry_name(tar_entry* entry, char name[TAR_NAME_MAX]) {
+    u64 name_len = strlenn(entry->header.name, MEMBER_SIZE(tar_header, name));
+    u64 prefix_len = strlenn(entry->header.name_prefix,
+                             MEMBER_SIZE(tar_header, name_prefix));
+
     if (prefix_len > 0) {
         memcpy(name, entry->header.name_prefix, prefix_len);
         name[prefix_len] = '/';
@@ -70,7 +74,7 @@ void tar_fill_full_entry_name(tar_entry* entry, char name[256]) {
         memcpy(name, entry->header.name, name_len + 1);
     }
 
-    name[255] = '\0';
+    name[TAR_NAME_MAX - 1] = '\0';
 }
 
 void tar_print_entry(tar_entry* entry) {

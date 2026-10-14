@@ -14,7 +14,7 @@ u64 strlen(string str) {
 
 u64 strlenn(string str, u64 limit) {
     u64 len = 0;
-    while (str[len] != '\0' && len < limit)
+    while (len < limit && str[len] != '\0')
         len++;
 
     return len;

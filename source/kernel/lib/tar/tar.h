@@ -4,6 +4,7 @@
 #include "../types.h"
 
 #define TAR_SECTOR_SIZE 512
+#define TAR_NAME_MAX (256 + 1)
 
 typedef enum tar_file_type {
     TAR_NORMAL_FILE = 0,
@@ -48,7 +49,7 @@ tar_entry* tar_next_entry(tar_entry* entry);
 
 bool tar_is_valid_entry(tar_entry* entry);
 
-void tar_fill_full_entry_name(tar_entry* entry, char name[256]);
+void tar_fill_full_entry_name(tar_entry* entry, char name[TAR_NAME_MAX]);
 
 void tar_print_entry(tar_entry* entry);
 
