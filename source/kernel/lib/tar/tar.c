@@ -1,6 +1,7 @@
 #include "tar.h"
 #include "../alignment.h"
 #include "../kprint.h"
+#include "../math.h"
 #include "../memory_util.h"
 #include "../string.h"
 #include "../util.h"
@@ -9,38 +10,15 @@ tar_file_type tar_parse_type(tar_entry* entry) {
     return entry->header.type - '0';
 }
 
-static u64 parse_tar_size(string field) {
-    unsigned char c = field[0];
-
-    /* GNU base-256 encoding (large files) */
-    if (c & 0x80) {
-        u64 v = c & 0x7F; /* drop the indicator bit */
-        for (int i = 1; i < 12; i++)
-            v = (v << 8) | field[i];
-        return v;
-    }
-
-    /* Standard octal, possibly padded with leading spaces and terminated
-       by space or NUL. */
-    int i = 0;
-    while (i < 12 && field[i] == ' ')
-        i++;
-
-    u64 v = 0;
-    while (i < 12) {
-        c = field[i];
-        if (c == '\0' || c == ' ')
-            break;
-        if (c < '0' || c > '7')
-            return 0; /* malformed */
-        v = (v << 3) | (c - '0');
-        i++;
-    }
-    return v;
-}
-
 u64 tar_parse_size(tar_entry* entry) {
-    return parse_tar_size((const char*) entry->header.size);
+    char* iter = entry->header.size;
+    char* end = iter + MEMBER_SIZE(tar_header, size);
+
+    u64 size = 0;
+    for (; iter != end && *iter; iter++)
+        size = size * 8 + MAX(*iter, '0') - '0'; // max for skipping spaces
+
+    return size;
 }
 
 tar_entry* tar_next_entry(tar_entry* entry) {
