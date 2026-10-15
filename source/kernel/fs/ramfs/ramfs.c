@@ -15,7 +15,9 @@ static vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags);
 
 static u64 ramfs_open(vfs_file* file, u64 mode);
 static u64 ramfs_write(vfs_file* file, __user void* buf, u64 size);
+static u64 ramfs_kwrite(vfs_file* file, void* buf, u64 size);
 static u64 ramfs_read(vfs_file* file, __user void* buf, u64 size);
+static u64 ramfs_kread(vfs_file* file, void* buf, u64 size);
 
 vfs_dentry* ramfs_lookup(vfs_dentry* parent, string name);
 static u64 ramfs_rename(vfs_dentry* old_dir, vfs_dentry* source,
@@ -24,8 +26,11 @@ static u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child);
 
 static vfs_type_ops ops = {.mount = ramfs_mount};
 
-static vfs_file_ops file_ops = {
-    .open = ramfs_open, .write = ramfs_write, .read = ramfs_read};
+static vfs_file_ops file_ops = {.open = ramfs_open,
+                                .write = ramfs_write,
+                                .kwrite = ramfs_kwrite,
+                                .read = ramfs_read,
+                                .kread = ramfs_kread};
 
 static vfs_inode_ops inode_ops = {.evict = ramfs_evict,
                                   .create = ramfs_create,
@@ -127,7 +132,7 @@ vfs_dentry* ramfs_create(vfs_dentry* parent, string name, u64 flags) {
     return ramfs_lookup(parent, name);
 }
 
-static vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags) {
+vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags) {
     UNUSED(flags);
     if (find_subnode(parent->inode->private_data, name))
         return ERROR_PTR(-EEXIST);
@@ -147,7 +152,9 @@ u64 ramfs_open(vfs_file* file, u64 mode) {
     return 0;
 }
 
-u64 ramfs_write(vfs_file* file, __user void* buf, u64 size) {
+static u64 ramfs_write_generic(vfs_file* file, void* buf, bool kernel_call,
+                               u64 size) {
+
     vfs_inode* inode = file->path.dentry->inode;
     tree_node* node = inode->private_data;
 
@@ -165,8 +172,10 @@ u64 ramfs_write(vfs_file* file, __user void* buf, u64 size) {
         node->file_data.capacity = new_capacity;
     }
 
-    if (!copy_from_user(node->file_data.buf + pos, buf, size))
+    if (!kernel_call && !copy_from_user(node->file_data.buf + pos, buf, size))
         return -EINVAL;
+    else if (kernel_call)
+        memcpy(node->file_data.buf + pos, buf, size);
 
     inode->size = MAX(pos + size, inode->size);
     node->file_data.size = inode->size;
@@ -174,7 +183,17 @@ u64 ramfs_write(vfs_file* file, __user void* buf, u64 size) {
     return size;
 }
 
-u64 ramfs_read(vfs_file* file, __user void* buf, u64 size) {
+u64 ramfs_write(vfs_file* file, __user void* buf, u64 size) {
+    return ramfs_write_generic(file, buf, false, size);
+}
+
+u64 ramfs_kwrite(vfs_file* file, void* buf, u64 size) {
+    return ramfs_write_generic(file, buf, true, size);
+}
+
+static u64 ramfs_read_generic(vfs_file* file, void* buf, bool kernel_call,
+                              u64 size) {
+
     vfs_inode* inode = file->path.dentry->inode;
     tree_node* node = inode->private_data;
 
@@ -184,11 +203,21 @@ u64 ramfs_read(vfs_file* file, __user void* buf, u64 size) {
         return 0;
 
     u64 read = end - start;
-    if (!copy_to_user(buf, node->file_data.buf + start, read))
+    if (!kernel_call && !copy_to_user(buf, node->file_data.buf + start, read))
         return (u64) -EFAULT;
+    else if (kernel_call)
+        memcpy(buf, node->file_data.buf + start, read);
 
     file->pos += read;
     return read;
+}
+
+u64 ramfs_read(vfs_file* file, __user void* buf, u64 size) {
+    return ramfs_read_generic(file, buf, false, size);
+}
+
+u64 ramfs_kread(vfs_file* file, void* buf, u64 size) {
+    return ramfs_read_generic(file, buf, true, size);
 }
 
 u64 ramfs_unlink(vfs_inode* dir, vfs_dentry* child) {

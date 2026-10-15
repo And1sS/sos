@@ -171,8 +171,10 @@ out_error_walk_parent:
     return ERROR_PTR(error);
 }
 
-u64 vfs_read(vfs_file* file, __user void* buf, u64 size) {
-    if (!file->ops->read)
+static u64 vfs_read_generic(vfs_file* file, __user void* buf, u64 size,
+                            u64 (*read)(vfs_file*, void*, u64)) {
+
+    if (!read)
         return -EPERM;
 
     vfs_inode* inode = file->path.dentry->inode;
@@ -180,14 +182,24 @@ u64 vfs_read(vfs_file* file, __user void* buf, u64 size) {
         return -EISDIR;
 
     vfs_inode_lock_shared(inode);
-    u64 res = file->ops->read(file, buf, size);
+    u64 res = read(file, buf, size);
     vfs_inode_unlock_shared(inode);
 
     return res;
 }
 
-u64 vfs_write(struct vfs_file* file, __user void* buf, u64 size) {
-    if (!file->ops->write || (file->flags & O_RONLY))
+u64 vfs_read(vfs_file* file, __user void* buf, u64 size) {
+    return vfs_read_generic(file, buf, size, file->ops->read);
+}
+
+u64 vfs_kread(vfs_file* file, void* buf, u64 size) {
+    return vfs_read_generic(file, buf, size, file->ops->kread);
+}
+
+static u64 vfs_write_generic(struct vfs_file* file, __user void* buf, u64 size,
+                             u64 (*write)(vfs_file*, void*, u64)) {
+
+    if (!write || (file->flags & O_RONLY))
         return -EPERM;
 
     vfs_inode* inode = file->path.dentry->inode;
@@ -195,10 +207,18 @@ u64 vfs_write(struct vfs_file* file, __user void* buf, u64 size) {
         return -EISDIR;
 
     vfs_inode_lock(inode);
-    u64 res = file->ops->write(file, buf, size);
+    u64 res = write(file, buf, size);
     vfs_inode_unlock(inode);
 
     return res;
+}
+
+u64 vfs_write(struct vfs_file* file, __user void* buf, u64 size) {
+    return vfs_write_generic(file, buf, size, file->ops->write);
+}
+
+u64 vfs_kwrite(struct vfs_file* file, void* buf, u64 size) {
+    return vfs_write_generic(file, buf, size, file->ops->kwrite);
 }
 
 u64 vfs_seek(vfs_file* file, u64 offset, u64 whence) {

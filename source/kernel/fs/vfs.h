@@ -36,7 +36,9 @@ u64 vfs_rename(struct vfs_path old_dir, struct vfs_dentry* source,
                struct vfs_path new_dir, string name);
 
 u64 vfs_read(struct vfs_file* file, __user void* buf, u64 size);
+u64 vfs_kread(struct vfs_file* file, void* buf, u64 size);
 u64 vfs_write(struct vfs_file* file, __user void* buf, u64 size);
+u64 vfs_kwrite(struct vfs_file* file, void* buf, u64 size);
 
 u64 vfs_seek(struct vfs_file* file, u64 offset, u64 whence);
 

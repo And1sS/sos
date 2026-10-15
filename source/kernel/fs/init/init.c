@@ -9,7 +9,7 @@ static vfs_file* copy_tar_file(vfs_path parent, string name, tar_entry* entry) {
     if (IS_ERROR(file))
         return file;
 
-    u64 copy_res = vfs_write(file, entry->data, tar_parse_size(entry));
+    u64 copy_res = vfs_kwrite(file, entry->data, tar_parse_size(entry));
     if (!IS_ERROR(copy_res))
         return file;
 

@@ -25,7 +25,9 @@ typedef struct vfs_file_ops {
     void (*release)(struct vfs_file* file);
 
     u64 (*read)(struct vfs_file* file, __user void* buff, u64 size);
+    u64 (*kread)(struct vfs_file* file, void* buff, u64 size);
     u64 (*write)(struct vfs_file* file, __user void* buff, u64 size);
+    u64 (*kwrite)(struct vfs_file* file, void* buff, u64 size);
 
     u64 (*seek)(struct vfs_file* file, u64 offset, u64 whence);
 } vfs_file_ops;

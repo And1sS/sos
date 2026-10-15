@@ -39,7 +39,7 @@ static void init_process_init() {
         u64 page_base = offset + i * PAGE_SIZE;
 
         for (u64 j = 0; j < PAGE_SIZE / chunk_size; j++) {
-            u64 read = vfs_read(init_binary, buffer, chunk_size);
+            u64 read = vfs_kread(init_binary, buffer, chunk_size);
             if (IS_ERROR(read))
                 panic("Couldn't read init binary");
 
