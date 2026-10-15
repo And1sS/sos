@@ -7,7 +7,7 @@
 #define TAR_NAME_MAX (256 + 1)
 
 typedef enum tar_file_type {
-    TAR_NORMAL_FILE = 0,
+    TAR_FILE = 0,
     TAR_HARD_LINK = 1,
     TAR_SYMBOLIK_LINK = 2,
     TAR_CHARACTER_DEVICE = 3,

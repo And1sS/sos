@@ -60,7 +60,7 @@ void tar_print_entry(tar_entry* entry) {
 
     print(entry->header.name);
     print(", t: ");
-    if (type == TAR_NORMAL_FILE)
+    if (type == TAR_FILE)
         print("file");
     else if (type == TAR_DIRECTORY)
         print("dir");

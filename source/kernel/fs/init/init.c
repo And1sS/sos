@@ -32,7 +32,7 @@ static u64 create_intermediate_dir(vfs_path parent, string name,
 // Safe to do IO calls, as at this stage vfs tree consists of RAM backed ramfs
 static void copy_tar_entry(tar_entry* entry) {
     tar_file_type type = tar_parse_type(entry);
-    if (type != TAR_NORMAL_FILE && type != TAR_DIRECTORY)
+    if (type != TAR_FILE && type != TAR_DIRECTORY)
         return;
 
     char name[TAR_NAME_MAX];
@@ -53,11 +53,9 @@ static void copy_tar_entry(tar_entry* entry) {
         curr = res;
     }
 
-    path_parts_walk_next(&parts);
-
-    vfs_file* file = type == TAR_NORMAL_FILE
-                         ? copy_tar_file(curr, parts.part, entry)
-                         : vfs_mkdir(curr, parts.part, 0);
+    string part = path_parts_walk_next(&parts);
+    vfs_file* file = type == TAR_FILE ? copy_tar_file(curr, part, entry)
+                                      : vfs_mkdir(curr, part, 0);
     if (IS_ERROR(file))
         panic("Can't create initramfs directory tree, corrupted tar archive");
 
