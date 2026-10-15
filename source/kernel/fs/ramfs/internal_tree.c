@@ -1,15 +1,10 @@
 #include "internal_tree.h"
 #include "../../error/errno.h"
 #include "../../error/error.h"
-#include "../../lib/string.h"
 
 static volatile u64 id_gen = 0;
 
-tree_node* internal_tree_create() {
-    return alloc_tree_node("[root]", DIRECTORY);
-}
-
-tree_node* alloc_tree_node(string name, vfs_inode_type type) {
+tree_node* alloc_node(string name, vfs_inode_type type) {
     if (type != DIRECTORY && type != FILE)
         return ERROR_PTR(-EPERM);
 
