@@ -4,29 +4,14 @@
 #include "../../lib/tar/tar.h"
 #include "../file.h"
 
-static vfs_file* copy_tar_file(vfs_path parent, string name, tar_entry* entry) {
+u64 copy_tar_file(vfs_path parent, string name, tar_entry* entry) {
     vfs_file* file = vfs_open(parent, name, O_CREAT);
     if (IS_ERROR(file))
-        return file;
+        return PTR_ERROR(file);
 
     u64 copy_res = vfs_write(file, entry->data, tar_parse_size(entry));
-    if (!IS_ERROR(copy_res))
-        return file;
-
     vfs_file_close(file);
-    return ERROR_PTR(copy_res);
-}
-
-static u64 create_intermediate_dir(vfs_path parent, string name,
-                                   vfs_path* res) {
-
-    vfs_file* created = vfs_mkdir(parent, name, 0);
-    if (IS_ERROR(created))
-        return PTR_ERROR(created);
-
-    *res = vfs_path_acquire(created->path);
-    vfs_file_close(created);
-    return 0;
+    return IS_ERROR(copy_res) ? copy_res : 0;
 }
 
 // Safe to do IO calls, as at this stage vfs tree consists of RAM backed ramfs
@@ -44,8 +29,7 @@ static void copy_tar_entry(tar_entry* entry) {
         vfs_path res;
         u64 walk_res = walk_one(curr, &res, &parts);
         if (walk_res == (u64) -ENOENT)
-            walk_res = create_intermediate_dir(curr, parts.part, &res);
-
+            walk_res = vfs_mkdir(curr, parts.part, 0);
         if (IS_ERROR(walk_res))
             panic("Can't create initramfs directory tree");
 
@@ -54,13 +38,12 @@ static void copy_tar_entry(tar_entry* entry) {
     }
 
     string part = path_parts_walk_next(&parts);
-    vfs_file* file = type == TAR_FILE ? copy_tar_file(curr, part, entry)
-                                      : vfs_mkdir(curr, part, 0);
-    if (IS_ERROR(file))
-        panic("Can't create initramfs directory tree, corrupted tar archive");
-
+    u64 result = type == TAR_FILE ? copy_tar_file(curr, part, entry)
+                                  : vfs_mkdir(curr, part, 0);
     vfs_path_release(curr);
-    vfs_file_close(file);
+
+    if (IS_ERROR(result))
+        panic("Can't create initramfs directory tree, corrupted tar archive");
 }
 
 static void initramfs_init(module initramfs_tar) {

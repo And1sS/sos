@@ -29,3 +29,14 @@ long long int chroot(const char* path) {
 long long int chdir(const char* path) {
     return syscall1(SYS_CHDIR, (long long) path);
 }
+
+long long mkdir(const char* path, unsigned long long mode) {
+    return syscall2(SYS_MKDIR, (long long) path, (long long) mode);
+}
+
+long long mkdirat(unsigned long long dirfd, const char* path,
+                  unsigned long long mode) {
+
+    return syscall3(SYS_MKDIRAT, (long long) dirfd, (long long) path,
+                    (long long) mode);
+}

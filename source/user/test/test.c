@@ -125,6 +125,14 @@ void fork_test() {
 
 void io_test() {
     print("=========== IO test ============\n");
+    long long res = mkdir("/test", 0);
+    if (res < 0) {
+        print("Couldn't create test dir: ");
+        printll(res);
+        exit(-1);
+    }
+    print("Succesfully created /test dir\n");
+
     const char* path = "a/c/d/f";
 
     long long fd = open(path, 0);
@@ -169,7 +177,7 @@ void io_test() {
     close(fd);
     close(fd1);
 
-    long long res = chdir("/a/c");
+    res = chdir("/a/c");
     if (res < 0) {
         print("Couldn't change workdir to /a/c");
         exit(-1);

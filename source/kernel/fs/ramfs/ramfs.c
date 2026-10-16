@@ -127,7 +127,7 @@ vfs_dentry* ramfs_create(vfs_dentry* parent, string name, u64 flags) {
     return ramfs_lookup(parent, name);
 }
 
-static vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags) {
+vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags) {
     UNUSED(flags);
     if (find_subnode(parent->inode->private_data, name))
         return ERROR_PTR(-EEXIST);

@@ -25,6 +25,8 @@
 #define SYS_WRITE 16
 #define SYS_CHROOT 17
 #define SYS_CHDIR 18
+#define SYS_MKDIR 19
+#define SYS_MKDIRAT 20
 
 long long syscall0(int syscall_number);
 long long syscall1(int syscall_number, long long arg0);
