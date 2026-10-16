@@ -1,17 +1,20 @@
 #include "process.h"
 #include "../arch/common/context.h"
 #include "../error/errno.h"
-#include "../lib/container/hash_table/hash_table.h"
-#include "../memory/virtual/vmm.h"
+#include "../error/error.h"
 #include "../synchronization/wait.h"
 #include "scheduler.h"
 #include "thread_cleaner.h"
 #include "uthread.h"
 
+static u64 key_hash(u64 key) { return key; }
+static bool key_equals(u64 a, u64 b) { return a == b; }
+DEFINE_HASH_TABLE(ptable, u64, process*, key_hash, key_equals)
+
 process kernel_process;
 process init_process;
 
-static hash_table process_table;
+static ptable process_table;
 static lock process_table_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
 static id_generator pid_gen;
@@ -25,7 +28,7 @@ void processing_init() {
     if (!id_generator_init(&pid_gen))
         panic("Can't init pid generator");
 
-    if (!hash_table_init(&process_table))
+    if (!ptable_init(&process_table))
         panic("Can't init process table");
 
     if (!process_init(&kernel_process, true))
@@ -34,8 +37,8 @@ void processing_init() {
     if (!process_init(&init_process, false))
         panic("Can't init user init process");
 
-    hash_table_put(&process_table, kernel_process.id, &kernel_process, NULL);
-    hash_table_put(&process_table, init_process.id, &init_process, NULL);
+    ptable_put(&process_table, kernel_process.id, &kernel_process, NULL);
+    ptable_put(&process_table, init_process.id, &init_process, NULL);
 }
 
 static bool process_init(process* proc, bool is_kernel_process) {
@@ -44,6 +47,9 @@ static bool process_init(process* proc, bool is_kernel_process) {
 
     if (!array_list_init(&proc->threads, 8))
         goto failed_to_init_thread_list;
+
+    if (!array_list_init(&proc->files, 8))
+        goto failed_to_init_files_list;
 
     linked_list_init(&proc->children);
 
@@ -67,12 +73,19 @@ static bool process_init(process* proc, bool is_kernel_process) {
     memset(&proc->siginfo, 0, sizeof(process_siginfo));
     proc->siginfo_lock = SPIN_LOCK_STATIC_INITIALIZER;
 
+    proc->working_directory = vfs_root();
+    // to have same snapshot of the vfs root in both workdir and root
+    proc->root = vfs_path_acquire(proc->working_directory);
+
     return true;
 
 failed_to_init_tgid_generator:
     vm_space_destroy(proc->vm);
 
 failed_to_fork_vm_space:
+    array_list_deinit(&proc->files);
+
+failed_to_init_files_list:
     array_list_deinit(&proc->threads);
 
 failed_to_init_thread_list:
@@ -97,9 +110,13 @@ static process* create_user_process() {
 
 void process_destroy(process* proc) {
     vm_space_destroy(proc->vm);
+
     id_generator_free_id(&pid_gen, proc->id);
     id_generator_deinit(&proc->tgid_generator);
+
     array_list_deinit(&proc->threads);
+    array_list_deinit(&proc->files);
+
     kfree(proc);
 }
 
@@ -111,6 +128,37 @@ bool process_add_thread(process* proc, struct thread* thrd) {
     return added;
 }
 
+static bool clone_files_data(process* dst, process* src) {
+    // release paths that are about to be replaced
+    vfs_path_release(dst->root);
+    vfs_path_release(dst->working_directory);
+
+    bool interrupts_enabled = spin_lock_irq_save(&src->lock);
+    dst->root = vfs_path_acquire(src->root);
+    dst->working_directory = vfs_path_acquire(src->working_directory);
+
+    if (!array_list_copy(&dst->files, &src->files)) {
+        spin_unlock_irq_restore(&src->lock, interrupts_enabled);
+        return false;
+    }
+
+    ARRAY_LIST_FOR_EACH(&dst->files, vfs_file * file) {
+        vfs_file_acquire(file);
+    }
+    spin_unlock_irq_restore(&src->lock, interrupts_enabled);
+
+    return true;
+}
+
+static void cleanup_files_data(process* proc) {
+    vfs_path_release(proc->root);
+    vfs_path_release(proc->working_directory);
+
+    ARRAY_LIST_FOR_EACH(&proc->files, vfs_file * file) {
+        vfs_file_release(file);
+    }
+}
+
 u64 process_fork(struct cpu_context* context) {
     thread* current = get_current_thread();
     process* proc = current->proc;
@@ -118,6 +166,9 @@ u64 process_fork(struct cpu_context* context) {
     process* created = create_user_process();
     if (!created)
         goto failed_to_create_process;
+
+    if (!clone_files_data(created, proc))
+        goto failed_to_clone_file_descriptors;
 
     thread* start_thread = uthread_create_orphan(
         created, "main", current->user_stack,
@@ -134,10 +185,10 @@ u64 process_fork(struct cpu_context* context) {
     arch_set_syscall_return_value(start_thread->context, 0);
 
     interrupts_enabled = spin_lock_irq_save(&process_table_lock);
-    bool added_to_table = hash_table_put(&process_table, proc->id, proc, NULL);
+    bool added_to_table = ptable_put(&process_table, proc->id, proc, NULL);
     bool should_start = added_to_table && process_add_child(created);
     if (!should_start && added_to_table)
-        hash_table_remove(&process_table, proc->id);
+        ptable_remove(&process_table, proc->id);
     spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
 
     if (!should_start)
@@ -151,6 +202,9 @@ failed_to_publish:
     thread_destroy(start_thread);
 
 failed_to_create_start_process_thread:
+    cleanup_files_data(created);
+
+failed_to_clone_file_descriptors:
     process_destroy(created);
 
 failed_to_create_process:
@@ -249,6 +303,19 @@ static void process_transfer_children_to_init() {
     }
 }
 
+static void process_close_files() {
+    process* current = get_current_thread()->proc;
+
+    // No locks needed here, since no one will ever change files at this point,
+    // visibility has been carried through process lock during last thread check
+    vfs_path_release(current->root);
+    vfs_path_release(current->working_directory);
+
+    while (current->files.size != 0) {
+        vfs_file_close(array_list_remove_last(&current->files));
+    }
+}
+
 static void process_finalize() {
     thread* current = get_current_thread();
     process* proc = current->proc;
@@ -275,6 +342,7 @@ static void process_finalize() {
     spin_unlock_irq_restore(&process_table_lock, interrupts_enabled);
 
     process_transfer_children_to_init();
+    process_close_files();
 
     interrupts_enabled = spin_lock_irq_save(&proc->lock);
     ref_count* refc = &proc->refc;
@@ -285,7 +353,7 @@ static void process_finalize() {
     spin_unlock(&proc->lock); // Interrupts left disabled on purpose
 
     spin_lock(&process_table_lock);
-    hash_table_remove(&process_table, proc->id);
+    ptable_remove(&process_table, proc->id);
     spin_unlock(&process_table_lock);
 
     vmm_switch_to_kernel_vm_space();
@@ -425,6 +493,91 @@ void process_kill(process* proc) {
         panic("Trying to kill kernel process");
 
     process_signal(proc, SIGKILL);
+}
+
+vfs_path process_root() {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_path root = vfs_path_acquire(proc->root);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return root;
+}
+
+vfs_path process_working_directory() {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_path working_directory = vfs_path_acquire(proc->working_directory);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return working_directory;
+}
+
+void process_change_root(vfs_path root) {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_path old_root = proc->root;
+    proc->root = vfs_path_acquire(root);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    vfs_path_release(old_root);
+}
+
+void process_change_working_directory(vfs_path workdir) {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_path old_workdir = proc->root;
+    proc->working_directory = vfs_path_acquire(workdir);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    vfs_path_release(old_workdir);
+}
+
+u64 process_add_file(vfs_file* file) {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    for (u64 i = 0; i < proc->files.size; i++) {
+        if (!array_list_get(&proc->files, i)) {
+            array_list_set(&proc->files, i, file);
+            spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+            return i;
+        }
+    }
+
+    u64 result = array_list_add_last(&proc->files, file) ? proc->files.size - 1
+                                                         : (u64) -ENOMEM;
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return result;
+}
+
+vfs_file* process_remove_file(u64 fd) {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_file* file = array_list_get(&proc->files, fd);
+    if (file)
+        array_list_set(&proc->files, fd, NULL);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return file ? file : ERROR_PTR(-EBADF);
+}
+
+vfs_file* process_get_file(u64 fd) {
+    process* proc = get_current_thread()->proc;
+
+    bool interrupts_enabled = spin_lock_irq_save(&proc->lock);
+    vfs_file* file = array_list_get(&proc->files, fd);
+    if (file)
+        vfs_file_acquire(file);
+    spin_unlock_irq_restore(&proc->lock, interrupts_enabled);
+
+    return file ? file : ERROR_PTR(-EBADF);
 }
 
 static bool process_add_child(process* child) {

@@ -1,0 +1,413 @@
+#include "vfs.h"
+#include "../error/errno.h"
+#include "../error/error.h"
+#include "../lib/string.h"
+#include "dcache/dcache.h"
+#include "dcache/dentry.h"
+#include "file.h"
+#include "mount.h"
+#include "path.h"
+#include "ramfs/ramfs.h"
+
+void vfs_init() {
+    vfs_type_registry_init();
+    // TODO: calculate based on available ram or get from config
+    dcache_init(4, 10000);
+    vfs_icache_init();
+    vfs_mount_tree_init();
+
+    ramfs_init();
+    vfs_type* rootfs_type = vfs_type_get(RAMFS_NAME);
+    vfs_dentry* rootfs_root = rootfs_type->ops->mount(rootfs_type, NULL);
+    if (IS_ERROR(rootfs_root))
+        panic("Can't mount root filesystem");
+
+    vfs_mount_root(rootfs_root);
+    vfs_dentry_release(rootfs_root);
+}
+
+vfs_path vfs_root() {
+    vfs_mount* mount = vfs_mount_get_root();
+    vfs_path root = {.mount = mount, // mount reference already acquired
+                     .dentry = vfs_dentry_acquire(mount->mount_root)};
+
+    vfs_path resolved_root;
+    vfs_mount_walk_down(root, &resolved_root);
+    vfs_path_release(root);
+    return resolved_root;
+}
+
+vfs_file* vfs_create(vfs_path start, string path, u64 mode) {
+    return vfs_open(start, path, mode | O_WRONLY | O_CREAT | O_TRUNC);
+}
+
+static u64 handle_truncation(vfs_inode* inode, u64 flags) {
+    if (!(flags & O_TRUNC))
+        return 0;
+
+    if (inode->type != FILE)
+        return -EISDIR;
+
+    // TODO: vfs_truncate()
+    return 0;
+}
+
+vfs_file* vfs_open(vfs_path start, string path, u64 flags) {
+    vfs_path parent;
+    vfs_path child;
+    path_parts parts = path_parts_from_path(path);
+
+    u64 error = walk_parent(start, &parent, &parts);
+    if (IS_ERROR(error))
+        return ERROR_PTR(error);
+
+    vfs_inode* dir = parent.dentry->inode;
+    vfs_inode_lock(dir);
+
+    error = walk_one(parent, &child, &parts);
+    string name = parts.part;
+
+    if (IS_ERROR(error)) {
+        if (error != (u64) -ENOENT || !(flags & O_CREAT) || flags & O_DIRECTORY)
+            goto out_error_get_child;
+
+        error = -EPERM;
+        if (!dir->ops->create)
+            goto out_error_get_child;
+
+        vfs_dentry* child_dentry = dir->ops->create(parent.dentry, name, flags);
+        error = PTR_ERROR(child_dentry);
+        if (IS_ERROR(child_dentry))
+            goto out_error_get_child;
+
+        child.dentry = child_dentry; // child reference is already incremented
+        child.mount = vfs_mount_acquire(parent.mount);
+    }
+
+    vfs_inode_unlock(dir);
+    vfs_path_release(parent);
+
+    vfs_inode* inode = child.dentry->inode;
+
+    error = handle_truncation(inode, flags);
+    if (IS_ERROR(error))
+        goto out_error_no_open;
+
+    error = -EPERM;
+    if (!inode->file_ops->open)
+        goto out_error_no_open;
+
+    vfs_file* file = vfs_file_create(child, flags);
+    vfs_path_release(child);
+
+    error = PTR_ERROR(file);
+    if (IS_ERROR(file))
+        goto out_error_create_file;
+
+    error = file->ops->open(file, flags);
+    if (IS_ERROR(error)) {
+        vfs_file_release(file);
+        goto out_error_open;
+    }
+
+    return file;
+
+out_error_get_child:
+    vfs_inode_unlock(dir);
+
+    vfs_path_release(parent);
+    return ERROR_PTR(error);
+
+out_error_create_file:
+out_error_no_open:
+    vfs_path_release(child);
+
+out_error_open:
+    return ERROR_PTR(error);
+}
+
+u64 vfs_mkdir(vfs_path start, string path, u64 flags) {
+    if (start.dentry->inode->type != DIRECTORY) {
+        return -ENOTDIR;
+    }
+
+    vfs_path parent;
+    path_parts parts = path_parts_from_path(path);
+
+    u64 error = walk_parent(start, &parent, &parts);
+    if (IS_ERROR(error))
+        return error;
+
+    vfs_inode* dir = parent.dentry->inode;
+    if (dir->type != DIRECTORY)
+        return -ENOTDIR;
+    if (!dir->ops->mkdir)
+        return -EPERM;
+
+    vfs_inode_lock(dir);
+    vfs_dentry* created =
+        dir->ops->mkdir(parent.dentry, path_parts_walk_next(&parts), flags);
+    vfs_inode_unlock(dir);
+
+    vfs_path_release(parent);
+
+    if (IS_ERROR(created))
+        return PTR_ERROR(created);
+
+    vfs_dentry_release(created);
+
+    return 0;
+}
+
+u64 vfs_read(vfs_file* file, __user void* buf, u64 size) {
+    if (!file->ops->read)
+        return -EPERM;
+
+    vfs_inode* inode = file->path.dentry->inode;
+    if (inode->type == DIRECTORY)
+        return -EISDIR;
+
+    vfs_inode_lock_shared(inode);
+    u64 res = file->ops->read(file, buf, size);
+    vfs_inode_unlock_shared(inode);
+
+    return res;
+}
+
+u64 vfs_write(struct vfs_file* file, __user void* buf, u64 size) {
+    if (!file->ops->write || (file->flags & O_RONLY))
+        return -EPERM;
+
+    vfs_inode* inode = file->path.dentry->inode;
+    if (inode->type == DIRECTORY)
+        return -EISDIR;
+
+    vfs_inode_lock(inode);
+    u64 res = file->ops->write(file, buf, size);
+    vfs_inode_unlock(inode);
+
+    return res;
+}
+
+u64 vfs_seek(vfs_file* file, u64 offset, u64 whence) {
+    if (whence >= 3) // TODO: add whence enum
+        return -EINVAL;
+
+    if (!file->ops->seek)
+        return -EPERM;
+
+    vfs_inode* inode = file->path.dentry->inode;
+    if (inode->type == DIRECTORY)
+        return -EISDIR;
+
+    vfs_inode_lock_shared(inode);
+    u64 error = file->ops->seek(file, offset, whence);
+    vfs_inode_unlock_shared(inode);
+
+    return error;
+}
+
+u64 vfs_unlink(vfs_path start, string path) {
+    if (path_ends_with_dot(path) || path_ends_with_dotdot(path))
+        return -EPERM;
+
+    vfs_path res;
+    path_parts parts = path_parts_from_path(path);
+
+    u64 error = walk_parent(start, &res, &parts);
+    if (IS_ERROR(error))
+        return error;
+
+    vfs_dentry* parent = res.dentry;
+    vfs_inode* dir = parent->inode;
+
+    vfs_inode_lock(dir);
+    error = walk_one(res, &res, &parts);
+    if (IS_ERROR(error))
+        goto out;
+
+    vfs_dentry* child = res.dentry;
+    vfs_inode_lock(child->inode);
+
+    error = -EISDIR;
+    if (child->inode->type == DIRECTORY)
+        goto failed_to_unlink;
+
+    error = -EBUSY;
+    // can only report invalid state when we raced with unmouning and missed
+    // flag change to false, but it is harmless in this case
+    if (vfs_dentry_is_mountpoint(child))
+        goto failed_to_unlink;
+
+    error = -EPERM;
+    if (!dir->ops->unlink)
+        goto failed_to_unlink;
+
+    error = dir->ops->unlink(dir, child);
+    if (!IS_ERROR(error))
+        vfs_dentry_unlink(child);
+
+failed_to_unlink:
+    vfs_inode_unlock(child->inode);
+    vfs_dentry_release(child);
+out:
+    vfs_inode_unlock(dir);
+    vfs_dentry_release(parent);
+
+    return error;
+}
+
+static void vfs_rename_lock(vfs_dentry* old_dir, vfs_dentry* new_dir) {
+    if (old_dir == new_dir) {
+        vfs_inode_lock(old_dir->inode);
+        return;
+    }
+
+    mutex_lock(&old_dir->inode->sb->rename_mut);
+
+    // Safe to check ancestor without holding old_dir and new_dir inode locks,
+    // since we only care about locking order here (deadlock avoidance in
+    // particular), lets examine all possible cases:
+    //
+    // 1) ancestor check sees there is parent->child relationship between
+    // old_dir and new_dir that, then:
+    //    1.a) if this changes during the time we are holding rename_mut -> then
+    //       child can only be detached and won't be locked at the same time
+    //       with parent, because no concurrent renames can occur -> no deadlock
+    //    1.b) if this doesn't change -> it's the easiest case, totally fine, no
+    //       deadlock
+    //
+    // 2) ancestor check sees no parent->child relationship -> then only rename
+    // could potentially try to lock both nodes, change tree structure and cause
+    // deadlock, but this also can't happen since we are holding rename_mut and
+    // preventing concurrent renames -> no deadlock
+
+    if (vfs_dentry_is_ancestor(old_dir, new_dir)) {
+        vfs_inode_lock(new_dir->inode);
+        vfs_inode_lock(old_dir->inode);
+    } else if (vfs_dentry_is_ancestor(new_dir, old_dir)) {
+        vfs_inode_lock(old_dir->inode);
+        vfs_inode_lock(new_dir->inode);
+    } else
+        vfs_inodes_lock(old_dir->inode, new_dir->inode);
+}
+
+static void vfs_rename_unlock(vfs_dentry* old_dir, vfs_dentry* new_dir) {
+    if (old_dir == new_dir)
+        vfs_inode_unlock(old_dir->inode);
+    else {
+        // unlock order doesn't matter
+        vfs_inodes_unlock(old_dir->inode, new_dir->inode);
+        mutex_unlock(&old_dir->inode->sb->rename_mut);
+    }
+}
+
+static void vfs_rename_lock_children(vfs_dentry* source, vfs_dentry* target) {
+    if (!target)
+        vfs_inode_lock(source->inode);
+    else
+        vfs_inodes_lock(source->inode, target->inode);
+}
+
+static void vfs_rename_unlock_children(vfs_dentry* source, vfs_dentry* target) {
+    if (!target)
+        vfs_inode_unlock(source->inode);
+    else
+        vfs_inodes_unlock(source->inode, target->inode);
+}
+
+u64 vfs_rename(vfs_path old_dir, vfs_dentry* source, vfs_path new_dir,
+               string name) {
+
+    vfs_dentry* old_dir_dentry = old_dir.dentry;
+    vfs_dentry* new_dir_dentry = new_dir.dentry;
+
+    if (path_ends_with_dot(name) || path_ends_with_dotdot(name))
+        return -EPERM;
+
+    string name_copy = strcpy(name);
+    if (!name_copy)
+        return -ENOMEM;
+
+    u64 error = -EPERM;
+    // check that new_dir is directory and rename is supported
+    if (!vfs_dentry_is_dir(new_dir_dentry) || !source->inode->ops->rename)
+        goto out;
+
+    error = -EXDEV;
+    if (old_dir.mount != new_dir.mount) // check that parents are in same mnt
+        goto out;
+
+    vfs_rename_lock(old_dir_dentry, new_dir_dentry);
+
+    // lookup victim that will be replaced, no need for crossing mount since
+    // victim is not allowed to be mountpoint anyway
+    vfs_dentry* target = lookup_child(new_dir_dentry, name);
+    error = IS_ERROR(target) ? PTR_ERROR(target) : 0;
+    target = target && !IS_ERROR(target) ? target : NULL;
+    if (error && error != (u64) -ENOENT)
+        goto out_parents_locked;
+
+    // check that we are not changing anything in case old name == new name
+    error = -EEXIST;
+    if (target == source)
+        goto out_parents_locked;
+
+    error = -ENOTEMPTY;
+    // this is crucial, as locking children can cause deadlock, for example,
+    // in case of this type of topology: /new_dir/target/old_dir/source. And
+    // even though rename of this type would fail later on target emptiness
+    // check, by the time we should have checked it, we already had caused a
+    // deadlock
+    // safe to lock after this check, since if there is no parent->child
+    // relationship, it can't change for the duration of holding rename_mut
+    if (vfs_dentry_is_ancestor(source, target)
+        || vfs_dentry_is_ancestor(target, source))
+        goto out_parents_locked;
+
+    // prevent concurrent changes to source or target topologies
+    vfs_rename_lock_children(source, target);
+
+    // recheck that new dir and source are still alive or
+    // source hasn't been moved while we weren't holding lock
+    error = -ENOENT;
+    if (vfs_dentry_is_orphaned(new_dir_dentry) || vfs_dentry_is_orphaned(source)
+        || source->parent != old_dir_dentry)
+        goto out_children_locked;
+
+    // check that we are not moving directory into its subdirectory
+    error = -EINVAL;
+    if (vfs_dentry_is_ancestor(new_dir_dentry, source))
+        goto out_children_locked;
+
+    // prevent concurrent mnt tree changes, needed to prevent
+    // mounting/unmounting down the subtrees involved
+    vfs_mount_tree_lock_shared();
+
+    error = -EBUSY;
+    if (has_submounts(source) || (target && has_submounts(target)))
+        goto error_dentry;
+
+    error = source->inode->ops->rename(old_dir_dentry, source, new_dir_dentry,
+                                       target, name_copy);
+
+    if (!error)
+        vfs_dentry_move(new_dir_dentry, source, name_copy);
+
+error_dentry:
+    vfs_mount_tree_unlock_shared();
+
+out_children_locked:
+    vfs_rename_unlock_children(source, target);
+
+out_parents_locked:
+    if (target)
+        vfs_dentry_release(target);
+
+    vfs_rename_unlock(old_dir_dentry, new_dir_dentry);
+out:
+    if (error)
+        strfree(name_copy);
+
+    return error;
+}

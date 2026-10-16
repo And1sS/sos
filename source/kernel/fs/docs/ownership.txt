@@ -1,0 +1,34 @@
+All public functions in the fs folder must be called with ownership of each
+argument as required by the function. This means the caller must hold
+a valid reference to every argument for the entire duration of the function call.
+Violation of this rule will lead to memory corruption or deadlock.
+
+Ownership:
+1) Child dentry holds a reference (pins) parent dentry, but not the other way
+around. So, this means that tree is always full and is destructed from leaf
+nodes to parent nodes - tree never have gaps. In other words - if you hold
+reference to child, you can safely climb up by atomically obtaining parent
+references and incrementing their reference counts.
+
+2) Each dentry holds a reference to its inode.
+
+3) Superblock hold a reference to its root dentry.
+
+4) Each inode holds a reference to super block.
+
+5) Each superblock holds a reference to fs type
+
+6) Each mount holds a reference to parent mount
+
+All above rules can be summarized into:
+Lifetime: type > mount > super > inode > dentry
+Ownership (A holds refcounted pointer of B, A → B):
+
+         to parent     to root
+             ┌───┐ ┌───────────────┐
+             │   ▼ ▼               │
+             └── dentry → inode → super → type
+             ┌───┐ ▲
+ to parent   │   ▼ │  to root and mountpoint
+             └─ mount
+

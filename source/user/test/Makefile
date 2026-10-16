@@ -6,7 +6,7 @@ OBJ_FILES := $(patsubst ./%.c, $(BUILD_FOLDER)%.o, $(С_FILES))
 
 CROSS_COMPILE =
 CC = gcc
-CC_FLAGS = -r -c -g -O3 -w -nostdlib -nostdinc -nostartfiles -nodefaultlibs -mmanual-endbr -fcf-protection=branch
+CC_FLAGS = -r -c -g -O3 -w -nostdlib -nostdinc -nostartfiles -nodefaultlibs -mmanual-endbr -fcf-protection=branch -mno-sse
 
 LINKER = ld
 

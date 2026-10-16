@@ -19,7 +19,7 @@ export CROSS_COMPILE =
 all: iso
 
 run: iso
-	qemu-system-x86_64 -cdrom $(ISO_FILE) $(QEMU_FLAGS)
+	qemu-system-x86_64 -m 20G -cdrom $(ISO_FILE) $(QEMU_FLAGS)
 
 clean:
 	rm -rf $(BUILD_FOLDER)

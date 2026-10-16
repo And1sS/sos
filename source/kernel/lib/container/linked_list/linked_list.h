@@ -17,10 +17,10 @@ typedef struct {
 } linked_list;
 
 #define LINKED_LIST_NODE_OF(val)                                               \
-    { .value = val, .prev = NULL, .next = NULL }
+    (linked_list_node) { .value = val, .prev = NULL, .next = NULL }
 
 #define LINKED_LIST_STATIC_INITIALIZER                                         \
-    { .head = NULL, .tail = NULL, .size = 0 }
+    (linked_list){.head = NULL, .tail = NULL, .size = 0}
 
 #define DECLARE_LINKED_LIST(name)                                              \
     linked_list name = LINKED_LIST_STATIC_INITIALIZER

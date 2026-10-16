@@ -1,0 +1,44 @@
+#ifndef SOS_PATH_H
+#define SOS_PATH_H
+
+#include "mount.h"
+
+#define NAME_MAX 256
+#define PATH_MAX 4096
+
+typedef struct vfs_path {
+    vfs_mount* mount;
+    struct vfs_dentry* dentry;
+} vfs_path;
+
+// temporary structure for path walking
+typedef struct path_parts {
+    char part[NAME_MAX];
+    u64 parts_left;
+    string path;
+} path_parts;
+
+bool path_ends_with_dot(string path);
+bool path_ends_with_dotdot(string path);
+
+path_parts path_parts_from_path(string path);
+
+string path_parts_walk_next(path_parts* parts);
+
+vfs_path vfs_path_acquire(vfs_path path);
+void vfs_path_release(vfs_path path);
+
+// assumes that dir->inode->mut is locked in shared mode
+u64 walk_one(vfs_path start, vfs_path* res, path_parts* parts);
+
+// these two will take necessary locks on their own
+u64 walk_parent(vfs_path start, vfs_path* res, path_parts* parts);
+u64 walk(vfs_path start, vfs_path* res, path_parts* parts);
+
+// these two assume that dir->inode->mut is locked in shared mode
+// this can look up ., .., and children with mountpoint resolution
+u64 lookup(vfs_path start, vfs_path* res, string name);
+// this one only looks up direct child
+vfs_dentry* lookup_child(vfs_dentry* dentry, string name);
+
+#endif // SOS_PATH_H

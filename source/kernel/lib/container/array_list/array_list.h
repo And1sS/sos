@@ -20,6 +20,7 @@ void array_list_destroy(array_list* list);
 bool array_list_init(array_list* list, u64 capacity);
 void array_list_deinit(array_list* list);
 
+bool array_list_copy(array_list* dst, array_list* src);
 void array_list_clear(array_list* list);
 
 void* array_list_get(array_list* list, u64 index);

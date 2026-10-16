@@ -1,0 +1,123 @@
+#ifndef SOS_INODE_H
+#define SOS_INODE_H
+
+#include "../lib/types.h"
+#include "../synchronization/rw_mutex.h"
+#include "super_block.h"
+#include "vfs.h"
+
+// set once after initialisation has finished, safe to read without atomics when
+// inode has been obtained via cache
+#define INODE_INITIALIZED (1 << 0)
+
+// set once on initialisation failure, safe to read without atomics when
+// inode has been obtained via cache
+#define INODE_INITIALIZATION_FAILED (1 << 1)
+
+// set when inode is dead (from rmdir or unlink) and should not be used
+// afterward
+#define INODE_DEAD (1 << 2)
+
+struct vfs_file;
+
+typedef struct vfs_file_ops {
+    u64 (*open)(struct vfs_file* file, u64 flags);
+    void (*release)(struct vfs_file* file);
+
+    u64 (*read)(struct vfs_file* file, __user void* buff, u64 size);
+    u64 (*write)(struct vfs_file* file, __user void* buff, u64 size);
+
+    u64 (*seek)(struct vfs_file* file, u64 offset, u64 whence);
+} vfs_file_ops;
+
+typedef struct {
+    // called upon destruction when inode is unlinked
+    void (*evict)(struct vfs_inode* inode);
+    // called upon destruction when inode is not unlinked
+    void (*release)(struct vfs_inode* inode);
+
+    // file operations
+    struct vfs_dentry* (*create)(struct vfs_dentry* parent, string name,
+                                 u64 flags);
+
+    // directory operations
+    struct vfs_dentry* (*mkdir)(struct vfs_dentry* parent, string name,
+                                u64 flags);
+    u64 (*unlink)(struct vfs_inode* dir, struct vfs_dentry* dentry);
+    struct vfs_dentry* (*lookup)(struct vfs_dentry* parent, string name);
+    u64 (*rename)(struct vfs_dentry* old_parent_dentry,
+                  struct vfs_dentry* old_dentry,
+                  struct vfs_dentry* victim_dentry,
+                  struct vfs_dentry* new_dentry, string name);
+} vfs_inode_ops;
+
+typedef enum {
+    FILE,
+    DIRECTORY,
+    CHARACTER_DEVICE,
+    BLOCK_DEVICE,
+    PIPE,
+    SYMLINK,
+    SOCKET
+} vfs_inode_type;
+
+typedef struct vfs_inode {
+    // Immutable data
+    u64 id;
+
+    struct vfs_super_block* sb;
+    vfs_inode_type type;
+    vfs_inode_ops* ops;
+    vfs_file_ops* file_ops;
+    // End of immutable data
+
+    rw_mutex mut; // This mutex used for separating reading operations such as
+                  // (lookup, readdir) from modifying operations (link, unlink,
+                  // rmdir, etc.), also for synchronizing concurrent writes
+
+    u64 size;  // Should be accessed atomically only under mut
+    u64 links; // Should be accessed atomically only under mut
+               // (exception is inspection before freeing, since noone can
+               // modify links at that point and visibility will be carried
+               // through refcount and initialization, since noone can inspect
+               // uninitialized inode)
+
+    u64 flags; // Should be accessed atomically
+    u64 refc;  // Should be accessed atomically
+
+    lock lock; // guards all fields below
+    u64 mode;
+    void* private_data;
+
+    con_var initialization_cvar;
+} vfs_inode;
+
+// unlocks uninitialised inode, serializes all updated inode data, acts as
+// store-release
+vfs_inode* vfs_inode_unlock_new(vfs_inode* inode);
+
+vfs_inode* vfs_inode_acquire(vfs_inode* inode);
+void vfs_inode_release(vfs_inode* inode);
+
+// agressively destroy inode caller got from vfs_icache_get,
+// should be used when creation of new superblock is failed and
+// created inode should be removed from cache and destroyed.
+void vfs_inode_drop(vfs_inode* inode);
+
+void vfs_inode_drop_link(vfs_inode* inode);
+void vfs_inode_add_link(vfs_inode* inode);
+
+void vfs_inode_lock_shared(vfs_inode* inode);
+void vfs_inode_unlock_shared(vfs_inode* inode);
+void vfs_inode_lock(vfs_inode* inode);
+void vfs_inode_unlock(vfs_inode* inode);
+void vfs_inodes_lock(vfs_inode* left, vfs_inode* right);
+void vfs_inodes_unlock(vfs_inode* left, vfs_inode* right);
+
+void vfs_icache_init();
+
+// Safe to use inside fill_super, since fill_super is called on unpublished
+// superblock without superblock lock held
+vfs_inode* vfs_icache_get(struct vfs_super_block* sb, u64 id);
+
+#endif // SOS_INODE_H
