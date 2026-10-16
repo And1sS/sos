@@ -21,7 +21,7 @@ static void copy_tar_entry(tar_entry* entry) {
         return;
 
     char name[TAR_NAME_MAX];
-    tar_fill_full_entry_name(entry, name);
+    tar_get_entry_name(entry, name);
     path_parts parts = path_parts_from_path(name);
 
     vfs_path curr = vfs_root();

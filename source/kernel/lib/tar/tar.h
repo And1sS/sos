@@ -49,7 +49,7 @@ tar_entry* tar_next_entry(tar_entry* entry);
 
 bool tar_is_valid_entry(tar_entry* entry);
 
-void tar_fill_full_entry_name(tar_entry* entry, char name[TAR_NAME_MAX]);
+void tar_get_entry_name(tar_entry* entry, char name[TAR_NAME_MAX]);
 
 void tar_print_entry(tar_entry* entry);
 

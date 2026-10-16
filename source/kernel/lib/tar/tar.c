@@ -39,7 +39,7 @@ bool tar_is_valid_entry(tar_entry* entry) {
     return true;
 }
 
-void tar_fill_full_entry_name(tar_entry* entry, char name[TAR_NAME_MAX]) {
+void tar_get_entry_name(tar_entry* entry, char name[TAR_NAME_MAX]) {
     u64 name_len = strlenn(entry->header.name, MEMBER_SIZE(tar_header, name));
     u64 prefix_len = strlenn(entry->header.name_prefix,
                              MEMBER_SIZE(tar_header, name_prefix));
@@ -47,9 +47,11 @@ void tar_fill_full_entry_name(tar_entry* entry, char name[TAR_NAME_MAX]) {
     if (prefix_len > 0) {
         memcpy(name, entry->header.name_prefix, prefix_len);
         name[prefix_len] = '/';
-        memcpy(name + prefix_len + 1, entry->header.name, name_len + 1);
+        memcpy(name + prefix_len + 1, entry->header.name, name_len);
+        name[prefix_len + name_len + 1] = '\0';
     } else {
-        memcpy(name, entry->header.name, name_len + 1);
+        memcpy(name, entry->header.name, name_len);
+        name[name_len] = '\0';
     }
 
     name[TAR_NAME_MAX - 1] = '\0';
