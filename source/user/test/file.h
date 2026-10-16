@@ -9,5 +9,8 @@ long long int write(unsigned long long fd, void* buffer,
                     unsigned long long size);
 long long int chroot(const char* path);
 long long int chdir(const char* path);
+long long mkdir(const char* path, unsigned long long mode);
+long long mkdirat(unsigned long long dirfd, const char* path,
+                  unsigned long long mode);
 
 #endif // SOS_FILE_H

@@ -27,7 +27,7 @@ struct vfs_file* vfs_create(struct vfs_path path, string name, u64 mode);
 
 u64 vfs_stat(struct vfs_path);
 
-struct vfs_file* vfs_mkdir(struct vfs_path path, string name, u64 flags);
+u64 vfs_mkdir(struct vfs_path start, string path, u64 flags);
 u64 vfs_rmdir(struct vfs_path path);
 u64 vfs_listdir(struct vfs_path path);
 

@@ -126,6 +126,39 @@ out_error_open:
     return ERROR_PTR(error);
 }
 
+u64 vfs_mkdir(vfs_path start, string path, u64 flags) {
+    if (start.dentry->inode->type != DIRECTORY) {
+        return -ENOTDIR;
+    }
+
+    vfs_path parent;
+    path_parts parts = path_parts_from_path(path);
+
+    u64 error = walk_parent(start, &parent, &parts);
+    if (IS_ERROR(error))
+        return error;
+
+    vfs_inode* dir = parent.dentry->inode;
+    if (dir->type != DIRECTORY)
+        return -ENOTDIR;
+    if (!dir->ops->mkdir)
+        return -EPERM;
+
+    vfs_inode_lock(dir);
+    vfs_dentry* created =
+        dir->ops->mkdir(parent.dentry, path_parts_walk_next(&parts), flags);
+    vfs_inode_unlock(dir);
+
+    vfs_path_release(parent);
+
+    if (IS_ERROR(created))
+        return PTR_ERROR(created);
+
+    vfs_dentry_release(created);
+
+    return 0;
+}
+
 u64 vfs_read(vfs_file* file, __user void* buf, u64 size) {
     if (!file->ops->read)
         return -EPERM;

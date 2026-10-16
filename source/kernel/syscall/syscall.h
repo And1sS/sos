@@ -28,8 +28,10 @@
 #define SYS_WRITE 16
 #define SYS_CHROOT 17
 #define SYS_CHDIR 18
+#define SYS_MKDIR 19
+#define SYS_MKDIRAT 20
 
-#define SYSCALLS_IMPLEMENTED_COUNT 19
+#define SYSCALLS_IMPLEMENTED_COUNT 21
 #define SYSCALLS_MAX_COUNT 1024
 
 struct cpu_context;
@@ -68,5 +70,8 @@ u64 sys_write(u64 fd, void* __user buf, u64 size);
 
 u64 sys_chroot(string __user path);
 u64 sys_chdir(string __user path);
+
+u64 sys_mkdir(string __user path, u64 mode);
+u64 sys_mkdirat(u64 dirfd, string __user path, u64 mode);
 
 #endif // SOS_SYSCALL_H

@@ -59,7 +59,7 @@ void set_up_init_process(module init_module) {
         u64 page_start = i * PAGE_SIZE;
         void* user_page =
             vm_space_get_page_view(init_process.vm, 0x1000 + page_start);
-        memcpy(user_page, (void*) P2V(init_module.mod_start),
+        memcpy(user_page, (void*) P2V(init_module.mod_start) + i * PAGE_SIZE,
                MIN(module_size - page_start, PAGE_SIZE));
     }
 

@@ -139,3 +139,42 @@ u64 sys_chdir(string __user path) {
     vfs_path_release(new_workdir);
     return 0;
 }
+
+u64 sys_mkdir(string __user path, u64 mode) {
+    string path_copy = copy_string_from_user(path, PATH_MAX);
+    if (IS_ERROR(path_copy))
+        return PTR_ERROR(path_copy);
+
+    vfs_path start =
+        path_copy[0] == '/' ? process_root() : process_working_directory();
+
+    u64 result = vfs_mkdir(start, path_copy, mode);
+
+    vfs_path_release(start);
+    strfree(path_copy);
+
+    return result;
+}
+
+u64 sys_mkdirat(u64 dirfd, string __user path, u64 mode) {
+    string path_copy = copy_string_from_user(path, PATH_MAX);
+    if (IS_ERROR(path_copy))
+        return PTR_ERROR(path_copy);
+
+    vfs_file* at = process_get_file(dirfd);
+    if (IS_ERROR(at)) {
+        strfree(path_copy);
+        return PTR_ERROR(at);
+    }
+
+    vfs_path start =
+        path_copy[0] == '/' ? process_root() : vfs_path_acquire(at->path);
+    vfs_file_release(at);
+
+    u64 result = vfs_mkdir(start, path_copy, mode);
+
+    vfs_path_release(start);
+    strfree(path_copy);
+
+    return result;
+}
