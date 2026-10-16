@@ -5,9 +5,7 @@
 #include "vm.h"
 #include "vmm.h"
 
-/*
- * Routines to safely copy from/write to user space
- */
+// Routines to safely copy from/write to user space
 #define __user
 
 bool copy_to_user(void* __user dst, void* src, u64 length);

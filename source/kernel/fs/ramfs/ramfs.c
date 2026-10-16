@@ -58,7 +58,11 @@ static vfs_inode* to_inode(tree_node* node, vfs_super_block* sb) {
 void ramfs_evict(vfs_inode* inode) { evict_node(inode->private_data); }
 
 u64 ramfs_fill_super(vfs_super_block* sb) {
-    vfs_inode* root_inode = to_inode(internal_tree_create(), sb);
+    tree_node* root_node = alloc_node("[root]", DIRECTORY);
+    if (IS_ERROR(root_node))
+        return PTR_ERROR(root_node);
+
+    vfs_inode* root_inode = to_inode(root_node, sb);
     if (IS_ERROR(root_inode))
         return PTR_ERROR(root_inode);
 
@@ -115,7 +119,7 @@ vfs_dentry* ramfs_lookup(vfs_dentry* parent, string name) {
 
 vfs_dentry* ramfs_create(vfs_dentry* parent, string name, u64 flags) {
     UNUSED(flags);
-    tree_node* child_node = alloc_tree_node(name, FILE);
+    tree_node* child_node = alloc_node(name, FILE);
     if (IS_ERROR(child_node))
         return ERROR_PTR(child_node);
 
@@ -128,7 +132,7 @@ vfs_dentry* ramfs_mkdir(vfs_dentry* parent, string name, u64 flags) {
     if (find_subnode(parent->inode->private_data, name))
         return ERROR_PTR(-EEXIST);
 
-    tree_node* child_node = alloc_tree_node(name, DIRECTORY);
+    tree_node* child_node = alloc_node(name, DIRECTORY);
     if (IS_ERROR(child_node))
         return ERROR_PTR(child_node);
 

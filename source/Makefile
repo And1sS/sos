@@ -19,7 +19,7 @@ export CROSS_COMPILE =
 all: iso
 
 run: iso
-	qemu-system-x86_64 -m 20G -cdrom $(ISO_FILE) $(QEMU_FLAGS)
+	qemu-system-x86_64 -cdrom $(ISO_FILE) $(QEMU_FLAGS)
 
 clean:
 	rm -rf $(BUILD_FOLDER)
@@ -33,11 +33,16 @@ kernel: FORCE
 
 iso-user: user
 	mkdir -p $(ISO_USER_FOLDER)
-	$(eval FILES := $(shell find $(USER_OUTPUT_FOLDER) -name "*.bin"))
-	if [ ! -z "$(FILES)" -a "$(FILES)" != " " ]; then cp -r $(FILES) $(ISO_FOLDER)user; fi
+	mkdir -p $(USER_OUTPUT_FOLDER)tmp/usr/bin
 
-	$(eval FILES := $(shell find $(USER_OUTPUT_FOLDER) -name "*.elf"))
-	if [ ! -z "$(FILES)" -a "$(FILES)" != " " ]; then cp -r $(FILES) $(ISO_FOLDER)user; fi
+	$(eval BIN_FILES := $(shell find $(USER_OUTPUT_FOLDER) -name "*.bin"))
+	if [ ! -z "$(BIN_FILES)" -a "$(BIN_FILES)" != " " ]; then cp -r $(BIN_FILES) $(USER_OUTPUT_FOLDER)tmp/usr/bin; fi
+
+	$(eval ELF_FILES := $(shell find $(USER_OUTPUT_FOLDER) -name "*.elf"))
+	if [ ! -z "$(ELF_FILES)" -a "$(ELF_FILES)" != " " ]; then cp -r $(ELF_FILES) $(USER_OUTPUT_FOLDER)tmp/usr/bin; fi
+
+	tar -C $(USER_OUTPUT_FOLDER)tmp -cvf $(ISO_FOLDER)user/initramfs.tar usr
+	rm -rf $(USER_OUTPUT_FOLDER)tmp
 
 user: FORCE
 	$(MAKE) BUILD_FOLDER=$(USER_OUTPUT_FOLDER) -C user

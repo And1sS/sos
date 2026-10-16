@@ -22,6 +22,7 @@ void vfs_init() {
     if (IS_ERROR(rootfs_root))
         panic("Can't mount root filesystem");
 
+    vfs_type_release(rootfs_type);
     vfs_mount_root(rootfs_root);
     vfs_dentry_release(rootfs_root);
 }
