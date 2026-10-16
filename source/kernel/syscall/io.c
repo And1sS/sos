@@ -38,9 +38,10 @@ u64 sys_openat(u64 fd, string __user path, u64 flags) {
 
     vfs_path start =
         path_copy[0] == '/' ? process_root() : vfs_path_acquire(at->path);
+    vfs_file_release(at);
+
     vfs_file* file = vfs_open(start, path_copy, flags);
 
-    vfs_file_release(at);
     vfs_path_release(start);
     strfree(path_copy);
 
